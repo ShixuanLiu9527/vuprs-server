@@ -1,0 +1,63 @@
+{
+    "description": "VUPRS FPGA Configurations",
+    "platform": "RK3568-XC7A100T",
+    "author": "Shixuan Liu",
+    "address-map": {
+        "axi-lite": {
+            "bus-address-offset": "0x4000_0000",
+            "adc": {
+                "address-offset": "0x0001_0000",
+                "registers-address-offset": {
+                    "SCI-address-offset": "0x00",
+                    "SP-address-offset": "0x04",
+                    "SF-address-offset": "0x08",
+                    "STR-address-offset": "0x0c",
+                    "NGF-address-offset": "0x10",
+                    "ERR-address-offset": "0x14"
+                }
+            },
+            "dma": {
+                "address-offset": "0x0000_0000",
+                "registers-address-offset": {
+                    "S2MM_DMACR-address-offset": "0x30",
+                    "S2MM_DMASR-address-offset": "0x34",
+                    "SG_CTL-address-offset": "0x2c",
+                    "S2MM_CURDESC-address-offset": "0x38",
+                    "S2MM_CURDESC_MSB-address-offset": "0x3c",
+                    "S2MM_TAILDESC-address-offset": "0x40",
+                    "S2MM_TAILDESC_MSB-address-offset": "0x44",
+                    "S2MM_DA-address-offset": "0x48",
+                    "S2MM_DA_MSB-address-offset": "0x4c",
+                    "S2MM_LENGTH-address-offset": "0x58"
+                }
+            }
+        },
+        "axi-full": {
+            "address-offset": "0x8000_0000",
+            "ddr": {
+                "address-offset": "0x0000_0000"
+            }
+        }
+    },
+    "hardware-features": {
+        "adc": {
+            "data-width-bits": "16",
+            "channels": "16",
+            "max-sampling-frequency-hz": "120_000"
+        },
+        "ddr": {
+            "memory-capacity-megabytes": "512",
+            "data-width-bits": "32"
+        },
+        "dma": {
+            "dma": {
+                
+            },
+            "xdma": {
+                "h2c-channels": "2",
+                "c2h-channels": "2",
+                "max-transfer-size-bytes": "65536"
+            }
+        }
+    }
+}

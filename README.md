@@ -1,1 +1,1 @@
-# vuprs-server
+# VUPRS Server

@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "fstream": "cpp",
+        "format": "cpp",
+        "thread": "cpp",
+        "string_view": "cpp"
+    }
+}
