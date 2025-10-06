@@ -1,6 +1,9 @@
 #ifndef FPGA_CONTROL_H
 #define FPGA_CONTROL_H
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <fcntl.h>
 #include <stdint.h>
 #include <string>
 #include <vector>
@@ -9,14 +12,66 @@
 
 #include "nlohmann/json.hpp"
 
+/* AXI-Lite ADC Registers */
+
+#define AXI_LITE_REGISTER__ADC__SCI               0
+#define AXI_LITE_REGISTER__ADC__SP                1
+#define AXI_LITE_REGISTER__ADC__SF                2
+#define AXI_LITE_REGISTER__ADC__STR               3
+#define AXI_LITE_REGISTER__ADC__NGF               4
+#define AXI_LITE_REGISTER__ADC__ERR               5
+
+/* DMA Registers */
+
+#define AXI_LITE_REGISTER__DMA__S2MM_DMACR        6
+#define AXI_LITE_REGISTER__DMA__S2MM_DMASR        7
+#define AXI_LITE_REGISTER__DMA__SG_CTL            8
+#define AXI_LITE_REGISTER__DMA__S2MM_CURDESC      9
+#define AXI_LITE_REGISTER__DMA__S2MM_CURDESC_MSB  10
+#define AXI_LITE_REGISTER__DMA__S2MM_TAILDESC     11
+#define AXI_LITE_REGISTER__DMA__S2MM_TAILDESC_MSB 12
+#define AXI_LITE_REGISTER__DMA__S2MM_DA           13
+#define AXI_LITE_REGISTER__DMA__S2MM_DA_MSB       14
+#define AXI_LITE_REGISTER__DMA__S2MM_LENGTH       15
+
+#define IS_AXI_LITE_REGISTER__ADC(val) \
+(val == AXI_LITE_REGISTER__ADC__SCI               || \
+ val == AXI_LITE_REGISTER__ADC__SP                || \
+ val == AXI_LITE_REGISTER__ADC__SF                || \
+ val == AXI_LITE_REGISTER__ADC__STR               || \
+ val == AXI_LITE_REGISTER__ADC__NGF               || \
+ val == AXI_LITE_REGISTER__ADC__ERR)
+
+#define IS_AXI_LITE_RDONLY_REGISTER(val) \
+(val == AXI_LITE_REGISTER__ADC__NGF               || \
+ val == AXI_LITE_REGISTER__ADC__ERR)
+
+#define IS_AXI_LITE_REGISTER__DMA(val) \
+(val == AXI_LITE_REGISTER__DMA__S2MM_DMACR        || \
+ val == AXI_LITE_REGISTER__DMA__S2MM_DMASR        || \
+ val == AXI_LITE_REGISTER__DMA__SG_CTL            || \
+ val == AXI_LITE_REGISTER__DMA__S2MM_CURDESC      || \
+ val == AXI_LITE_REGISTER__DMA__S2MM_CURDESC_MSB  || \
+ val == AXI_LITE_REGISTER__DMA__S2MM_TAILDESC     || \
+ val == AXI_LITE_REGISTER__DMA__S2MM_TAILDESC_MSB || \
+ val == AXI_LITE_REGISTER__DMA__S2MM_DA           || \
+ val == AXI_LITE_REGISTER__DMA__S2MM_DA_MSB       || \
+ val == AXI_LITE_REGISTER__DMA__S2MM_LENGTH)
+
+ #define IS_AXI_LITE_REGISTER(val) \
+ (IS_AXI_LITE_REGISTER__ADC(val)                  || \
+  IS_AXI_LITE_REGISTER__DMA(val))
+
 namespace vuprs
 {
-
-    /* -------------------------------- Address of Registers ------------------------------------ */
+    /* --------------------------------  FPGA Configuration ------------------------------------ */
 
     typedef struct FPGAbusAddress
     {
         /* Base Address */
+
+        uint64_t addrBusBaseAXILite;
+        uint64_t addrBusBaseAXIFull;
 
         uint64_t addrBusBaseAXILite__DMA;  /* Offset of AXI-Lite interface for DMA controller configuration */
         uint64_t addrBusBaseAXILite__ADC;  /* Offset of AXI-Lite interface for ADC peripheral control */
@@ -64,13 +119,8 @@ namespace vuprs
         vuprs::FPGAregisterAddressADC registerAddressADC;
     };
 
-    typedef struct FPGAConfig
+    typedef struct FPGAhardwareConfig
     {
-
-        /* Address */
-        
-        vuprs::FPGAaddressConfig fpgaAddress;
-
         /* DDR Parameters */
 
         uint64_t ddrMemoryCapacity_megabytes;
@@ -82,43 +132,72 @@ namespace vuprs
         uint64_t adcDataWidth_bits;
         uint64_t adcMaxSamplingFrequency_Hz;
     };
+    
+    typedef struct XDMADriverConfig
+    {
+        std::string deviceFilename_xdma_control;
+        std::vector<std::string> deviceFilename_xdma_h2c;
+        std::vector<std::string> deviceFilename_xdma_c2h;
+        std::vector<std::string> deviceFilename_xdma_events;
+
+        uint64_t maxTransferSize_bytes;
+    };
+    
+
+    typedef struct FPGAConfig
+    {
+        vuprs::FPGAaddressConfig fpgaAddress;  /* Address */
+        vuprs::FPGAhardwareConfig hardwareConfig;  /* Hardware */
+        vuprs::XDMADriverConfig xdmaDriverConfig;  /* XDMA */
+    };
+
+    /* ----------------------------------  FPGA Controller ------------------------------------ */
 
     class FPGAController
     {
+        private:
 
-    private:
+            vuprs::FPGAConfig *fpgaConfig;
 
-        std::string fpgaConfigJsonFilename;
+            std::string fpgaConfigJsonFilename;
+            bool configDown;
 
-        /* input json["address-map"] */
-        bool ParseMemoryBaseAddress(const nlohmann::json &jsonData);
+            /* --------------------------- Json read -------------------------------- */
 
-        /* input json["address-map"]["axi-lite"]["adc"] */
-        bool ParseRegisterAddressADC(const nlohmann::json &jsonData);
+            /* input json["address-map"] */
+            bool ParseMemoryBaseAddress(const nlohmann::json &jsonData);
 
-        /* input json["address-map"]["axi-lite"]["dma"] */
-        bool ParseRegisterAddressDMA(const nlohmann::json &jsonData);
+            /* input json["address-map"]["axi-lite"]["adc"] */
+            bool ParseRegisterAddressADC(const nlohmann::json &jsonData);
 
-        /* input json["hardware-features"] */
-        bool ParseHardwareFeatures(const nlohmann::json &jsonData);
+            /* input json["address-map"]["axi-lite"]["dma"] */
+            bool ParseRegisterAddressDMA(const nlohmann::json &jsonData);
 
-        uint64_t ParseHexFromString(const std::string &dataString, bool *status = nullptr);
-        int ParseIntegerFromString(const std::string &dataString, bool *status = nullptr);
+            /* input json["hardware-features"] */
+            bool ParseHardwareFeatures(const nlohmann::json &jsonData);
 
-    public:
+            /* input json["xdma-driver"] */
+            bool ParseXDMADriverConfig(const nlohmann::json &jsonData);
 
-        vuprs::FPGAConfig *fpgaConfig;
+            /* -------------------------- Parse Digital --------------------------- */
 
-        FPGAController();
+            uint64_t ParseHexFromString(const std::string &dataString, bool *status = nullptr);
+            int ParseIntegerFromString(const std::string &dataString, bool *status = nullptr);
 
-        ~FPGAController();
+            uint64_t GetRegisterOffset(const int &registerSelection, bool *status = nullptr);
 
-        bool LoadFPGAConfigFromJson(const std::string &configJsonFilename);
+        public:
 
+            FPGAController();
+
+            ~FPGAController();
+
+            bool LoadFPGAConfigFromJson(const std::string &configJsonFilename);
+            bool FPGAConfigDown();
+
+            bool AXILite_WriteToRegister(const int &registerSelection, const uint32_t &w_value);
+            bool AXILite_ReadFromRegister(const int &registerSelection, uint32_t *r_value);
     };
-
-    /* -------------------------------- Functions for Loading ------------------------------------ */
-
 }
 
 #endif

@@ -3,6 +3,16 @@
         "fstream": "cpp",
         "format": "cpp",
         "thread": "cpp",
-        "string_view": "cpp"
+        "string_view": "cpp",
+        "stdexcept": "cpp",
+        "deque": "cpp",
+        "list": "cpp",
+        "string": "cpp",
+        "unordered_map": "cpp",
+        "unordered_set": "cpp",
+        "vector": "cpp",
+        "forward_list": "cpp",
+        "hash_map": "cpp",
+        "bitset": "cpp"
     }
 }

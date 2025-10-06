@@ -50,14 +50,23 @@
             "data-width-bits": "32"
         },
         "dma": {
-            "dma": {
-                
-            },
-            "xdma": {
-                "h2c-channels": "2",
-                "c2h-channels": "2",
-                "max-transfer-size-bytes": "65536"
-            }
+            
         }
+    },
+    "xdma-driver": {
+        "device-files": {
+            "xdma-control": "/dev/xdma0_control",
+            "xdma-h2c": ["/dev/xdma0_h2c_0", "/dev/xdma0_h2c_1"],
+            "xdma-c2h": ["/dev/xdma0_c2h_0", "/dev/xdma0_c2h_0"],
+            "xdma-events": [
+                "xdma0_events_0", "xdma0_events_1", "xdma0_events_2", "xdma0_events_3", 
+                "xdma0_events_4", "xdma0_events_5", "xdma0_events_6", "xdma0_events_7", 
+                "xdma0_events_8", "xdma0_events_9", "xdma0_events_10", "xdma0_events_11",
+                "xdma0_events_12", "xdma0_events_13", "xdma0_events_14", "xdma0_events_15"
+            ]
+        },
+        "max-transfer-size-bytes": "65536",
+        "h2c-channel": "2",
+        "c2h-channel": "2"
     }
 }
