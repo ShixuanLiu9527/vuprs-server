@@ -548,17 +548,13 @@ bool vuprs::FPGAController::FPGAConfigDown()
     return this->configDown;
 }
 
-uint64_t vuprs::FPGAController::GetRegisterOffset(const int &registerSelection, bool *status)
+uint64_t vuprs::FPGAController::AXILite_GetRegisterOffset(const int &registerSelection, bool *status)
 {
     if (status != nullptr)
     {
         *status = false;
     }
     if (!IS_AXI_LITE_REGISTER(registerSelection) || !this->configDown)
-    {
-        return 0;
-    }
-    if (IS_AXI_LITE_RDONLY_REGISTER(registerSelection))
     {
         return 0;
     }
@@ -681,31 +677,48 @@ uint64_t vuprs::FPGAController::GetRegisterOffset(const int &registerSelection, 
         *status = true;
     }
 
-    return axiLiteRegisterSpaceBaseAddress + registerOffset;
+    return axiLiteRegisterSpaceBaseAddress + registerOffset;  /* Base Address (Relative to AXI-Lite base address) + Register Offset */
 }
 
-bool vuprs::FPGAController::AXILite_WriteToRegister(const int &registerSelection, const uint32_t &w_value)
+bool vuprs::FPGAController::DMA_AXILite_FPGARegisterIO(const std::string &rd_wr, const int &registerSelection, const uint32_t &w_value, uint32_t *r_value)
 {
     /* ------------------------ Security Check Start ------------------------- */
 
-    if (!IS_AXI_LITE_REGISTER(registerSelection) || !this->configDown)
+    if (!IS_AXI_LITE_REGISTER(registerSelection))
     {
-        return false;
+        throw std::runtime_error("Invalid register selection: " + std::to_string(registerSelection));
     }
-    if (IS_AXI_LITE_RDONLY_REGISTER(registerSelection))
+    if (!this->configDown)
     {
-        return false;
+        throw std::runtime_error("Config not complete.");
+    }
+
+    std::string direction = rd_wr;
+
+    std::transform(direction.begin(), direction.end(), direction.begin(), ::toupper);  /* Upper */
+
+    if (!(direction == "R" || direction == "READ" || direction == "RD" ||
+          direction == "W" || direction == "WRITE" || direction == "WR"))
+    {
+        throw std::runtime_error("Invalid IO direction.");
+    }
+    else if (direction == "W" || direction == "WRITE" || direction == "WR")
+    {
+        if (IS_AXI_LITE_RDONLY_REGISTER(registerSelection))
+        {
+            throw std::runtime_error("This register is read only: " + std::to_string(registerSelection));
+        }
     }
 
     /* ------------------------- Security Check End -------------------------- */
 
-    int fpga_fd, writeStatus;
+    int fpga_fd = -1, writeReadStatus = -1;
     bool registerCalculateStatus = false;
-    uint64_t currentOffset, registerOffset;
-
+    uint64_t currentOffset = 0, registerOffset = 0;
+    
     /* Calculate register address */
 
-    registerOffset = this->GetRegisterOffset(registerSelection, &registerCalculateStatus);
+    registerOffset = this->AXILite_GetRegisterOffset(registerSelection, &registerCalculateStatus);
 
     if (!registerCalculateStatus)
     {
@@ -715,6 +728,8 @@ bool vuprs::FPGAController::AXILite_WriteToRegister(const int &registerSelection
     /* Open device file (AXI-Lite) */
 
     fpga_fd = open((this->fpgaConfig->xdmaDriverConfig.deviceFilename_xdma_control).c_str(), O_RDWR);
+
+    /* Check if device file is open */
 
     if (fpga_fd < 0)
     {
@@ -727,12 +742,23 @@ bool vuprs::FPGAController::AXILite_WriteToRegister(const int &registerSelection
 
     if (currentOffset != registerOffset)
     {
+        close(fpga_fd);  /* close file */
         throw std::runtime_error("Seek error.");
     }
 
     /* Write data to register */
 
-    writeStatus = write(fpga_fd, &w_value, sizeof(uint32_t));  /* All registers are 32 bit */
+    if (direction == "W" || direction == "WRITE" || direction == "WR")
+    {
+        writeReadStatus = write(fpga_fd, &w_value, sizeof(uint32_t));  /* All registers are 32 bit */
+    }
+    else if (direction == "R" || direction == "READ" || direction == "RD")
+    {
+        if (r_value != nullptr)
+        {
+            writeReadStatus = read(fpga_fd, r_value, sizeof(uint32_t));  /* All registers are 32 bit */
+        }
+    }
 
     /* Close */
 
@@ -741,58 +767,117 @@ bool vuprs::FPGAController::AXILite_WriteToRegister(const int &registerSelection
         throw std::runtime_error("Cannot close device file: " + this->fpgaConfig->xdmaDriverConfig.deviceFilename_xdma_control);
     }
 
-    return writeStatus >= 0;
+    return writeReadStatus >= 0;
 }
 
-bool vuprs::FPGAController::AXILite_ReadFromRegister(const int &registerSelection, uint32_t *r_value)
+bool vuprs::FPGAController::DMA_AXIFull_IO(const std::string &rd_wr, const std::vector<uint64_t> &writeBuffer, std::vector<uint64_t> *readBuffer, const uint64_t &readBytes, const uint8_t &dmaChannel)
 {
     /* ------------------------ Security Check Start ------------------------- */
 
-    if (!IS_AXI_LITE_REGISTER(registerSelection) || !this->configDown)
+    if (!this->configDown)
     {
-        return false;
+        throw std::runtime_error("Config not complete.");
     }
-    if (IS_AXI_LITE_RDONLY_REGISTER(registerSelection))
+
+    std::string direction = rd_wr;
+    std::transform(direction.begin(), direction.end(), direction.begin(), ::toupper);  /* Upper */
+
+    if (!(direction == "R" || direction == "READ" || direction == "RD" ||
+          direction == "W" || direction == "WRITE" || direction == "WR"))
     {
-        return false;
+        throw std::runtime_error("Invalid IO direction.");
+    }
+
+    if ((direction == "W" || direction == "WRITE" || direction == "WR") && writeBuffer.size() <= 0)
+    {
+        throw std::runtime_error("Write buffer is empty, no data be written.");
     }
 
     /* ------------------------- Security Check End -------------------------- */
 
-    int fpga_fd, writeStatus;
-    bool registerCalculateStatus = false;
-    uint64_t currentOffset, registerOffset;
+    int fpga_fd = -1, writeReadStatus = -1, writeReadBytes = 0;
+    uint64_t currentOffset = 0, componentOffset = 0;
+    uint64_t targetWriteReadBytes = 0;
 
-    /* Calculate register address */
+    /* Set DDR offset (relative to AXI-Full) */
 
-    registerOffset = this->GetRegisterOffset(registerSelection, &registerCalculateStatus);
+    componentOffset = this->fpgaConfig->fpgaAddress.busAddress.addrBusBaseAXIFull__DDR;
 
-    if (!registerCalculateStatus)
+    /* Open device file (AXI-Full DMA) */
+
+    if (direction == "R" || direction == "READ" || direction == "RD")
     {
-        throw std::runtime_error("Invalid register selection.");
+        if (dmaChannel < this->fpgaConfig->xdmaDriverConfig.deviceFilename_xdma_c2h.size())
+        {
+            fpga_fd = open((this->fpgaConfig->xdmaDriverConfig.deviceFilename_xdma_c2h[dmaChannel]).c_str(), O_RDWR);
+        }
+        else
+        {
+            throw std::runtime_error(
+                "Invalid DMA channel (required: < " + \
+                std::to_string(this->fpgaConfig->xdmaDriverConfig.deviceFilename_xdma_c2h.size()) + "), current = " + \
+                std::to_string(dmaChannel)
+            );
+        }
+    }
+    else if (direction == "W" || direction == "WRITE" || direction == "WR")
+    {
+        if (dmaChannel < this->fpgaConfig->xdmaDriverConfig.deviceFilename_xdma_h2c.size())
+        {
+            fpga_fd = open((this->fpgaConfig->xdmaDriverConfig.deviceFilename_xdma_h2c[dmaChannel]).c_str(), O_RDWR);
+        }
+        else
+        {
+            throw std::runtime_error(
+                "Invalid DMA channel (required: < " + \
+                std::to_string(this->fpgaConfig->xdmaDriverConfig.deviceFilename_xdma_h2c.size()) + "), current = " + \
+                std::to_string(dmaChannel)
+            );
+        }
+    }
+    else
+    {
+        throw std::runtime_error("Invalid IO direction.");
     }
 
-    /* Open device file (AXI-Lite) */
-
-    fpga_fd = open((this->fpgaConfig->xdmaDriverConfig.deviceFilename_xdma_control).c_str(), O_RDWR);
+    /* Check if device file is open */
 
     if (fpga_fd < 0)
     {
         throw std::runtime_error("Cannot open device file: " + this->fpgaConfig->xdmaDriverConfig.deviceFilename_xdma_control);
     }
 
-    /* Seek to offset relative to AXI-Lite base address in FPGA */
+    /* Seek to offset relative to AXI-Full base address in FPGA */
 
-    currentOffset = lseek(fpga_fd, registerOffset, SEEK_SET);
+    currentOffset = lseek(fpga_fd, componentOffset, SEEK_SET);
 
-    if (currentOffset != registerOffset)
+    if (currentOffset != componentOffset)
     {
+        close(fpga_fd);  /* close file */
         throw std::runtime_error("Seek error.");
     }
 
     /* Write data to register */
 
-    writeStatus = read(fpga_fd, &r_value, sizeof(uint32_t));  /* All registers are 32 bit */
+    if (direction == "W" || direction == "WRITE" || direction == "WR")
+    {
+        targetWriteReadBytes = writeBuffer.size() * sizeof(uint64_t);
+        writeReadBytes = write(fpga_fd, writeBuffer.data(), targetWriteReadBytes);
+    }
+    else if (direction == "R" || direction == "READ" || direction == "RD")
+    {
+        if (readBuffer != nullptr)
+        {
+            if (readBuffer->size() <= 0)
+            {
+                readBuffer->resize(
+                    std::min(this->fpgaConfig->xdmaDriverConfig.maxTransferSize_bytes / sizeof(uint64_t), readBytes)
+                );
+            }
+            targetWriteReadBytes = readBuffer->size() * sizeof(uint64_t);
+            writeReadBytes = read(fpga_fd, readBuffer->data(), targetWriteReadBytes);
+        }
+    }
 
     /* Close */
 
@@ -801,5 +886,33 @@ bool vuprs::FPGAController::AXILite_ReadFromRegister(const int &registerSelectio
         throw std::runtime_error("Cannot close device file: " + this->fpgaConfig->xdmaDriverConfig.deviceFilename_xdma_control);
     }
 
-    return writeStatus >= 0;
+    return (static_cast<int>(targetWriteReadBytes) == writeReadBytes);
+}
+
+bool vuprs::FPGAController::DMA_AXILite_WriteToFPGARegister(const int &registerSelection, const uint32_t &w_value)
+{
+    if (!IS_AXI_LITE_RDONLY_REGISTER(registerSelection))
+    {
+        return this->DMA_AXILite_FPGARegisterIO("write", registerSelection, w_value, nullptr);
+    }
+    else
+    {
+        throw std::runtime_error("Register is read only: " + std::to_string(registerSelection));
+    }
+}
+
+bool vuprs::FPGAController::DMA_AXILite_ReadFPGARegister(const int &registerSelection, uint32_t *r_value)
+{
+    return this->DMA_AXILite_FPGARegisterIO("read", registerSelection, 0, r_value);
+}
+
+bool vuprs::FPGAController::DMA_AXIFull_WriteToFPGA(const std::vector<uint64_t> &writeBuffer, const uint8_t &dmaChannel = 0)
+{
+    return this->DMA_AXIFull_IO("write", writeBuffer, nullptr, 0, dmaChannel);
+}
+
+bool vuprs::FPGAController::DMA_AXIFull_ReadFromFPGA(std::vector<uint64_t> *readBuffer, const uint64_t &readBytes, const uint8_t &dmaChannel = 0)
+{
+    std::vector<uint64_t> writeBuffer;
+    return this->DMA_AXIFull_IO("read", writeBuffer, readBuffer, readBytes, dmaChannel);
 }

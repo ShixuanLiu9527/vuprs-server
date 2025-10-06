@@ -12,6 +12,8 @@
 
 #include "nlohmann/json.hpp"
 
+/* --------------------------------------- AXI-Lite Registers --------------------------------------- */
+
 /* AXI-Lite ADC Registers */
 
 #define AXI_LITE_REGISTER__ADC__SCI               0
@@ -21,7 +23,7 @@
 #define AXI_LITE_REGISTER__ADC__NGF               4
 #define AXI_LITE_REGISTER__ADC__ERR               5
 
-/* DMA Registers */
+/* AXI-Lite DMA Registers */
 
 #define AXI_LITE_REGISTER__DMA__S2MM_DMACR        6
 #define AXI_LITE_REGISTER__DMA__S2MM_DMASR        7
@@ -184,8 +186,12 @@ namespace vuprs
             uint64_t ParseHexFromString(const std::string &dataString, bool *status = nullptr);
             int ParseIntegerFromString(const std::string &dataString, bool *status = nullptr);
 
-            uint64_t GetRegisterOffset(const int &registerSelection, bool *status = nullptr);
+            uint64_t AXILite_GetRegisterOffset(const int &registerSelection, bool *status = nullptr);
+            
+            bool DMA_AXILite_FPGARegisterIO(const std::string &rd_wr, const int &registerSelection, const uint32_t &w_value, uint32_t *r_value);
 
+            bool DMA_AXIFull_IO(const std::string &rd_wr, const std::vector<uint64_t> &writeBuffer, std::vector<uint64_t> *readBuffer, const uint64_t &readBytes, const uint8_t &dmaChannel);
+            
         public:
 
             FPGAController();
@@ -195,8 +201,11 @@ namespace vuprs
             bool LoadFPGAConfigFromJson(const std::string &configJsonFilename);
             bool FPGAConfigDown();
 
-            bool AXILite_WriteToRegister(const int &registerSelection, const uint32_t &w_value);
-            bool AXILite_ReadFromRegister(const int &registerSelection, uint32_t *r_value);
+            bool DMA_AXILite_WriteToFPGARegister(const int &registerSelection, const uint32_t &w_value);
+            bool DMA_AXILite_ReadFPGARegister(const int &registerSelection, uint32_t *r_value);
+
+            bool DMA_AXIFull_WriteToFPGA(const std::vector<uint64_t> &writeBuffer, const uint8_t &dmaChannel = 0);
+            bool DMA_AXIFull_ReadFromFPGA(std::vector<uint64_t> *readBuffer, const uint64_t &readBytes, const uint8_t &dmaChannel = 0);
     };
 }
 

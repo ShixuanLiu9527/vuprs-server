@@ -56,6 +56,7 @@
     "xdma-driver": {
         "device-files": {
             "xdma-control": "/dev/xdma0_control",
+            "xdma-user": "/dev/xdma0_user",
             "xdma-h2c": ["/dev/xdma0_h2c_0", "/dev/xdma0_h2c_1"],
             "xdma-c2h": ["/dev/xdma0_c2h_0", "/dev/xdma0_c2h_0"],
             "xdma-events": [
