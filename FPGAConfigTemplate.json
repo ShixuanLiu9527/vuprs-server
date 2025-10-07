@@ -2,12 +2,16 @@
     "description": "VUPRS FPGA Configurations",
     "platform": "RK3568-XC7A100T",
     "author": "Shixuan Liu",
-    "address-map": {
-        "axi-lite": {
+    "address-map": 
+    {
+        "axi-lite": 
+        {
             "bus-address-offset": "0x4000_0000",
-            "adc": {
+            "adc": 
+            {
                 "address-offset": "0x0001_0000",
-                "registers-address-offset": {
+                "registers-address-offset": 
+                {
                     "SCI-address-offset": "0x00",
                     "SP-address-offset": "0x04",
                     "SF-address-offset": "0x08",
@@ -16,9 +20,11 @@
                     "ERR-address-offset": "0x14"
                 }
             },
-            "dma": {
+            "dma": 
+            {
                 "address-offset": "0x0000_0000",
-                "registers-address-offset": {
+                "registers-address-offset": 
+                {
                     "S2MM_DMACR-address-offset": "0x30",
                     "S2MM_DMASR-address-offset": "0x34",
                     "SG_CTL-address-offset": "0x2c",
@@ -32,41 +38,51 @@
                 }
             }
         },
-        "axi-full": {
+        "axi-full": 
+        {
             "address-offset": "0x8000_0000",
-            "ddr": {
+            "ddr": 
+            {
                 "address-offset": "0x0000_0000"
             }
         }
     },
-    "hardware-features": {
-        "adc": {
+    "hardware-features": 
+    {
+        "adc": 
+        {
             "data-width-bits": "16",
             "channels": "16",
             "max-sampling-frequency-hz": "120_000"
         },
-        "ddr": {
+        "ddr": 
+        {
             "memory-capacity-megabytes": "512",
             "data-width-bits": "32"
         },
-        "dma": {
+        "dma": 
+        {
             
         }
     },
-    "xdma-driver": {
-        "device-files": {
+    "xdma-driver": 
+    {
+        "device-files": 
+        {
             "xdma-control": "/dev/xdma0_control",
             "xdma-user": "/dev/xdma0_user",
             "xdma-h2c": ["/dev/xdma0_h2c_0", "/dev/xdma0_h2c_1"],
             "xdma-c2h": ["/dev/xdma0_c2h_0", "/dev/xdma0_c2h_0"],
-            "xdma-events": [
-                "xdma0_events_0", "xdma0_events_1", "xdma0_events_2", "xdma0_events_3", 
-                "xdma0_events_4", "xdma0_events_5", "xdma0_events_6", "xdma0_events_7", 
-                "xdma0_events_8", "xdma0_events_9", "xdma0_events_10", "xdma0_events_11",
-                "xdma0_events_12", "xdma0_events_13", "xdma0_events_14", "xdma0_events_15"
+            "xdma-events": 
+            [
+                "/dev/xdma0_events_0", "/dev/xdma0_events_1", "/dev/xdma0_events_2", "/dev/xdma0_events_3", 
+                "/dev/xdma0_events_4", "/dev/xdma0_events_5", "/dev/xdma0_events_6", "/dev/xdma0_events_7", 
+                "/dev/xdma0_events_8", "/dev/xdma0_events_9", "/dev/xdma0_events_10", "/dev/xdma0_events_11",
+                "/dev/xdma0_events_12", "/dev/xdma0_events_13", "/dev/xdma0_events_14", "/dev/xdma0_events_15"
             ]
         },
         "max-transfer-size-bytes": "65536",
+        "dma-alignment-bytes": "4096",
         "h2c-channel": "2",
         "c2h-channel": "2"
     }

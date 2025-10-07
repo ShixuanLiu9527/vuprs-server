@@ -1,5 +1,13 @@
 #include "FPGAControl.h"
 
+#define __DIRECTION_IS_READ__(DIR) \
+(DIR == "R" || DIR == "READ" || DIR == "RD")
+
+#define __DIRECTION_IS_WRITE__(DIR) \
+(DIR == "W" || DIR == "WRITE" || DIR == "WR")
+
+void FreeAll(int fpga_fd, int file_fd, char **allocated);
+
 vuprs::FPGAController::FPGAController()
 {
     this->configDown = false;
@@ -10,6 +18,10 @@ vuprs::FPGAController::~FPGAController()
 {
 
 }
+
+/* --------------------------------------------------------------------------------------------------------------- */
+/* --------------------------------------------- Parse JSON file ------------------------------------------------- */
+/* --------------------------------------------------------------------------------------------------------------- */
 
 bool vuprs::FPGAController::LoadFPGAConfigFromJson(const std::string &configJsonFilename)
 {
@@ -451,6 +463,11 @@ bool vuprs::FPGAController::ParseXDMADriverConfig(const nlohmann::json &jsonData
         parseResultValue = this->ParseIntegerFromString(jsonData["max-transfer-size-bytes"].get<std::string>(), &parseIntegerStatus);
         if (parseIntegerStatus) this->fpgaConfig->xdmaDriverConfig.maxTransferSize_bytes = parseResultValue;
         else parseSuccess = false;
+
+        if (this->fpgaConfig->xdmaDriverConfig.maxTransferSize_bytes > __LINUX_DMA_MAX_TRANSFER_BYTES__)
+        {
+            this->fpgaConfig->xdmaDriverConfig.maxTransferSize_bytes = __LINUX_DMA_MAX_TRANSFER_BYTES__;
+        }
     }
     else
     {
@@ -543,10 +560,16 @@ int vuprs::FPGAController::ParseIntegerFromString(const std::string &dataString,
     }
 }
 
+/* --------------------------------------------------------------------------------------------------------------- */
+/* ------------------------------------------- FPGA Communication ------------------------------------------------ */
+/* --------------------------------------------------------------------------------------------------------------- */
+
 bool vuprs::FPGAController::FPGAConfigDown()
 {
     return this->configDown;
 }
+
+/* ------------------------------------------- Read/Write to value ----------------------------------------------- */
 
 uint64_t vuprs::FPGAController::AXILite_GetRegisterOffset(const int &registerSelection, bool *status)
 {
@@ -680,7 +703,7 @@ uint64_t vuprs::FPGAController::AXILite_GetRegisterOffset(const int &registerSel
     return axiLiteRegisterSpaceBaseAddress + registerOffset;  /* Base Address (Relative to AXI-Lite base address) + Register Offset */
 }
 
-bool vuprs::FPGAController::DMA_AXILite_FPGARegisterIO(const std::string &rd_wr, const int &registerSelection, const uint32_t &w_value, uint32_t *r_value)
+bool vuprs::FPGAController::AXILite_FPGARegisterIO(const std::string &rd_wr, const int &registerSelection, const uint32_t &w_value, uint32_t *r_value)
 {
     /* ------------------------ Security Check Start ------------------------- */
 
@@ -697,12 +720,11 @@ bool vuprs::FPGAController::DMA_AXILite_FPGARegisterIO(const std::string &rd_wr,
 
     std::transform(direction.begin(), direction.end(), direction.begin(), ::toupper);  /* Upper */
 
-    if (!(direction == "R" || direction == "READ" || direction == "RD" ||
-          direction == "W" || direction == "WRITE" || direction == "WR"))
+    if (!(__DIRECTION_IS_READ__(direction) || __DIRECTION_IS_WRITE__(direction)))
     {
         throw std::runtime_error("Invalid IO direction.");
     }
-    else if (direction == "W" || direction == "WRITE" || direction == "WR")
+    else if (__DIRECTION_IS_WRITE__(direction))
     {
         if (IS_AXI_LITE_RDONLY_REGISTER(registerSelection))
         {
@@ -748,11 +770,11 @@ bool vuprs::FPGAController::DMA_AXILite_FPGARegisterIO(const std::string &rd_wr,
 
     /* Write data to register */
 
-    if (direction == "W" || direction == "WRITE" || direction == "WR")
+    if (__DIRECTION_IS_WRITE__(direction))
     {
         writeReadStatus = write(fpga_fd, &w_value, sizeof(uint32_t));  /* All registers are 32 bit */
     }
-    else if (direction == "R" || direction == "READ" || direction == "RD")
+    else if (__DIRECTION_IS_READ__(direction))
     {
         if (r_value != nullptr)
         {
@@ -770,11 +792,11 @@ bool vuprs::FPGAController::DMA_AXILite_FPGARegisterIO(const std::string &rd_wr,
     return writeReadStatus >= 0;
 }
 
-bool vuprs::FPGAController::DMA_AXIFull_IO(const std::string &rd_wr, const std::vector<uint64_t> &writeBuffer, std::vector<uint64_t> *readBuffer, const uint64_t &readBytes, const uint8_t &dmaChannel)
+bool vuprs::FPGAController::AXIFull_IO(const std::string &rd_wr, const uint64_t &offsetDDR, const std::vector<uint64_t> &writeBuffer, std::vector<uint64_t> *readBuffer, const uint64_t &readBytes, const uint8_t &dmaChannel)
 {
     /* ------------------------ Security Check Start ------------------------- */
 
-    if (!this->configDown)
+    if (!this->configDown)  /* detect at first */
     {
         throw std::runtime_error("Config not complete.");
     }
@@ -782,15 +804,33 @@ bool vuprs::FPGAController::DMA_AXIFull_IO(const std::string &rd_wr, const std::
     std::string direction = rd_wr;
     std::transform(direction.begin(), direction.end(), direction.begin(), ::toupper);  /* Upper */
 
-    if (!(direction == "R" || direction == "READ" || direction == "RD" ||
-          direction == "W" || direction == "WRITE" || direction == "WR"))
+    if (!(__DIRECTION_IS_READ__(direction) || __DIRECTION_IS_WRITE__(direction)))
     {
         throw std::runtime_error("Invalid IO direction.");
     }
 
-    if ((direction == "W" || direction == "WRITE" || direction == "WR") && writeBuffer.size() <= 0)
+    if (__DIRECTION_IS_WRITE__(direction))
     {
-        throw std::runtime_error("Write buffer is empty, no data be written.");
+        if (writeBuffer.size() <= 0)
+        {
+            throw std::runtime_error("Write buffer is empty, no data be written.");
+        }
+        else if (writeBuffer.size() >= this->fpgaConfig->xdmaDriverConfig.maxTransferSize_bytes / sizeof(uint64_t))
+        {
+            throw std::runtime_error("Write buffer is bigger than maximum transfer size.");
+        }
+    }
+
+    if (__DIRECTION_IS_READ__(direction))
+    {
+        if (readBuffer == nullptr)
+        {
+            throw std::runtime_error("Read buffer is NULL.");
+        }
+        if (readBytes <= 0)
+        {
+            throw std::runtime_error("Read bytes is 0.");
+        }
     }
 
     /* ------------------------- Security Check End -------------------------- */
@@ -799,19 +839,19 @@ bool vuprs::FPGAController::DMA_AXIFull_IO(const std::string &rd_wr, const std::
     uint64_t currentOffset = 0, componentOffset = 0;
     uint64_t targetWriteReadBytes = 0;
 
+    /* Aligned vector for XDMA */
+
+    std::vector<uint64_t, vuprs::VectorAlignedAllocatorXDMA<uint64_t, __XDMA_DMA_ALIGNMENT_BYTES__>> alignedWriteBuffer, alignedReadBuffer;
+
     /* Set DDR offset (relative to AXI-Full) */
 
-    componentOffset = this->fpgaConfig->fpgaAddress.busAddress.addrBusBaseAXIFull__DDR;
+    componentOffset = this->fpgaConfig->fpgaAddress.busAddress.addrBusBaseAXIFull__DDR + offsetDDR;
 
     /* Open device file (AXI-Full DMA) */
 
-    if (direction == "R" || direction == "READ" || direction == "RD")
+    if (__DIRECTION_IS_READ__(direction))
     {
-        if (dmaChannel < this->fpgaConfig->xdmaDriverConfig.deviceFilename_xdma_c2h.size())
-        {
-            fpga_fd = open((this->fpgaConfig->xdmaDriverConfig.deviceFilename_xdma_c2h[dmaChannel]).c_str(), O_RDWR);
-        }
-        else
+        if (dmaChannel >= this->fpgaConfig->xdmaDriverConfig.deviceFilename_xdma_c2h.size())
         {
             throw std::runtime_error(
                 "Invalid DMA channel (required: < " + \
@@ -819,14 +859,12 @@ bool vuprs::FPGAController::DMA_AXIFull_IO(const std::string &rd_wr, const std::
                 std::to_string(dmaChannel)
             );
         }
+
+        fpga_fd = open((this->fpgaConfig->xdmaDriverConfig.deviceFilename_xdma_c2h[dmaChannel]).c_str(), O_RDWR);
     }
-    else if (direction == "W" || direction == "WRITE" || direction == "WR")
+    else if (__DIRECTION_IS_WRITE__(direction))
     {
-        if (dmaChannel < this->fpgaConfig->xdmaDriverConfig.deviceFilename_xdma_h2c.size())
-        {
-            fpga_fd = open((this->fpgaConfig->xdmaDriverConfig.deviceFilename_xdma_h2c[dmaChannel]).c_str(), O_RDWR);
-        }
-        else
+        if (dmaChannel >= this->fpgaConfig->xdmaDriverConfig.deviceFilename_xdma_h2c.size())
         {
             throw std::runtime_error(
                 "Invalid DMA channel (required: < " + \
@@ -834,6 +872,8 @@ bool vuprs::FPGAController::DMA_AXIFull_IO(const std::string &rd_wr, const std::
                 std::to_string(dmaChannel)
             );
         }
+
+        fpga_fd = open((this->fpgaConfig->xdmaDriverConfig.deviceFilename_xdma_h2c[dmaChannel]).c_str(), O_RDWR);
     }
     else
     {
@@ -857,26 +897,39 @@ bool vuprs::FPGAController::DMA_AXIFull_IO(const std::string &rd_wr, const std::
         throw std::runtime_error("Seek error.");
     }
 
-    /* Write data to register */
+    /* Write data to DDR */
 
-    if (direction == "W" || direction == "WRITE" || direction == "WR")
+    if (__DIRECTION_IS_WRITE__(direction))
     {
-        targetWriteReadBytes = writeBuffer.size() * sizeof(uint64_t);
-        writeReadBytes = write(fpga_fd, writeBuffer.data(), targetWriteReadBytes);
+        uint64_t writeSize = writeBuffer.size();
+        alignedWriteBuffer.resize(writeSize);
+
+        /* Copy */
+
+        std::copy(writeBuffer.begin(), writeBuffer.end(), alignedWriteBuffer.begin());
+
+        /* DMA to FPGA */
+
+        targetWriteReadBytes = alignedWriteBuffer.size() * sizeof(uint64_t);
+        writeReadBytes = write(fpga_fd, alignedWriteBuffer.data(), targetWriteReadBytes);
     }
-    else if (direction == "R" || direction == "READ" || direction == "RD")
+    else if (__DIRECTION_IS_READ__(direction))
     {
-        if (readBuffer != nullptr)
+        uint64_t maxReadBytes = std::min(this->fpgaConfig->xdmaDriverConfig.maxTransferSize_bytes, readBytes);
+
+        if (readBuffer->size() <= 0 || readBuffer->size() >= maxReadBytes / sizeof(uint64_t))
         {
-            if (readBuffer->size() <= 0)
-            {
-                readBuffer->resize(
-                    std::min(this->fpgaConfig->xdmaDriverConfig.maxTransferSize_bytes / sizeof(uint64_t), readBytes)
-                );
-            }
-            targetWriteReadBytes = readBuffer->size() * sizeof(uint64_t);
-            writeReadBytes = read(fpga_fd, readBuffer->data(), targetWriteReadBytes);
+            readBuffer->resize(maxReadBytes / sizeof(uint64_t));
         }
+
+        alignedReadBuffer.resize(readBuffer->size());
+
+        targetWriteReadBytes = alignedReadBuffer.size() * sizeof(uint64_t);
+        writeReadBytes = read(fpga_fd, alignedReadBuffer.data(), targetWriteReadBytes);
+
+        /* Copy back */
+
+        std::copy(alignedReadBuffer.begin(), alignedReadBuffer.end(), readBuffer->begin());
     }
 
     /* Close */
@@ -889,11 +942,258 @@ bool vuprs::FPGAController::DMA_AXIFull_IO(const std::string &rd_wr, const std::
     return (static_cast<int>(targetWriteReadBytes) == writeReadBytes);
 }
 
-bool vuprs::FPGAController::DMA_AXILite_WriteToFPGARegister(const int &registerSelection, const uint32_t &w_value)
+/* ------------------------------------------- Read/Write to file ------------------------------------------------ */
+
+void FreeAll(int fpga_fd, int file_fd, char **allocated)
+{
+    if (fpga_fd >= 0)
+    {
+        close(fpga_fd);
+    }
+    if (file_fd >= 0)
+    {
+        close(file_fd);
+    }
+    if (allocated != nullptr)
+    {
+        if ((*allocated) != nullptr)
+        {
+#ifdef _WIN32
+            _aligned_free(*allocated);
+#else
+            free(*allocated);
+#endif
+        }
+    }
+}
+
+bool vuprs::FPGAController::AXIFull_IO(const std::string &rd_wr, const uint64_t &offsetDDR, const uint64_t &offsetFile, const std::string &inputfileName, const std::string &outputFileName, const uint64_t &transferBytes, const uint8_t &dmaChannel)
+{
+    /* ------------------------ Security Check Start ------------------------- */
+
+    if (!this->configDown)  /* detect at first */
+    {
+        throw std::runtime_error("Config not complete.");
+    }
+
+    std::string direction = rd_wr;
+    std::transform(direction.begin(), direction.end(), direction.begin(), ::toupper);  /* Upper */
+
+    if (!(__DIRECTION_IS_READ__(direction) || __DIRECTION_IS_WRITE__(direction)))
+    {
+        throw std::runtime_error("Invalid IO direction.");
+    }
+
+    if (__DIRECTION_IS_WRITE__(direction))
+    {
+        if (inputfileName.empty())
+        {
+            throw std::runtime_error("Invalid input file name.");
+        }
+    }
+
+    if (__DIRECTION_IS_READ__(direction))
+    {
+        if (outputFileName.empty())
+        {
+            throw std::runtime_error("Invalid output file name.");
+        }
+    }
+
+    if (transferBytes <= 0)
+    {
+        throw std::runtime_error("Read bytes is 0.");
+    }
+
+    if ((offsetDDR + transferBytes) > this->fpgaConfig->hardwareConfig.ddrMemoryCapacity_megabytes * 1024 * 1024)
+    {
+        throw std::runtime_error("Read Domain of the DDR overflow.");
+    }
+
+    /* ------------------------- Security Check End -------------------------- */
+
+    int fpga_fd = -1, file_fd = -1, writeReadStatus = -1, writeReadBytes = 0;
+    uint64_t currentOffset = 0, componentOffset = 0, currentFileOffset = 0;
+    uint64_t targetWriteReadBytes = 0;
+    char* allocated = nullptr;
+
+    /* Create aligned memory domain */
+
+    #ifdef _WIN32
+        allocated = static_cast<char*>(_aligned_malloc(transferBytes + __XDMA_DMA_ALIGNMENT_BYTES__, __XDMA_DMA_ALIGNMENT_BYTES__));
+    #else
+        if(posix_memalign((void **)&allocated, __XDMA_DMA_ALIGNMENT_BYTES__ , transferBytes + __XDMA_DMA_ALIGNMENT_BYTES__) != 0)
+        {
+            FreeAll(fpga_fd, file_fd, &allocated);
+            throw std::runtime_error("Cannot make aligned memory.");
+        }
+    #endif
+
+    if (allocated == nullptr)
+    {
+        FreeAll(fpga_fd, file_fd, &allocated);
+        throw std::runtime_error("Cannot make aligned memory.");
+    }
+
+    /* Open input/output file */
+
+    if (__DIRECTION_IS_READ__(direction))
+    {
+        file_fd = open(outputFileName.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0666);
+
+        if (file_fd < 0)
+        {
+            FreeAll(fpga_fd, file_fd, &allocated);
+            throw std::runtime_error("Cannot open file: " + outputFileName);
+        }
+    }
+    else if (__DIRECTION_IS_WRITE__(direction))
+    {
+        file_fd = open(inputfileName.c_str(), O_RDONLY);
+
+        if (file_fd < 0)
+        {
+            FreeAll(fpga_fd, file_fd, &allocated);
+            throw std::runtime_error("Cannot open file: " + inputfileName);
+        }
+    }
+
+    /* Open device file (AXI-Full DMA) */
+
+    if (__DIRECTION_IS_READ__(direction))
+    {
+        if (dmaChannel >= this->fpgaConfig->xdmaDriverConfig.deviceFilename_xdma_c2h.size())
+        {
+            FreeAll(fpga_fd, file_fd, &allocated);
+            throw std::runtime_error(
+                "Invalid DMA channel (required: < " + \
+                std::to_string(this->fpgaConfig->xdmaDriverConfig.deviceFilename_xdma_c2h.size()) + "), current = " + \
+                std::to_string(dmaChannel)
+            );
+        }
+
+        fpga_fd = open((this->fpgaConfig->xdmaDriverConfig.deviceFilename_xdma_c2h[dmaChannel]).c_str(), O_RDWR);
+    }
+    else if (__DIRECTION_IS_WRITE__(direction))
+    {
+        if (dmaChannel >= this->fpgaConfig->xdmaDriverConfig.deviceFilename_xdma_h2c.size())
+        {
+            FreeAll(fpga_fd, file_fd, &allocated);
+            throw std::runtime_error(
+                "Invalid DMA channel (required: < " + \
+                std::to_string(this->fpgaConfig->xdmaDriverConfig.deviceFilename_xdma_h2c.size()) + "), current = " + \
+                std::to_string(dmaChannel)
+            );
+        }
+
+        fpga_fd = open((this->fpgaConfig->xdmaDriverConfig.deviceFilename_xdma_h2c[dmaChannel]).c_str(), O_RDWR);
+    }
+
+    /* Check if device file & input/output file is open */
+
+    if (fpga_fd < 0)
+    {
+        FreeAll(fpga_fd, file_fd, &allocated);
+        throw std::runtime_error("Cannot open device file: " + this->fpgaConfig->xdmaDriverConfig.deviceFilename_xdma_control);
+    }
+
+    /* --- Seek --- */
+
+    /* Seek to offset relative to AXI-Full base address in FPGA */
+
+    componentOffset = this->fpgaConfig->fpgaAddress.busAddress.addrBusBaseAXIFull__DDR + offsetDDR;
+    currentOffset = lseek(fpga_fd, componentOffset, SEEK_SET);
+
+    if (currentOffset != componentOffset)
+    {
+        FreeAll(fpga_fd, file_fd, &allocated);
+        throw std::runtime_error("Seek error.");
+    }
+
+    /* Seek file offset */
+
+    currentFileOffset = lseek(file_fd, offsetFile, SEEK_SET);
+
+    if (currentFileOffset != offsetFile)
+    {
+        FreeAll(fpga_fd, file_fd, &allocated);
+        throw std::runtime_error("Seek error.");
+    }
+
+    /* --- Read --- */
+
+    /* Read FPGA data to buffer (READ mode) */
+
+    if (__DIRECTION_IS_READ__(direction))
+    {
+        writeReadBytes = read(fpga_fd, allocated, transferBytes);
+
+        if (static_cast<int>(transferBytes) != writeReadBytes)
+        {
+            FreeAll(fpga_fd, file_fd, &allocated);
+            throw std::runtime_error("Read from FPGA error.");
+        }
+    }
+
+    /* Read file data to buffer (WRITE mode) */
+
+    else if (__DIRECTION_IS_WRITE__(direction))
+    {
+        writeReadBytes = read(file_fd, allocated, transferBytes);
+
+        if (static_cast<int>(transferBytes) != writeReadBytes)
+        {
+            FreeAll(fpga_fd, file_fd, &allocated);
+            throw std::runtime_error("Read from File error.");
+        }
+    }
+
+    /* --- Write --- */
+
+    /* Write buffer data to file (READ mode) */
+
+    if (__DIRECTION_IS_READ__(direction))
+    {
+        writeReadBytes = write(file_fd, allocated, transferBytes);
+
+        if (static_cast<int>(transferBytes) != writeReadBytes)
+        {
+            FreeAll(fpga_fd, file_fd, &allocated);
+            throw std::runtime_error("Read from FPGA error.");
+        }
+    }
+
+    /* Write buffer data to FPGA (WRITE mode) */
+
+    else if (__DIRECTION_IS_WRITE__(direction))
+    {
+        writeReadBytes = write(fpga_fd, allocated, transferBytes);
+
+        if (static_cast<int>(transferBytes) != writeReadBytes)
+        {
+            FreeAll(fpga_fd, file_fd, &allocated);
+            throw std::runtime_error("Read from File error.");
+        }
+    }
+
+    /* Free all */
+
+    FreeAll(fpga_fd, file_fd, &allocated);
+
+    return true;
+}
+
+/* --------------------------------------------------------------------------------------------------------------- */
+/* ---------------------------------------------- User Interface ------------------------------------------------- */
+/* --------------------------------------------------------------------------------------------------------------- */
+
+/* --------------------------------------------------- AXI-Lite -------------------------------------------------- */
+
+bool vuprs::FPGAController::AXILite_WriteToFPGARegister(const int &registerSelection, const uint32_t &w_value)
 {
     if (!IS_AXI_LITE_RDONLY_REGISTER(registerSelection))
     {
-        return this->DMA_AXILite_FPGARegisterIO("write", registerSelection, w_value, nullptr);
+        return this->AXILite_FPGARegisterIO("write", registerSelection, w_value, nullptr);
     }
     else
     {
@@ -901,18 +1201,34 @@ bool vuprs::FPGAController::DMA_AXILite_WriteToFPGARegister(const int &registerS
     }
 }
 
-bool vuprs::FPGAController::DMA_AXILite_ReadFPGARegister(const int &registerSelection, uint32_t *r_value)
+bool vuprs::FPGAController::AXILite_ReadFPGARegister(const int &registerSelection, uint32_t *r_value)
 {
-    return this->DMA_AXILite_FPGARegisterIO("read", registerSelection, 0, r_value);
+    return this->AXILite_FPGARegisterIO("read", registerSelection, 0, r_value);
 }
 
-bool vuprs::FPGAController::DMA_AXIFull_WriteToFPGA(const std::vector<uint64_t> &writeBuffer, const uint8_t &dmaChannel = 0)
+/* --------------------------------------------------- AXI-Full -------------------------------------------------- */
+
+/* vector format */
+
+bool vuprs::FPGAController::AXIFull_WriteToFPGA(const std::vector<uint64_t> &writeBuffer, const uint64_t &offsetDDR, const uint8_t &dmaChannel)
 {
-    return this->DMA_AXIFull_IO("write", writeBuffer, nullptr, 0, dmaChannel);
+    return this->AXIFull_IO("write", offsetDDR, writeBuffer, nullptr, 0, dmaChannel);
 }
 
-bool vuprs::FPGAController::DMA_AXIFull_ReadFromFPGA(std::vector<uint64_t> *readBuffer, const uint64_t &readBytes, const uint8_t &dmaChannel = 0)
+bool vuprs::FPGAController::AXIFull_ReadFromFPGA(std::vector<uint64_t> *readBuffer, const uint64_t &offsetDDR, const uint64_t &readBytes, const uint8_t &dmaChannel)
 {
     std::vector<uint64_t> writeBuffer;
-    return this->DMA_AXIFull_IO("read", writeBuffer, readBuffer, readBytes, dmaChannel);
+    return this->AXIFull_IO("read", offsetDDR, writeBuffer, readBuffer, readBytes, dmaChannel);
+}
+
+/* file format */
+
+bool vuprs::FPGAController::AXIFull_WriteToFPGA(const std::string &inputFileName, const uint64_t &offsetDDR, const uint64_t &offsetFile, const uint64_t &writeBytes, const uint8_t &dmaChannel)
+{
+    return this->AXIFull_IO("write", offsetDDR, offsetFile, inputFileName, "", writeBytes, dmaChannel);
+}
+
+bool vuprs::FPGAController::AXIFull_ReadFromFPGA(const std::string &outputFileName, const uint64_t &offsetDDR, const uint64_t &offsetFile, const uint64_t &readBytes, const uint8_t &dmaChannel)
+{
+    return this->AXIFull_IO("read", offsetDDR, offsetFile, "", outputFileName, readBytes, dmaChannel);
 }

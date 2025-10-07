@@ -9,6 +9,15 @@
 #include <vector>
 #include <fstream>
 #include <filesystem>  /* Standard: C++ 17 */
+#include <memory>
+#include <cstdlib>
+#include <stdexcept>
+
+#ifdef _WIN32
+#include <malloc.h>
+#else
+#include <cstdlib>
+#endif
 
 #include "nlohmann/json.hpp"
 
@@ -36,36 +45,138 @@
 #define AXI_LITE_REGISTER__DMA__S2MM_DA_MSB       14
 #define AXI_LITE_REGISTER__DMA__S2MM_LENGTH       15
 
-#define IS_AXI_LITE_REGISTER__ADC(val) \
-(val == AXI_LITE_REGISTER__ADC__SCI               || \
- val == AXI_LITE_REGISTER__ADC__SP                || \
- val == AXI_LITE_REGISTER__ADC__SF                || \
- val == AXI_LITE_REGISTER__ADC__STR               || \
- val == AXI_LITE_REGISTER__ADC__NGF               || \
- val == AXI_LITE_REGISTER__ADC__ERR)
+#define IS_AXI_LITE_REGISTER__ADC(VAL) \
+(VAL == AXI_LITE_REGISTER__ADC__SCI               || \
+ VAL == AXI_LITE_REGISTER__ADC__SP                || \
+ VAL == AXI_LITE_REGISTER__ADC__SF                || \
+ VAL == AXI_LITE_REGISTER__ADC__STR               || \
+ VAL == AXI_LITE_REGISTER__ADC__NGF               || \
+ VAL == AXI_LITE_REGISTER__ADC__ERR)
 
-#define IS_AXI_LITE_RDONLY_REGISTER(val) \
-(val == AXI_LITE_REGISTER__ADC__NGF               || \
- val == AXI_LITE_REGISTER__ADC__ERR)
+#define IS_AXI_LITE_RDONLY_REGISTER(VAL) \
+(VAL == AXI_LITE_REGISTER__ADC__NGF               || \
+ VAL == AXI_LITE_REGISTER__ADC__ERR)
 
-#define IS_AXI_LITE_REGISTER__DMA(val) \
-(val == AXI_LITE_REGISTER__DMA__S2MM_DMACR        || \
- val == AXI_LITE_REGISTER__DMA__S2MM_DMASR        || \
- val == AXI_LITE_REGISTER__DMA__SG_CTL            || \
- val == AXI_LITE_REGISTER__DMA__S2MM_CURDESC      || \
- val == AXI_LITE_REGISTER__DMA__S2MM_CURDESC_MSB  || \
- val == AXI_LITE_REGISTER__DMA__S2MM_TAILDESC     || \
- val == AXI_LITE_REGISTER__DMA__S2MM_TAILDESC_MSB || \
- val == AXI_LITE_REGISTER__DMA__S2MM_DA           || \
- val == AXI_LITE_REGISTER__DMA__S2MM_DA_MSB       || \
- val == AXI_LITE_REGISTER__DMA__S2MM_LENGTH)
+#define IS_AXI_LITE_REGISTER__DMA(VAL) \
+(VAL == AXI_LITE_REGISTER__DMA__S2MM_DMACR        || \
+ VAL == AXI_LITE_REGISTER__DMA__S2MM_DMASR        || \
+ VAL == AXI_LITE_REGISTER__DMA__SG_CTL            || \
+ VAL == AXI_LITE_REGISTER__DMA__S2MM_CURDESC      || \
+ VAL == AXI_LITE_REGISTER__DMA__S2MM_CURDESC_MSB  || \
+ VAL == AXI_LITE_REGISTER__DMA__S2MM_TAILDESC     || \
+ VAL == AXI_LITE_REGISTER__DMA__S2MM_TAILDESC_MSB || \
+ VAL == AXI_LITE_REGISTER__DMA__S2MM_DA           || \
+ VAL == AXI_LITE_REGISTER__DMA__S2MM_DA_MSB       || \
+ VAL == AXI_LITE_REGISTER__DMA__S2MM_LENGTH)
 
- #define IS_AXI_LITE_REGISTER(val) \
- (IS_AXI_LITE_REGISTER__ADC(val)                  || \
-  IS_AXI_LITE_REGISTER__DMA(val))
+ #define IS_AXI_LITE_REGISTER(VAL) \
+ (IS_AXI_LITE_REGISTER__ADC(VAL)                  || \
+  IS_AXI_LITE_REGISTER__DMA(VAL))
+
+/* --------------------------------------- Aligned Parameters --------------------------------------- */
+
+#define __XDMA_DMA_ALIGNMENT_BYTES__              4096        /* 4 kB alignment */
+#define __LINUX_DMA_MAX_TRANSFER_BYTES__          0x7ffff000  /* Maximum transfer size in Linux-32bit or Linux-64bit */
 
 namespace vuprs
 {
+    /* -----------------------------------  Aligned Vector ------------------------------------- */
+
+    template<typename T, std::size_t Alignment>
+    class VectorAlignedAllocatorXDMA 
+    {
+        static_assert(Alignment > 0, "Alignment must be positive");
+        
+        public:
+            using value_type = T;
+            using pointer = T*;
+            using const_pointer = const T*;
+            using reference = T&;
+            using const_reference = const T&;
+            using size_type = std::size_t;
+            using difference_type = std::ptrdiff_t;
+
+            static constexpr std::size_t alignment = Alignment;
+        
+            template<typename U>
+            struct rebind
+            {
+                using other = VectorAlignedAllocatorXDMA<U, Alignment>;
+            };
+        
+            VectorAlignedAllocatorXDMA() noexcept = default;
+        
+            template<typename U>
+            VectorAlignedAllocatorXDMA(const VectorAlignedAllocatorXDMA<U, Alignment>&) noexcept {}
+        
+            pointer allocate(size_type n) 
+            {
+                if (n > max_size()) 
+                {
+                    throw std::bad_alloc();
+                }
+            
+                void* ptr = nullptr;
+
+        #ifdef _WIN32
+                ptr = _aligned_malloc(n * sizeof(T), Alignment);
+        #else
+                if (posix_memalign(&ptr, Alignment, n * sizeof(T)) != 0) 
+                {
+                    ptr = nullptr;
+                }
+        #endif
+
+                if (!ptr)
+                {
+                    throw std::bad_alloc();
+                }
+
+                return static_cast<pointer>(ptr);
+            }
+        
+            void deallocate(pointer p, size_type) noexcept 
+            {
+                if (p) 
+                {
+        #ifdef _WIN32
+                    _aligned_free(p);
+        #else
+                    std::free(p);
+        #endif
+                }
+            }
+        
+            size_type max_size() const noexcept 
+            {
+                return std::size_t(-1) / sizeof(T);
+            }
+        
+            template<typename U, typename... Args>
+            void construct(U* p, Args&&... args) 
+            {
+                ::new(static_cast<void*>(p)) U(std::forward<Args>(args)...);
+            }
+        
+            template<typename U>
+            void destroy(U* p) 
+            {
+                p->~U();
+            }
+        
+            template<typename U>
+            bool operator==(const VectorAlignedAllocatorXDMA<U, Alignment>&) const noexcept 
+            {
+                return true;
+            }
+        
+            template<typename U>
+            bool operator!=(const VectorAlignedAllocatorXDMA<U, Alignment>& other) const noexcept 
+            {
+                return !(*this == other);
+            }
+    };
+
     /* --------------------------------  FPGA Configuration ------------------------------------ */
 
     typedef struct FPGAbusAddress
@@ -188,9 +299,10 @@ namespace vuprs
 
             uint64_t AXILite_GetRegisterOffset(const int &registerSelection, bool *status = nullptr);
             
-            bool DMA_AXILite_FPGARegisterIO(const std::string &rd_wr, const int &registerSelection, const uint32_t &w_value, uint32_t *r_value);
+            bool AXILite_FPGARegisterIO(const std::string &rd_wr, const int &registerSelection, const uint32_t &w_value, uint32_t *r_value);
 
-            bool DMA_AXIFull_IO(const std::string &rd_wr, const std::vector<uint64_t> &writeBuffer, std::vector<uint64_t> *readBuffer, const uint64_t &readBytes, const uint8_t &dmaChannel);
+            bool AXIFull_IO(const std::string &rd_wr, const uint64_t &offsetDDR, const std::vector<uint64_t> &writeBuffer, std::vector<uint64_t> *readBuffer, const uint64_t &readBytes, const uint8_t &dmaChannel);
+            bool AXIFull_IO(const std::string &rd_wr, const uint64_t &offsetDDR, const uint64_t &offsetFile, const std::string &inputfileName, const std::string &outputFileName, const uint64_t &transferBytes, const uint8_t &dmaChannel);
             
         public:
 
@@ -198,14 +310,93 @@ namespace vuprs
 
             ~FPGAController();
 
+            /**
+             * @brief Load config data from JSON file.
+             * @note The JSON file must be the required format.
+             * @param configJsonFilename file name of the JSON file. (e.g. ./usr/config.json)
+             * @retval true: load data success;
+             *         false: load data failed.
+             * @throws std::runtime_error
+             */
             bool LoadFPGAConfigFromJson(const std::string &configJsonFilename);
+
+            /**
+             * @brief Check if the configuration is complete.
+             * @note Call FPGAController::LoadFPGAConfigFromJson() before.
+             * @retval true: configuration is complete;
+             *         false: configuration not complete.
+             */
             bool FPGAConfigDown();
 
-            bool DMA_AXILite_WriteToFPGARegister(const int &registerSelection, const uint32_t &w_value);
-            bool DMA_AXILite_ReadFPGARegister(const int &registerSelection, uint32_t *r_value);
+            /**
+             * @brief Write word (32 bit) to register on AXI-Lite bus of FPGA (use Simple method).
+             * @param registerSelection target register.
+             * @param w_value value to write.
+             * @retval true: write success;
+             *         false: write failed.
+             * @throw std::runtime_error
+             */
+            bool AXILite_WriteToFPGARegister(const int &registerSelection, const uint32_t &w_value);
 
-            bool DMA_AXIFull_WriteToFPGA(const std::vector<uint64_t> &writeBuffer, const uint8_t &dmaChannel = 0);
-            bool DMA_AXIFull_ReadFromFPGA(std::vector<uint64_t> *readBuffer, const uint64_t &readBytes, const uint8_t &dmaChannel = 0);
+            /**
+             * @brief Read word (32 bit) from register on AXI-Lite bus of FPGA (use Simple method).
+             * @param registerSelection target register.
+             * @param r_value read value.
+             * @retval true: read success;
+             *         false: read failed.
+             * @throw std::runtime_error
+             */
+            bool AXILite_ReadFPGARegister(const int &registerSelection, uint32_t *r_value);
+
+            /**
+             * @brief Write data to DDR on AXI-Full bus of FPGA (use Simple method).
+             * @param writeBuffer data to write (cannot be empty).
+             * @param offsetDDR offset of DDR (relative to the begining of DDR)
+             * @param writeBytes write bytes. (be smaller than XDMA.MAX_TRANSFER_BYTES)
+             * @param dmaChannel DMA channel selection, 0: DMA channel, 1: DMA channel 1.
+             * @retval true: write success;
+             *         false: write failed.
+             * @throw std::runtime_error
+             */
+            bool AXIFull_WriteToFPGA(const std::vector<uint64_t> &writeBuffer, const uint64_t &offsetDDR, const uint8_t &dmaChannel = 0);
+            
+            /**
+             * @brief Write data to DDR on AXI-Full bus of FPGA (use Simple method).
+             * @param inputFileName data to write (cannot be empty).
+             * @param offsetDDR offset of DDR (relative to the begining of DDR, bytes)
+             * @param offsetFile offset of file (relative to the begining of file, bytes)
+             * @param writeBytes write bytes. (be smaller than XDMA.MAX_TRANSFER_BYTES)
+             * @param dmaChannel DMA channel selection, 0: DMA channel, 1: DMA channel 1.
+             * @retval true: write success;
+             *         false: write failed.
+             * @throw std::runtime_error
+             */
+            bool AXIFull_WriteToFPGA(const std::string &inputFileName, const uint64_t &offsetDDR, const uint64_t &offsetFile, const uint64_t &writeBytes, const uint8_t &dmaChannel = 0);
+
+            /**
+             * @brief Read data from DDR on AXI-Full bus of FPGA (use Simple method).
+             * @param readBuffer read buffer to store data.
+             * @param offsetDDR offset of DDR (relative to the begining of DDR)
+             * @param readBytes read bytes. (be smaller than XDMA.MAX_TRANSFER_BYTES)
+             * @param dmaChannel DMA channel selection, 0: DMA channel, 1: DMA channel 1.
+             * @retval true: read success;
+             *         false: read failed.
+             * @throw std::runtime_error
+             */
+            bool AXIFull_ReadFromFPGA(std::vector<uint64_t> *readBuffer, const uint64_t &offsetDDR, const uint64_t &readBytes, const uint8_t &dmaChannel = 0);
+
+            /**
+             * @brief Write data to DDR on AXI-Full bus of FPGA (use Simple method).
+             * @param inputFileName data to write (cannot be empty).
+             * @param offsetDDR offset of DDR (relative to the begining of DDR, bytes)
+             * @param offsetFile offset of file (relative to the begining of file, bytes)
+             * @param readBytes write bytes. (be smaller than XDMA.MAX_TRANSFER_BYTES)
+             * @param dmaChannel DMA channel selection, 0: DMA channel, 1: DMA channel 1.
+             * @retval true: write success;
+             *         false: write failed.
+             * @throw std::runtime_error
+             */
+            bool AXIFull_ReadFromFPGA(const std::string &outputFileName, const uint64_t &offsetDDR, const uint64_t &offsetFile, const uint64_t &readBytes, const uint8_t &dmaChannel = 0);
     };
 }
 
