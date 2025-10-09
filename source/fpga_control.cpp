@@ -431,6 +431,10 @@ bool vuprs::FPGAController::AXIFull_BufferIO(const vuprs::DMATransferConfig &tra
     return true;
 }
 
+/* --------------------------------------------------------------------------------------------------------------- */
+/* ---------------------------------------------- User Interface ------------------------------------------------- */
+/* --------------------------------------------------------------------------------------------------------------- */
+
 /* --------------------------------------------------- AXI-Lite -------------------------------------------------- */
 
 bool vuprs::FPGAController::AXILite_WriteToFPGARegister(const int &registerSelection, const uint32_t &w_value)
@@ -450,9 +454,7 @@ bool vuprs::FPGAController::AXILite_ReadFPGARegister(const int &registerSelectio
     return this->AXILite_FPGARegisterIO("read", registerSelection, 0, r_value);
 }
 
-/* --------------------------------------------------------------------------------------------------------------- */
-/* ---------------------------------------------- User Interface ------------------------------------------------- */
-/* --------------------------------------------------------------------------------------------------------------- */
+/* --------------------------------------------------- AXI-Full -------------------------------------------------- */
 
 bool vuprs::FPGAController::AXIFull_IO(const vuprs::DMATransferConfig &transferConfig, vuprs::AlignedBufferDMA *buffer)
 {

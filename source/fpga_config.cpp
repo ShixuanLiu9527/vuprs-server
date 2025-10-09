@@ -310,24 +310,6 @@ bool vuprs::FPGAConfigManager::ParseHardwareFeatures(const nlohmann::json &jsonD
     {
         auto adcHardware = jsonData["adc"];
 
-        /* ADC Data Width */
-
-        if (adcHardware.contains("data-width-bits"))
-        {
-            parseResultValue = this->ParseIntegerFromString(adcHardware["data-width-bits"].get<std::string>(), &parseIntegerStatus);
-            if (parseIntegerStatus) this->fpgaConfig.hardwareConfig.hardwareConfigADC.adcDataWidth_bits = parseResultValue;
-            else parseSuccessADC = false;
-        }
-
-        /* ADC Channels */
-
-        if (adcHardware.contains("channels"))
-        {
-            parseResultValue = this->ParseIntegerFromString(adcHardware["channels"].get<std::string>(), &parseIntegerStatus);
-            if (parseIntegerStatus) this->fpgaConfig.hardwareConfig.hardwareConfigADC.adcChannels = parseResultValue;
-            else parseSuccessADC = false;
-        }
-
         /* ADC Maximum Sampling Frequency */
 
         if (adcHardware.contains("max-sampling-frequency-hz"))
@@ -343,15 +325,6 @@ bool vuprs::FPGAConfigManager::ParseHardwareFeatures(const nlohmann::json &jsonD
         {
             parseResultValue = this->ParseIntegerFromString(adcHardware["voltage-range-radius-v"].get<std::string>(), &parseIntegerStatus);
             if (parseIntegerStatus) this->fpgaConfig.hardwareConfig.hardwareConfigADC.adcVoltageRangeRadius = static_cast<double>(parseResultValue);
-            else parseSuccessADC = false;
-        }
-
-        /* ADC Frame Size */
-
-        if (adcHardware.contains("frame-length-bytes"))
-        {
-            parseResultValue = this->ParseIntegerFromString(adcHardware["frame-length-bytes"].get<std::string>(), &parseIntegerStatus);
-            if (parseIntegerStatus) this->fpgaConfig.hardwareConfig.hardwareConfigADC.adcFrameSizeBytes = parseResultValue;
             else parseSuccessADC = false;
         }
 

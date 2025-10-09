@@ -91,10 +91,8 @@ namespace vuprs
 
     typedef struct FPGAhardwareConfigADC
     {
-        uint64_t adcChannels;
-        uint64_t adcDataWidth_bits;
+
         uint64_t adcMaxSamplingFrequency_Hz;
-        uint64_t adcFrameSizeBytes;   /* frame length in bytes */
         double adcVoltageRangeRadius;
 
         bool configdown;

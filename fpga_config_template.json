@@ -51,11 +51,8 @@
     {
         "adc": 
         {
-            "data-width-bits": "16",
-            "channels": "16",
             "max-sampling-frequency-hz": "120_000",
-            "voltage-range-radius-v": "10",
-            "frame-length-bytes": "48"
+            "voltage-range-radius-v": "10"
         },
         "ddr": 
         {
