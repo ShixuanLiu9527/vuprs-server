@@ -159,9 +159,6 @@ namespace vuprs
 
             /* -------------------------- Parse Digital --------------------------- */
 
-            uint64_t ParseHexFromString(const std::string &dataString, bool *status = nullptr);
-            int ParseIntegerFromString(const std::string &dataString, bool *status = nullptr);
-
         public:
 
             vuprs::FPGAConfig fpgaConfig;
@@ -183,6 +180,11 @@ namespace vuprs
 
             bool ConfigDown() const;
     };
+
+    uint64_t ParseHexFromString(const std::string &dataString, bool *status = nullptr);
+    int ParseIntegerFromString(const std::string &dataString, bool *status = nullptr);
+
+    uint64_t ParseNumberFromString(const std::string &dataString, bool *status = nullptr);
 }
 
 #endif

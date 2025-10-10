@@ -113,7 +113,7 @@ bool vuprs::FPGAConfigManager::ParseMemoryBaseAddress(const nlohmann::json &json
 
         if (axiLite.contains("bus-address-offset") && axiLite.contains("adc") && axiLite.contains("dma"))
         {
-            parseResultValue = this->ParseHexFromString(axiLite["bus-address-offset"].get<std::string>(), &parseHexStatus);
+            parseResultValue = vuprs::ParseHexFromString(axiLite["bus-address-offset"].get<std::string>(), &parseHexStatus);
             if (parseHexStatus) axiLiteBusAddress = parseResultValue;
             else parseSuccess = false;
             
@@ -122,7 +122,7 @@ bool vuprs::FPGAConfigManager::ParseMemoryBaseAddress(const nlohmann::json &json
 
             if (axiLiteADC.contains("address-offset")) 
             {
-                parseResultValue = this->ParseHexFromString(axiLiteADC["address-offset"].get<std::string>(), &parseHexStatus);
+                parseResultValue = vuprs::ParseHexFromString(axiLiteADC["address-offset"].get<std::string>(), &parseHexStatus);
                 if (parseHexStatus) adcAddressOffset = parseResultValue;
                 else parseSuccess = false;
             }
@@ -133,7 +133,7 @@ bool vuprs::FPGAConfigManager::ParseMemoryBaseAddress(const nlohmann::json &json
             
             if (axiLiteDMA.contains("address-offset")) 
             {
-                parseResultValue = this->ParseHexFromString(axiLiteDMA["address-offset"].get<std::string>(), &parseHexStatus);
+                parseResultValue = vuprs::ParseHexFromString(axiLiteDMA["address-offset"].get<std::string>(), &parseHexStatus);
                 if (parseHexStatus) dmaAddressOffset = parseResultValue;
                 else parseSuccess = false;
             }
@@ -148,7 +148,7 @@ bool vuprs::FPGAConfigManager::ParseMemoryBaseAddress(const nlohmann::json &json
 
         if (axiFull.contains("bus-address-offset") && axiFull.contains("ddr"))
         {
-            parseResultValue = this->ParseHexFromString(axiFull["bus-address-offset"].get<std::string>(), &parseHexStatus);
+            parseResultValue = vuprs::ParseHexFromString(axiFull["bus-address-offset"].get<std::string>(), &parseHexStatus);
             if (parseHexStatus) axiFullBusAddress = parseResultValue;
             else parseSuccess = false;
             
@@ -156,7 +156,7 @@ bool vuprs::FPGAConfigManager::ParseMemoryBaseAddress(const nlohmann::json &json
 
             if (axiFullDDR.contains("address-offset")) 
             {
-                parseResultValue = this->ParseHexFromString(axiFullDDR["address-offset"].get<std::string>(), &parseHexStatus);
+                parseResultValue = vuprs::ParseHexFromString(axiFullDDR["address-offset"].get<std::string>(), &parseHexStatus);
                 if (parseHexStatus) ddrAddressOffset = parseResultValue;
                 else parseSuccess = false;
             }
@@ -219,7 +219,7 @@ bool vuprs::FPGAConfigManager::ParseRegisterAddressADC(const nlohmann::json &jso
         {
             if (adcRegAddr.contains(registerAddressList[i]))
             {
-                parseResultValue = this->ParseHexFromString(adcRegAddr[registerAddressList[i]].get<std::string>(), &parseHexStatus);
+                parseResultValue = vuprs::ParseHexFromString(adcRegAddr[registerAddressList[i]].get<std::string>(), &parseHexStatus);
                 if (parseHexStatus) 
                 {
                     *(registerAddressTarget[i]) = parseResultValue;
@@ -279,7 +279,7 @@ bool vuprs::FPGAConfigManager::ParseRegisterAddressDMA(const nlohmann::json &jso
         {
             if (adcRegAddr.contains(registerAddressList[i]))
             {
-                parseResultValue = this->ParseHexFromString(adcRegAddr[registerAddressList[i]].get<std::string>(), &parseHexStatus);
+                parseResultValue = vuprs::ParseHexFromString(adcRegAddr[registerAddressList[i]].get<std::string>(), &parseHexStatus);
                 if (parseHexStatus) 
                 {
                     *(registerAddressTarget[i]) = parseResultValue;
@@ -314,7 +314,7 @@ bool vuprs::FPGAConfigManager::ParseHardwareFeatures(const nlohmann::json &jsonD
 
         if (adcHardware.contains("max-sampling-frequency-hz"))
         {
-            parseResultValue = this->ParseIntegerFromString(adcHardware["max-sampling-frequency-hz"].get<std::string>(), &parseIntegerStatus);
+            parseResultValue = vuprs::ParseIntegerFromString(adcHardware["max-sampling-frequency-hz"].get<std::string>(), &parseIntegerStatus);
             if (parseIntegerStatus) this->fpgaConfig.hardwareConfig.hardwareConfigADC.adcMaxSamplingFrequency_Hz = parseResultValue;
             else parseSuccessADC = false;
         }
@@ -323,7 +323,7 @@ bool vuprs::FPGAConfigManager::ParseHardwareFeatures(const nlohmann::json &jsonD
 
         if (adcHardware.contains("voltage-range-radius-v"))
         {
-            parseResultValue = this->ParseIntegerFromString(adcHardware["voltage-range-radius-v"].get<std::string>(), &parseIntegerStatus);
+            parseResultValue = vuprs::ParseIntegerFromString(adcHardware["voltage-range-radius-v"].get<std::string>(), &parseIntegerStatus);
             if (parseIntegerStatus) this->fpgaConfig.hardwareConfig.hardwareConfigADC.adcVoltageRangeRadius = static_cast<double>(parseResultValue);
             else parseSuccessADC = false;
         }
@@ -348,7 +348,7 @@ bool vuprs::FPGAConfigManager::ParseHardwareFeatures(const nlohmann::json &jsonD
 
         if (ddrHardware.contains("memory-capacity-megabytes"))
         {
-            parseResultValue = this->ParseIntegerFromString(ddrHardware["memory-capacity-megabytes"].get<std::string>(), &parseIntegerStatus);
+            parseResultValue = vuprs::ParseIntegerFromString(ddrHardware["memory-capacity-megabytes"].get<std::string>(), &parseIntegerStatus);
             if (parseIntegerStatus) this->fpgaConfig.hardwareConfig.hardwareConfigDDR.ddrMemoryCapacity_megabytes = parseResultValue;
             else parseSuccessDDR = false;
         }
@@ -357,7 +357,7 @@ bool vuprs::FPGAConfigManager::ParseHardwareFeatures(const nlohmann::json &jsonD
 
         if (ddrHardware.contains("data-width-bits"))
         {
-            parseResultValue = this->ParseIntegerFromString(ddrHardware["data-width-bits"].get<std::string>(), &parseIntegerStatus);
+            parseResultValue = vuprs::ParseIntegerFromString(ddrHardware["data-width-bits"].get<std::string>(), &parseIntegerStatus);
             if (parseIntegerStatus) this->fpgaConfig.hardwareConfig.hardwareConfigDDR.ddrDataWidth_bits = parseResultValue;
             else parseSuccessDDR = false;
         }
@@ -478,7 +478,7 @@ bool vuprs::FPGAConfigManager::ParseXDMADriverConfig(const nlohmann::json &jsonD
 
     if (jsonData.contains("max-transfer-size-bytes"))
     {
-        parseResultValue = this->ParseIntegerFromString(jsonData["max-transfer-size-bytes"].get<std::string>(), &parseIntegerStatus);
+        parseResultValue = vuprs::ParseIntegerFromString(jsonData["max-transfer-size-bytes"].get<std::string>(), &parseIntegerStatus);
         if (parseIntegerStatus) this->fpgaConfig.xdmaDriverConfig.maxTransferSize_bytes = parseResultValue;
         else parseSuccess = false;
     }
@@ -499,7 +499,7 @@ bool vuprs::FPGAConfigManager::ParseXDMADriverConfig(const nlohmann::json &jsonD
     return parseSuccess;
 }
 
-uint64_t vuprs::FPGAConfigManager::ParseHexFromString(const std::string &dataString, bool *status)
+uint64_t vuprs::ParseHexFromString(const std::string &dataString, bool *status)
 {
     std::string hexString = dataString;
 
@@ -549,7 +549,7 @@ uint64_t vuprs::FPGAConfigManager::ParseHexFromString(const std::string &dataStr
     }
 }
 
-int vuprs::FPGAConfigManager::ParseIntegerFromString(const std::string &dataString, bool *status)
+int vuprs::ParseIntegerFromString(const std::string &dataString, bool *status)
 {
     if (status != nullptr)
     {
@@ -580,4 +580,30 @@ int vuprs::FPGAConfigManager::ParseIntegerFromString(const std::string &dataStri
     {
         return 0;
     }
+}
+
+uint64_t vuprs::ParseNumberFromString(const std::string &dataString, bool *status = nullptr)
+{
+    bool parseStatus = false;
+    uint64_t parseData;
+
+    if (status != nullptr) (*status) = false;
+
+    parseData = vuprs::ParseHexFromString(dataString, &parseStatus);
+
+    if (parseStatus)
+    {
+        if (status != nullptr) (*status) = true;
+        return parseData;
+    }
+
+    parseData = vuprs::ParseIntegerFromString(dataString, &parseStatus);
+
+    if (parseStatus)
+    {
+        if (status != nullptr) (*status) = true;
+        return parseData;
+    }
+
+    return 0;
 }

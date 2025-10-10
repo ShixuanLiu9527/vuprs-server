@@ -172,11 +172,14 @@ uint64_t vuprs::FPGAController::AXILite_GetRegisterOffset(const int &registerSel
     return axiLiteRegisterSpaceBaseAddress + registerOffset;  /* Base Address (Relative to AXI-Lite base address) + Register Offset */
 }
 
-bool vuprs::FPGAController::AXILite_FPGARegisterIO(const std::string &rd_wr, const int &registerSelection, const uint32_t &w_value, uint32_t *r_value)
+bool vuprs::FPGAController::AXILite_FPGARegisterIO(
+    const std::string &rd_wr, const int &registerSelection, 
+    const uint32_t &w_value, uint32_t *r_value, 
+    const uint64_t &base, const uint64_t &offset)
 {
     /* ------------------------ Security Check Start ------------------------- */
 
-    if (!IS_AXI_LITE_REGISTER(registerSelection))
+    if (!IS_AXI_LITE_REGISTER(registerSelection) && registerSelection != __AXI_LITE__DMA_USER_ADDRESS)
     {
         throw std::runtime_error("Invalid register selection: " + std::to_string(registerSelection));
     }
@@ -210,7 +213,14 @@ bool vuprs::FPGAController::AXILite_FPGARegisterIO(const std::string &rd_wr, con
     
     /* Calculate register address */
 
-    registerTargetOffset = this->AXILite_GetRegisterOffset(registerSelection, &registerCalculateStatus);
+    if (registerSelection != __AXI_LITE__DMA_USER_ADDRESS)
+    {
+        registerTargetOffset = this->AXILite_GetRegisterOffset(registerSelection, &registerCalculateStatus);
+    }
+    else
+    {
+        registerTargetOffset = base + offset;
+    }
 
     if (!registerCalculateStatus)
     {
@@ -441,7 +451,7 @@ bool vuprs::FPGAController::AXILite_WriteToFPGARegister(const int &registerSelec
 {
     if (!IS_AXI_LITE_RDONLY_REGISTER(registerSelection))
     {
-        return this->AXILite_FPGARegisterIO("write", registerSelection, w_value, nullptr);
+        return this->AXILite_FPGARegisterIO("write", registerSelection, w_value, nullptr, 0, 0);
     }
     else
     {
@@ -451,7 +461,17 @@ bool vuprs::FPGAController::AXILite_WriteToFPGARegister(const int &registerSelec
 
 bool vuprs::FPGAController::AXILite_ReadFPGARegister(const int &registerSelection, uint32_t *r_value)
 {
-    return this->AXILite_FPGARegisterIO("read", registerSelection, 0, r_value);
+    return this->AXILite_FPGARegisterIO("read", registerSelection, 0, r_value, 0, 0);
+}
+
+bool vuprs::FPGAController::AXILite_Read(const uint64_t &base, const uint64_t &offset, uint32_t *r_value)
+{
+    return this->AXILite_FPGARegisterIO("read", __AXI_LITE__DMA_USER_ADDRESS, 0, r_value, base, offset);
+}
+
+bool vuprs::FPGAController::AXILite_Write(const uint64_t &base, const uint64_t &offset, const uint32_t &w_value)
+{
+    return this->AXILite_FPGARegisterIO("write", __AXI_LITE__DMA_USER_ADDRESS, w_value, nullptr, base, offset);
 }
 
 /* --------------------------------------------------- AXI-Full -------------------------------------------------- */

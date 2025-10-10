@@ -44,6 +44,10 @@
 #define AXI_LITE_REGISTER__DMA__S2MM_DA_MSB       14
 #define AXI_LITE_REGISTER__DMA__S2MM_LENGTH       15
 
+/* AXI-Lite User Access */
+
+#define __AXI_LITE__DMA_USER_ADDRESS              16
+
 #define IS_AXI_LITE_REGISTER__ADC(VAL) \
 (VAL == AXI_LITE_REGISTER__ADC__SCI               || \
  VAL == AXI_LITE_REGISTER__ADC__SP                || \
@@ -105,7 +109,8 @@ namespace vuprs
             vuprs::FPGAConfigManager fpgaConfigManager;
 
             uint64_t AXILite_GetRegisterOffset(const int &registerSelection, bool *status = nullptr);
-            bool AXILite_FPGARegisterIO(const std::string &rd_wr, const int &registerSelection, const uint32_t &w_value, uint32_t *r_value);
+            bool AXILite_FPGARegisterIO(const std::string &rd_wr, const int &registerSelection, const uint32_t &w_value, uint32_t *r_value, const uint64_t &base, const uint64_t &offset);
+
             bool AXIFull_BufferIO(const vuprs::DMATransferConfig &transferConfig, vuprs::AlignedBufferDMA *buffer);
 
         public:
@@ -159,6 +164,26 @@ namespace vuprs
              * @throw std::runtime_error, std::bad_malloc
              */
             bool AXIFull_IO(const vuprs::DMATransferConfig &transferConfig, vuprs::AlignedBufferDMA *buffer);
+
+            /**
+             * @brief Read data on AXI-Lite bus.
+             * @param base base address of the memory space (relative to AXI-Lite).
+             * @param offset offset relative to <base>.
+             * @retval true: write success;
+             *         false: write failed.
+             * @throw std::runtime_error
+             */
+            bool AXILite_Read(const uint64_t &base, const uint64_t &offset, uint32_t *r_value);
+
+            /**
+             * @brief Write data on AXI-Lite bus.
+             * @param base base address of the memory space (relative to AXI-Lite).
+             * @param offset offset relative to <base>.
+             * @retval true: write success;
+             *         false: write failed.
+             * @throw std::runtime_error
+             */
+            bool AXILite_Write(const uint64_t &base, const uint64_t &offset, const uint32_t &w_value);
     };
 }
 
