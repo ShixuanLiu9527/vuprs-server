@@ -10,12 +10,17 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <fcntl.h>
 #include <stdint.h>
 #include <string>
 #include <vector>
 #include <fstream>
 #include <stdexcept>
+
+#ifndef _WIN32
+#include <sys/mman.h>
+#endif
+
+#include <fcntl.h>
 
 #include "fpga_config.h"
 #include "aligned_data_structure.h"
@@ -88,6 +93,7 @@
 /* ----------------------------------- Fixed Transfer Parameters ------------------------------------ */
 
 #define __LINUX_DMA_MAX_TRANSFER_BYTES__          0x7ffff000  /* Maximum transfer size in Linux-32bit or Linux-64bit */
+#define __XDMA_AXI_LITE_MMAP_SIZE__               (2 * 64 * 1024UL)  /* 2 * 64 kB address in VUPRS FPGA AXI-Lite bus address space */
 
 namespace vuprs
 {
@@ -109,7 +115,7 @@ namespace vuprs
             vuprs::FPGAConfigManager fpgaConfigManager;
 
             uint64_t AXILite_GetRegisterOffset(const int &registerSelection, bool *status = nullptr);
-            bool AXILite_FPGARegisterIO(const std::string &rd_wr, const int &registerSelection, const uint32_t &w_value, uint32_t *r_value, const uint64_t &base, const uint64_t &offset);
+            bool AXILite_FPGARegisterIO(const std::string &rd_wr, const int &registerSelection, const uint32_t &w_value, uint32_t *r_value, const uint64_t &base, const uint64_t &offset, const bool &use_mmap = false);
 
             bool AXIFull_BufferIO(const vuprs::DMATransferConfig &transferConfig, vuprs::AlignedBufferDMA *buffer);
 

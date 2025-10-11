@@ -4,13 +4,14 @@
 /* ---------------------------------------- Aligned Data Structure ----------------------------------------------- */
 /* --------------------------------------------------------------------------------------------------------------- */
 
-explicit vuprs::AlignedBufferDMA::AlignedBufferDMA(uint64_t byteSize)
+vuprs::AlignedBufferDMA::AlignedBufferDMA(uint64_t byteSize)
 {
     if (!this->malloc(byteSize))
     {
         throw std::bad_alloc();
     }
 }
+
 vuprs::AlignedBufferDMA::~AlignedBufferDMA()
 {
     this->release();

@@ -6,10 +6,10 @@
     {
         "axi-lite": 
         {
-            "bus-address-offset": "0x4000_0000",
+            "bus-address-offset": "0x40000000",
             "adc": 
             {
-                "address-offset": "0x0001_0000",
+                "address-offset": "0x00010000",
                 "registers-address-offset": 
                 {
                     "SCI-address-offset": "0x00",
@@ -22,7 +22,7 @@
             },
             "dma": 
             {
-                "address-offset": "0x0000_0000",
+                "address-offset": "0x00000000",
                 "registers-address-offset": 
                 {
                     "S2MM_DMACR-address-offset": "0x30",
@@ -40,10 +40,10 @@
         },
         "axi-full": 
         {
-            "address-offset": "0x8000_0000",
+            "bus-address-offset": "0x80000000",
             "ddr": 
             {
-                "address-offset": "0x0000_0000"
+                "address-offset": "0x00000000"
             }
         }
     },
@@ -51,7 +51,7 @@
     {
         "adc": 
         {
-            "max-sampling-frequency-hz": "120_000",
+            "max-sampling-frequency-hz": "120000",
             "voltage-range-radius-v": "10"
         },
         "ddr": 
@@ -71,7 +71,7 @@
             "xdma-control": "/dev/xdma0_control",
             "xdma-user": "/dev/xdma0_user",
             "xdma-h2c": ["/dev/xdma0_h2c_0", "/dev/xdma0_h2c_1"],
-            "xdma-c2h": ["/dev/xdma0_c2h_0", "/dev/xdma0_c2h_0"],
+            "xdma-c2h": ["/dev/xdma0_c2h_0", "/dev/xdma0_c2h_1"],
             "xdma-events": 
             [
                 "/dev/xdma0_events_0", "/dev/xdma0_events_1", "/dev/xdma0_events_2", "/dev/xdma0_events_3", 

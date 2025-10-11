@@ -16,6 +16,19 @@
 #include <memory>
 #include <fcntl.h>
 #include <stdexcept>
+#include <cstring>
+
+#include <assert.h>
+#include <getopt.h>
+
+#ifndef _WIN32
+    #include <sys/mman.h>
+#endif
+
+#include <sys/stat.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #ifdef _WIN32
 #include <malloc.h>

@@ -175,7 +175,7 @@ uint64_t vuprs::FPGAController::AXILite_GetRegisterOffset(const int &registerSel
 bool vuprs::FPGAController::AXILite_FPGARegisterIO(
     const std::string &rd_wr, const int &registerSelection, 
     const uint32_t &w_value, uint32_t *r_value, 
-    const uint64_t &base, const uint64_t &offset)
+    const uint64_t &base, const uint64_t &offset, const bool &use_mmap)
 {
     /* ------------------------ Security Check Start ------------------------- */
 
@@ -198,7 +198,7 @@ bool vuprs::FPGAController::AXILite_FPGARegisterIO(
     }
     else if (__DIRECTION_IS_WRITE__(direction))
     {
-        if (IS_AXI_LITE_RDONLY_REGISTER(registerSelection))
+        if (IS_AXI_LITE_RDONLY_REGISTER(registerSelection) && registerSelection != __AXI_LITE__DMA_USER_ADDRESS)
         {
             throw std::runtime_error("This register is read only: " + std::to_string(registerSelection));
         }
@@ -208,6 +208,7 @@ bool vuprs::FPGAController::AXILite_FPGARegisterIO(
 
     int fpga_fd = -1, writeReadStatus = -1;
     bool registerCalculateStatus = false;
+    void* mmapBase;
     uint64_t registerTargetOffset = 0;
     ssize_t currentOffset = -1;
     
@@ -216,15 +217,15 @@ bool vuprs::FPGAController::AXILite_FPGARegisterIO(
     if (registerSelection != __AXI_LITE__DMA_USER_ADDRESS)
     {
         registerTargetOffset = this->AXILite_GetRegisterOffset(registerSelection, &registerCalculateStatus);
+
+        if (!registerCalculateStatus)
+        {
+            throw std::runtime_error("Invalid register selection.");
+        }
     }
     else
     {
         registerTargetOffset = base + offset;
-    }
-
-    if (!registerCalculateStatus)
-    {
-        throw std::runtime_error("Invalid register selection.");
     }
 
     /* Open device file (AXI-Lite) */
@@ -235,7 +236,7 @@ bool vuprs::FPGAController::AXILite_FPGARegisterIO(
 
 #else
 
-    fpga_fd = open((this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_user).c_str(), O_RDWR);
+    fpga_fd = open((this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_user).c_str(), O_RDWR | O_SYNC);
 
 #endif
 
@@ -243,31 +244,70 @@ bool vuprs::FPGAController::AXILite_FPGARegisterIO(
 
     if (fpga_fd < 0)
     {
-        throw std::runtime_error("Cannot open device file: " + this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_control);
+        throw std::runtime_error("Cannot open device file: " + this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_user);
     }
 
-    /* Seek to offset relative to AXI-Lite base address in FPGA */
-
-    currentOffset = lseek(fpga_fd, registerTargetOffset, SEEK_SET);
-
-    if (static_cast<uint64_t>(currentOffset) != registerTargetOffset || currentOffset < 0 || currentOffset == (off_t) - 1)
+    if (!use_mmap)
     {
-        close(fpga_fd);  /* close file */
-        throw std::runtime_error("Seek error.");
-    }
 
-    /* Write data to register */
+        /* Seek to offset relative to AXI-Lite base address in FPGA */
 
-    if (__DIRECTION_IS_WRITE__(direction))
-    {
-        writeReadStatus = write(fpga_fd, &w_value, sizeof(uint32_t));  /* All registers are 32 bit */
-    }
-    else if (__DIRECTION_IS_READ__(direction))
-    {
-        if (r_value != nullptr)
+        currentOffset = lseek(fpga_fd, registerTargetOffset, SEEK_SET);
+
+        if (static_cast<uint64_t>(currentOffset) != registerTargetOffset || currentOffset < 0 || currentOffset == (off_t) - 1)
         {
-            writeReadStatus = read(fpga_fd, r_value, sizeof(uint32_t));  /* All registers are 32 bit */
+            close(fpga_fd);  /* close file */
+            throw std::runtime_error("Seek error.");
         }
+
+        /* Write data to register */
+
+        if (__DIRECTION_IS_WRITE__(direction))
+        {
+            writeReadStatus = write(fpga_fd, &w_value, sizeof(uint32_t));  /* All registers are 32 bit */
+        }
+        else if (__DIRECTION_IS_READ__(direction))
+        {
+            if (r_value != nullptr)
+            {
+                writeReadStatus = read(fpga_fd, r_value, sizeof(uint32_t));  /* All registers are 32 bit */
+            }
+        }
+    }
+    else
+    {
+    
+#ifndef _WIN32
+    
+        /* Generate Memory Map */
+
+        void *map_base = mmap(0, __XDMA_AXI_LITE_MMAP_SIZE__, PROT_READ | PROT_WRITE, MAP_SHARED, fpga_fd, 0);
+
+        if (map_base != MAP_FAILED) 
+        {
+            /* Address convert */
+
+            volatile uint32_t *reg_addr = (volatile uint32_t *)((uint8_t *)map_base + registerTargetOffset);
+
+            if (__DIRECTION_IS_READ__(direction)) 
+            {
+                *r_value = *reg_addr;
+            }
+            else 
+            {
+                *reg_addr = w_value;
+            }
+            
+            munmap(map_base, __XDMA_AXI_LITE_MMAP_SIZE__);
+            writeReadStatus = 1;
+        }
+        else
+        {
+            writeReadStatus = -1;
+        }
+
+#endif
+
     }
 
     /* Close */
@@ -336,7 +376,7 @@ bool vuprs::FPGAController::AXIFull_BufferIO(const vuprs::DMATransferConfig &tra
 
 #else
 
-        fpga_fd = open((this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_c2h[transferConfig.transferDmaChannel]).c_str(), O_RDWR);
+        fpga_fd = open((this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_c2h[transferConfig.transferDmaChannel]).c_str(), O_RDWR | O_SYNC);
 
 #endif
 
@@ -365,7 +405,7 @@ bool vuprs::FPGAController::AXIFull_BufferIO(const vuprs::DMATransferConfig &tra
     
 #else
 
-        fpga_fd = open((this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_h2c[transferConfig.transferDmaChannel]).c_str(), O_RDWR);
+        fpga_fd = open((this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_h2c[transferConfig.transferDmaChannel]).c_str(), O_RDWR | O_SYNC);
 
 #endif
 
@@ -461,17 +501,17 @@ bool vuprs::FPGAController::AXILite_WriteToFPGARegister(const int &registerSelec
 
 bool vuprs::FPGAController::AXILite_ReadFPGARegister(const int &registerSelection, uint32_t *r_value)
 {
-    return this->AXILite_FPGARegisterIO("read", registerSelection, 0, r_value, 0, 0);
+    return this->AXILite_FPGARegisterIO("read", registerSelection, 0, r_value, 0, 0, true);
 }
 
 bool vuprs::FPGAController::AXILite_Read(const uint64_t &base, const uint64_t &offset, uint32_t *r_value)
 {
-    return this->AXILite_FPGARegisterIO("read", __AXI_LITE__DMA_USER_ADDRESS, 0, r_value, base, offset);
+    return this->AXILite_FPGARegisterIO("read", __AXI_LITE__DMA_USER_ADDRESS, 0, r_value, base, offset, true);
 }
 
 bool vuprs::FPGAController::AXILite_Write(const uint64_t &base, const uint64_t &offset, const uint32_t &w_value)
 {
-    return this->AXILite_FPGARegisterIO("write", __AXI_LITE__DMA_USER_ADDRESS, w_value, nullptr, base, offset);
+    return this->AXILite_FPGARegisterIO("write", __AXI_LITE__DMA_USER_ADDRESS, w_value, nullptr, base, offset, true);
 }
 
 /* --------------------------------------------------- AXI-Full -------------------------------------------------- */

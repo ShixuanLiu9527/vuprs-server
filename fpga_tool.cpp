@@ -59,94 +59,49 @@ typedef struct FPGA_TOOL_AXIParameters
 };
 
 void FPGA_TOOL__PrintHelp();
-void FPGA_TOOL__PrintError();
-void FPGA_TOOL__FileOpenError(const std::string &filename);
-void FPGA_TOOL__ShowReadValue(const uint32_t &r_value, const uint64_t &base, const uint64_t &offset);
-void FPGA_TOOL__ShowReadFile(const std::string &filename);
-void FPGA_TOOL__ShowReadFailed();
 FPGA_TOOL_AXIParameters FPGA_TOOL__ParseCommandParameters(const std::vector<std::string> &cmdList);
-
-void FPGA_TOOL__PrintError()
-{
-printf("\n");
-printf(" FPGA-TOOL: ERROR COMMAND! \n");
-printf("\n");
-}
-
-void FPGA_TOOL__ShowReadFailed()
-{
-printf("\n");
-printf(" [ READ FAILED ]\n");
-printf("\n");
-}
-
-void FPGA_TOOL__FileOpenError(const std::string &filename)
-{
-printf("\n");
-std::cout << " FPGA-TOOL: Cannot open: " << filename << std::endl;
-printf("\n");
-}
-
-void FPGA_TOOL__ShowReadFile(const std::string &filename)
-{
-printf("\n");
-printf(" [ READ SUCCESS ]\n");
-printf("\n");
-printf((" Data have be written to: " + filename + "\n").c_str());
-printf("\n");
-}
-
-void FPGA_TOOL__ShowReadValue(const uint32_t &r_value, const uint64_t &base, const uint64_t &offset)
-{
-printf("\n");
-printf(" [ READ SUCCESS ]\n");
-printf("\n");
-printf(" addr:  %lx\n", base + offset);
-printf(" val:   %lx\n", r_value);
-printf("\n");
-}
 
 void FPGA_TOOL__PrintHelp()
 {
 printf("\n");
-printf(" |=============================== [ FPGA TOOL HELP ] ====================|\n");
+printf(" |========================= [ FPGA TOOL HELP ] ==========================|\n");
 printf(" |                                                                       |\n");
 printf(" | ----- [ 1. For Help ] ----------------------------------------------- |\n");
 printf(" |                                                                       |\n");
-printf(" | [ COMMAND ]                                                           |\n");
+printf(" | [ \033[92mCOMMAND\033[0m ]                                                           |\n");
 printf(" |                                                                       |\n");
 printf(" | fpga-tool -h                                                          |\n");
 printf(" | fpga-tool --help                                                      |\n");
 printf(" |                                                                       |\n");
 printf(" | ----- [ 2. Access AXI-Lite & AXI-Full Bus ] ------------------------- |\n");
 printf(" |                                                                       |\n");
-printf(" | [ COMMAND ]                                                           |\n");
+printf(" | [ \033[92mCOMMAND\033[0m ]                                                           |\n");
 printf(" |                                                                       |\n");
 printf(" | fpga-tool --rw <rw> --bus <b> --cfg <cfg> --base <ba>                 |\n");
 printf(" |           --offset <of> --bytes <by> --io <io>                        |\n");
 printf(" |                                                                       |\n");
-printf(" | [ PARAMETERS ]                                                        |\n");
+printf(" | [ \033[92mPARAMETERS\033[0m ]                                                        |\n");
 printf(" |                                                                       |\n");
 printf(" | <rw> r = read from FPGA, w = write to FPGA;                           |\n");
 printf(" | <b>  bus selection, lite = AXI-Lite, full = AXI-Full;                 |\n");
 printf(" | <cf> config JSON file;                                                |\n");
 printf(" | <ba> base address of the address space (AXI-Lite only, AXI-Full = 0); |\n");
 printf(" | <of> register offset (AXI-Lite) or address offset (AXI-Full);         |\n");
-printf(" | <by> read/write bytes                  (AXI-Full only, AXI-Lite = 4); |\n");
+printf(" | <by> read/write bytes (AXI-Full only, AXI-Lite = 4);                  |\n");
 printf(" | <io> input value (AXI-Lite) or intput/output filename (AXI-Full);     |\n");
 printf(" |                                                                       |\n");
-printf(" | [ EXAMPLE ]                                                           |\n");
+printf(" | [ \033[92mEXAMPLE\033[0m ]                                                           |\n");
 printf(" |                                                                       |\n");
-printf(" | fpga-tool --rw r --bus lite --cfg ./cfg.json --base 0 --offset 0x04   |\n");
+printf(" | fpga-tool --rw \033[33mr\033[0m --bus \033[33mlite\033[0m --cfg \033[33m./cfg.json\033[0m --base \033[33m0\033[0m --offset \033[33m0x04\033[0m   |\n");
 printf(" |                                                                       |\n");
-printf(" | fpga-tool --rw w --bus lite --cfg ./cfg.json --base 0 --offset 0x0C   |\n");
-printf(" |           --io 0XFF                                                   |\n");
+printf(" | fpga-tool --rw \033[33mw\033[0m --bus \033[33mlite\033[0m --cfg \033[33m./cfg.json\033[0m --base \033[33m0\033[0m --offset \033[33m0x0C\033[0m   |\n");
+printf(" |           --io \033[33m0XFF\033[0m                                                   |\n");
 printf(" |                                                                       |\n");
-printf(" | fpga-tool --rw r --bus full --cfg ./cfg.json --offset 0 --bytes 1024  |\n");
-printf(" |           --io ./r_data.bin                                           |\n");
+printf(" | fpga-tool --rw \033[33mr\033[0m --bus \033[33mfull\033[0m --cfg \033[33m./cfg.json\033[0m --offset \033[33m0\033[0m --bytes \033[33m1024\033[0m  |\n");
+printf(" |           --io \033[33m./r_data.bin\033[0m                                           |\n");
 printf(" |                                                                       |\n");
-printf(" | fpga-tool --rw w --bus full --cfg ./cfg.json --offset 0 --bytes 1024  |\n");
-printf(" |           --io ./w_data.bin                                           |\n");
+printf(" | fpga-tool --rw \033[33mw\033[0m --bus \033[33mfull\033[0m --cfg \033[33m./cfg.json\033[0m --offset \033[33m0\033[0m --bytes \033[33m1024\033[0m  |\n");
+printf(" |           --io \033[33m./w_data.bin\033[0m                                           |\n");
 printf(" |                                                                       |\n");
 printf(" |=======================================================================|\n");
 printf("\n");
@@ -161,16 +116,21 @@ FPGA_TOOL_AXIParameters FPGA_TOOL__ParseCommandParameters(const std::vector<std:
 
     /* String to upper */
 
+    printf(" Processing commands: \n");
+
     for (uint64_t i = 0; i < cmdSize; i++)
     {
         std::transform(cmdListUpper[i].begin(), cmdListUpper[i].end(), cmdListUpper[i].begin(), ::toupper);  /* Upper */
+        std::cout << cmdListUpper[i] << " ";
     }
+
+    std::cout << std::endl;
 
     /* Check --rw & --bus */
 
     if (cmdSize == 2)
     {
-        if (cmdListUpper[1] == "-h" || cmdListUpper[1] == "--help")
+        if (cmdListUpper[1] == "-H" || cmdListUpper[1] == "--HELP")
         {
             retParameters.operate = FPGA_TOOL__OPERATE__FOR_HELP;
         }
@@ -186,17 +146,20 @@ FPGA_TOOL_AXIParameters FPGA_TOOL__ParseCommandParameters(const std::vector<std:
             if (!cmdList[6].empty())retParameters.configFileName = cmdList[6];
             else cmdError = true;
 
-            parseValue = vuprs::ParseNumberFromString(cmdListUpper[8]);
+            parseValue = vuprs::ParseNumberFromString(cmdList[8], &parseStatus);
             if (parseStatus)retParameters.base = parseValue;
             else cmdError = true;
-           
-            parseValue = vuprs::ParseNumberFromString(cmdListUpper[10]);
+
+            parseValue = vuprs::ParseNumberFromString(cmdList[10], &parseStatus);
             if (parseStatus)retParameters.offset = parseValue;
             else cmdError = true;
-            
+        }
+        else
+        {
+            cmdError = true;
         }
     }
-    else if (cmdSize = 13)
+    else if (cmdSize == 13)
     {
         if (IS__FPGA_TOOL__OPERATE__WRITE_AXI_LITE_CMD(cmdListUpper) && IS__FPGA_TOOL__OPERATE__WRITE_AXI_LITE(cmdListUpper))
         {
@@ -207,15 +170,15 @@ FPGA_TOOL_AXIParameters FPGA_TOOL__ParseCommandParameters(const std::vector<std:
             if (!cmdList[6].empty())retParameters.configFileName = cmdList[6];
             else cmdError = true;
 
-            parseValue = vuprs::ParseNumberFromString(cmdListUpper[8]);
+            parseValue = vuprs::ParseNumberFromString(cmdList[8], &parseStatus);
             if (parseStatus)retParameters.base = parseValue;
             else cmdError = true;
            
-            parseValue = vuprs::ParseNumberFromString(cmdListUpper[10]);
+            parseValue = vuprs::ParseNumberFromString(cmdList[10], &parseStatus);
             if (parseStatus)retParameters.offset = parseValue;
             else cmdError = true;
 
-            parseValue = vuprs::ParseNumberFromString(cmdListUpper[12]);
+            parseValue = vuprs::ParseNumberFromString(cmdList[12], &parseStatus);
             if (parseStatus)retParameters.writeValue = static_cast<uint32_t>(parseValue);
             else cmdError = true;
         }
@@ -228,11 +191,11 @@ FPGA_TOOL_AXIParameters FPGA_TOOL__ParseCommandParameters(const std::vector<std:
             if (!cmdList[6].empty())retParameters.configFileName = cmdList[6];
             else cmdError = true;
 
-            parseValue = vuprs::ParseNumberFromString(cmdListUpper[8]);
+            parseValue = vuprs::ParseNumberFromString(cmdList[8], &parseStatus);
             if (parseStatus)retParameters.offset = parseValue;
             else cmdError = true;
            
-            parseValue = vuprs::ParseNumberFromString(cmdListUpper[10]);
+            parseValue = vuprs::ParseNumberFromString(cmdList[10], &parseStatus);
             if (parseStatus)retParameters.transferBytes = parseValue;
             else cmdError = true;
 
@@ -248,11 +211,11 @@ FPGA_TOOL_AXIParameters FPGA_TOOL__ParseCommandParameters(const std::vector<std:
             if (!cmdList[6].empty())retParameters.configFileName = cmdList[6];
             else cmdError = true;
 
-            parseValue = vuprs::ParseNumberFromString(cmdListUpper[8]);
+            parseValue = vuprs::ParseNumberFromString(cmdList[8], &parseStatus);
             if (parseStatus)retParameters.offset = parseValue;
             else cmdError = true;
            
-            parseValue = vuprs::ParseNumberFromString(cmdListUpper[10]);
+            parseValue = vuprs::ParseNumberFromString(cmdList[10], &parseStatus);
             if (parseStatus)retParameters.transferBytes = parseValue;
             else cmdError = true;
 
@@ -279,6 +242,7 @@ FPGA_TOOL_AXIParameters FPGA_TOOL__ParseCommandParameters(const std::vector<std:
 
 int main(int argc, char *argv[])
 {
+
     std::vector<std::string> args;
     FPGA_TOOL_AXIParameters fpgaConfigParam;
 
@@ -298,23 +262,25 @@ int main(int argc, char *argv[])
 
     fpgaConfigParam = FPGA_TOOL__ParseCommandParameters(args);
 
-    if (fpgaConfigParam.operate != FPGA_TOOL__OPERATE__ERROR || fpgaConfigParam.operate != FPGA_TOOL__OPERATE__FOR_HELP)
+    if (fpgaConfigParam.operate != FPGA_TOOL__OPERATE__ERROR && fpgaConfigParam.operate != FPGA_TOOL__OPERATE__FOR_HELP)
     {
         if (!fpgaConfigManager.LoadFPGAConfigFromJson(fpgaConfigParam.configFileName))
         {
-            FPGA_TOOL__FileOpenError(fpgaConfigParam.configFileName);
+std::cout << " \033[31mFPGA-TOOL ERR: Cannot load config data from: " << fpgaConfigParam.configFileName << "\033[0m" << std::endl;
+            buffer.release();
             return 0;
         }
         else
         {
             if(!fpgaController.LoadFPGAConfig(fpgaConfigManager))
             {
-printf("\n");
-printf(" FPGA-TOOL: Error occurred when loading config.\n");
-printf("\n");
+printf(" \033[31mFPGA-TOOL ERR: Error occurred when loading config.\033[0m\n");
+                buffer.release();
                 return 0;
             }
         }
+
+std::cout << " \033[92mSuccessfully load configuration from\033[0m: \033[34m" << fpgaConfigParam.configFileName << "\033[0m" << std::endl;
     }
 
     switch (fpgaConfigParam.operate)
@@ -322,11 +288,13 @@ printf("\n");
         case FPGA_TOOL__OPERATE__FOR_HELP:
         {
             FPGA_TOOL__PrintHelp();
+            break;
         }
         case FPGA_TOOL__OPERATE__ERROR: 
         {
-            FPGA_TOOL__PrintError();
+printf(" \033[31mFPGA-TOOL: ERROR COMMAND!\033[0m Check the command below:  \n");
             FPGA_TOOL__PrintHelp();
+            break;
         }
 
         /* FPGA I/O */
@@ -337,17 +305,28 @@ printf("\n");
             {
                 if(fpgaController.AXILite_Read(fpgaConfigParam.base, fpgaConfigParam.offset, &rValue))
                 {
-                    FPGA_TOOL__ShowReadValue(rValue, fpgaConfigParam.base, fpgaConfigParam.offset);
+printf(" | --------------------------------------------------------------------- |\n");
+printf("                           [\033[92mREAD AXI-LITE SUCCESS\033[0m]\n");
+printf("\n");
+printf("   <address>    \033[33m0x%X\033[0m\n", fpgaConfigParam.base + fpgaConfigParam.offset);
+printf("   <value>      \033[33m0x%X\033[0m\n", rValue);
+printf("\n");
+printf(" | --------------------------------------------------------------------- |\n");
                 }
                 else
                 {
-                    FPGA_TOOL__ShowReadFailed();
+printf(" | --------------------------------------------------------------------- |\n");
+printf("                           [\033[31mREAD AXI-LITE FAILED\033[0m]\n");
+printf(" | --------------------------------------------------------------------- |\n");
                 }
             }
             catch(const std::exception& e)
             {
                 std::cerr << e.what() << '\n';
+                buffer.release();
+                return 0;
             }
+            break;
         }
         case FPGA_TOOL__OPERATE__WRITE_AXI_LITE:
         {
@@ -355,17 +334,38 @@ printf("\n");
             {
                 if(fpgaController.AXILite_Write(fpgaConfigParam.base, fpgaConfigParam.offset, fpgaConfigParam.writeValue))
                 {
-                    printf(" DONE.");
+                    if (fpgaController.AXILite_Read(fpgaConfigParam.base, fpgaConfigParam.offset, &rValue))
+                    {
+printf(" | --------------------------------------------------------------------- |\n");
+printf("                           [\033[92mWRITE AXI-LITE SUCCESS\033[0m]\n");
+printf("\n");
+printf("   <address>      \033[33m0x%X\033[0m\n", fpgaConfigParam.base + fpgaConfigParam.offset);
+printf("   <write value>  \033[33m0x%X\033[0m\n", fpgaConfigParam.writeValue);
+printf("   <read back>    \033[33m0x%X\033[0m\n", rValue);
+printf("\n");
+printf(" | --------------------------------------------------------------------- |\n");
+                    }
+                    else
+                    {
+printf(" | --------------------------------------------------------------------- |\n");
+printf("                           [\033[31mWRITE AXI-LITE FAILED\033[0m]\n");
+printf(" | --------------------------------------------------------------------- |\n");
+                    }
                 }
                 else
                 {
-                    printf(" FAILED.");
+printf(" | --------------------------------------------------------------------- |\n");
+printf("                           [\033[31mWRITE AXI-LITE FAILED\033[0m]\n");
+printf(" | --------------------------------------------------------------------- |\n");
                 }
             }
             catch(const std::exception& e)
             {
                 std::cerr << e.what() << '\n';
+                buffer.release();
+                return 0;
             }
+            break;
         }
         case FPGA_TOOL__OPERATE__READ_AXI_FULL:
         {
@@ -378,24 +378,74 @@ printf("\n");
 
                 if(fpgaController.AXIFull_IO(dmaTransferConfig, &buffer))
                 {
+printf(" | --------------------------------------------------------------------- |\n");
+printf("                           [\033[92mREAD AXI-FULL SUCCESS\033[0m]\n");
                     if(buffer.to_file(fpgaConfigParam.datafileName, 0, fpgaConfigParam.transferBytes))
                     {
-                        FPGA_TOOL__ShowReadFile(fpgaConfigParam.datafileName);
+std::cout << "   Successfully save <" << fpgaConfigParam.transferBytes << "> bytes to file: " << fpgaConfigParam.datafileName;
                     }
                     else
                     {
-                        printf(" FAILED.");
+printf("   Failed to save data to file.");
                     }
                 }
                 else
                 {
-                    printf(" FAILED.");
+printf("                           [\033[31mREAD AXI-FULL FAILED\033[0m]\n");
+printf(" | --------------------------------------------------------------------- |\n");
                 }
             }
             catch(const std::exception& e)
             {
                 std::cerr << e.what() << '\n';
+                buffer.release();
+                return 0;
             }
+            break;
+        }
+        case FPGA_TOOL__OPERATE__WRITE_AXI_FULL:
+        {
+            try
+            {
+                dmaTransferConfig.ddrOffset = fpgaConfigParam.offset;
+                dmaTransferConfig.transferByteSize = fpgaConfigParam.transferBytes;
+                dmaTransferConfig.transferDirectionSelection = DMA_TRANSFER_DIRECTION__HOST_TO_FPGA;
+                dmaTransferConfig.transferDmaChannel = 0;
+
+                buffer.release();
+printf(" | --------------------------------------------------------------------- |\n");
+                if (buffer.from_file(fpgaConfigParam.datafileName, 0, fpgaConfigParam.transferBytes))
+                {
+                    if(fpgaController.AXIFull_IO(dmaTransferConfig, &buffer))
+                    {
+printf("                         [\033[92mWRITE AXI-FULL SUCCESS\033[0m]\n");
+                    }
+                    else
+                    {
+printf("                         [\033[31mWRITE AXI-FULL FAILED\033[0m]\n");
+                    }
+                }
+                else
+                {
+std::cout << "   Failed to load data from: " << fpgaConfigParam.datafileName << std::endl;
+                }
+printf(" | --------------------------------------------------------------------- |\n");
+            }
+            catch(const std::exception& e)
+            {
+                std::cerr << e.what() << '\n';
+                buffer.release();
+                return 0;
+            }
+            break;
+        }
+
+        default: 
+        {
+            break;
         }
     }
+
+    buffer.release();
+    return 0;
 }

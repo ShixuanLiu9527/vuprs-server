@@ -8,10 +8,10 @@
 #ifndef FPGA_CONFIG_H
 #define FPGA_CONFIG_H
 
-#include <filesystem>
 #include <stdint.h>
 #include <string>
 #include <fstream>
+#include <iostream>
 
 #include "nlohmann/json.hpp"
 
@@ -181,10 +181,10 @@ namespace vuprs
             bool ConfigDown() const;
     };
 
-    uint64_t ParseHexFromString(const std::string &dataString, bool *status = nullptr);
-    int ParseIntegerFromString(const std::string &dataString, bool *status = nullptr);
+    uint64_t ParseHexFromString(const std::string &dataString, bool *status);
+    int ParseIntegerFromString(const std::string &dataString, bool *status);
 
-    uint64_t ParseNumberFromString(const std::string &dataString, bool *status = nullptr);
+    uint64_t ParseNumberFromString(const std::string &dataString, bool *status);
 }
 
 #endif

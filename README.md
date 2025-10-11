@@ -4,9 +4,9 @@
 
 在项目根目录输入以下指令:  
 
-    mkdir build
+    sudo mkdir build
     cd build
-    cmake ..
-    make
+    sudo cmake .. -DCMAKE_TOOLCHAIN_FILE=../rk3568_toolchain.cmake
+    sudo make
 
 ## Usage

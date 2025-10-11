@@ -21,11 +21,6 @@ bool vuprs::FPGAConfigManager::ConfigDown() const
 
 bool vuprs::FPGAConfigManager::LoadFPGAConfigFromJson(const std::string &configJsonFilename)
 {
-    if (!std::filesystem::exists(configJsonFilename))
-    {
-        throw std::runtime_error("No such file: " + configJsonFilename);
-    }
-
     this->fpgaConfigJsonFilename = configJsonFilename;
 
     std::ifstream configJsonFile;
@@ -48,7 +43,11 @@ bool vuprs::FPGAConfigManager::LoadFPGAConfigFromJson(const std::string &configJ
     {
         /* Bus Memory Base Address */
         auto addressMap = configJsonData["address-map"];
-        if (this->ParseMemoryBaseAddress(addressMap)) configSuccessCount++;
+        if (this->ParseMemoryBaseAddress(addressMap)) 
+        {
+            // printf("load memeory base address success.\n");
+            configSuccessCount++;
+        }
 
         if (addressMap.contains("axi-lite"))
         {
@@ -57,13 +56,21 @@ bool vuprs::FPGAConfigManager::LoadFPGAConfigFromJson(const std::string &configJ
             if (addressMapAxiLite.contains("adc"))
             {
                 /* ADC Register Address */
-                if (this->ParseRegisterAddressADC(addressMapAxiLite["adc"])) configSuccessCount++;
+                if (this->ParseRegisterAddressADC(addressMapAxiLite["adc"])) 
+                {
+                    // printf("load ADC register address success.\n");
+                    configSuccessCount++;
+                }
             }
 
             if (addressMapAxiLite.contains("dma"))
             {
                 /* DMA Register Address */
-                if (this->ParseRegisterAddressDMA(addressMapAxiLite["dma"])) configSuccessCount++;
+                if (this->ParseRegisterAddressDMA(addressMapAxiLite["dma"])) 
+                {
+                    // printf("load DMA register address success.\n");
+                    configSuccessCount++;
+                }
             }
 
         }
@@ -71,12 +78,20 @@ bool vuprs::FPGAConfigManager::LoadFPGAConfigFromJson(const std::string &configJ
     if (configJsonData.contains("hardware-features"))
     {
         /* Hardware Features */
-        if (this->ParseHardwareFeatures(configJsonData["hardware-features"])) configSuccessCount++;
+        if (this->ParseHardwareFeatures(configJsonData["hardware-features"])) 
+        {
+            // printf("load hardware features success.\n");
+            configSuccessCount++;
+        }
     }
     if (configJsonData.contains("xdma-driver"))
     {
         /* XDMA Driver */
-        if (this->ParseXDMADriverConfig(configJsonData["xdma-driver"])) configSuccessCount++;
+        if (this->ParseXDMADriverConfig(configJsonData["xdma-driver"])) 
+        {
+            // printf("load XDMA driver config success.\n");
+            configSuccessCount++;
+        }
     }
 
     if (configSuccessCount == 5)
@@ -440,6 +455,7 @@ bool vuprs::FPGAConfigManager::ParseXDMADriverConfig(const nlohmann::json &jsonD
                     this->fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_c2h.push_back(xdmaC2H[i].get<std::string>());
                 }
             }
+            else
             {
                 parseSuccess = false;
             }
@@ -463,10 +479,12 @@ bool vuprs::FPGAConfigManager::ParseXDMADriverConfig(const nlohmann::json &jsonD
                     this->fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_events.push_back(xdmaEvents[i].get<std::string>());
                 }
             }
+            else
             {
                 parseSuccess = false;
             }
         }
+        else
         {
             parseSuccess = false;
         }
@@ -553,7 +571,7 @@ int vuprs::ParseIntegerFromString(const std::string &dataString, bool *status)
 {
     if (status != nullptr)
     {
-        *status = false;
+        (*status) = false;
     }
     if (dataString.empty())
     {
@@ -572,17 +590,17 @@ int vuprs::ParseIntegerFromString(const std::string &dataString, bool *status)
         }
         if (status != nullptr)
         {
-            *status = true;
+            (*status) = true;
         }
-        return (uint64_t)(std::stoull(dataString, nullptr, 10));
-    } 
-    catch (...)
+        return std::stoi(dataString);
+    }
+    catch (const std::exception &e)
     {
         return 0;
     }
 }
 
-uint64_t vuprs::ParseNumberFromString(const std::string &dataString, bool *status = nullptr)
+uint64_t vuprs::ParseNumberFromString(const std::string &dataString, bool *status)
 {
     bool parseStatus = false;
     uint64_t parseData;
