@@ -15,12 +15,24 @@
 
 #include "nlohmann/json.hpp"
 
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+    #define ltohl(x)       (x)
+    #define ltohs(x)       (x)
+    #define htoll(x)       (x)
+    #define htols(x)       (x)
+#elif __BYTE_ORDER == __BIG_ENDIAN
+    #define ltohl(x)     __bswap_32(x)
+    #define ltohs(x)     __bswap_16(x)
+    #define htoll(x)     __bswap_32(x)
+    #define htols(x)     __bswap_16(x)
+#endif
+
 namespace vuprs
 {
 
     /* --------------------------------  FPGA Configuration ------------------------------------ */
 
-    typedef struct FPGAbusAddress
+    struct FPGAbusAddress
     {
         /* Base Address */
 
@@ -34,7 +46,7 @@ namespace vuprs
         bool configdown;
     };
 
-    typedef struct FPGAregisterAddressDMA
+    struct FPGAregisterAddressDMA
     {
         /* Registers Address of DMA SG & Simple Mode (refer to Xilinx PG021 AXI DMA) */
 
@@ -60,7 +72,7 @@ namespace vuprs
         bool configdown;
     };
 
-    typedef struct FPGAregisterAddressADC
+    struct FPGAregisterAddressADC
     {
         uint64_t addrRegisterBaseADC__SCI;  /* Sampling Clock Increment */
         uint64_t addrRegisterBaseADC__SP;  /* Sampling Points */
@@ -72,7 +84,7 @@ namespace vuprs
         bool configdown;
     };
 
-    typedef struct FPGAaddressConfig
+    struct FPGAaddressConfig
     {
         vuprs::FPGAbusAddress busAddress;
         vuprs::FPGAregisterAddressDMA registerAddressDMA;
@@ -81,7 +93,7 @@ namespace vuprs
         bool configdown;
     };
 
-    typedef struct FPGAhardwareConfigDDR
+    struct FPGAhardwareConfigDDR
     {
         uint64_t ddrMemoryCapacity_megabytes;
         uint64_t ddrDataWidth_bits;
@@ -89,7 +101,7 @@ namespace vuprs
         bool configdown;
     };
 
-    typedef struct FPGAhardwareConfigADC
+    struct FPGAhardwareConfigADC
     {
 
         uint64_t adcMaxSamplingFrequency_Hz;
@@ -98,7 +110,7 @@ namespace vuprs
         bool configdown;
     };
 
-    typedef struct FPGAhardwareConfig
+    struct FPGAhardwareConfig
     {
         /* DDR Parameters */
 
@@ -111,7 +123,7 @@ namespace vuprs
         bool configdown;
     };
     
-    typedef struct XDMADriverConfig
+    struct XDMADriverConfig
     {
         std::string deviceFilename_xdma_control;
         std::string deviceFilename_xdma_user;
@@ -125,7 +137,7 @@ namespace vuprs
     };
     
 
-    typedef struct FPGAConfig
+    struct FPGAConfig
     {
         vuprs::FPGAaddressConfig fpgaAddress;  /* Address */
         vuprs::FPGAhardwareConfig hardwareConfig;  /* Hardware */

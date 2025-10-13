@@ -94,12 +94,13 @@
 
 #define __LINUX_DMA_MAX_TRANSFER_BYTES__          0x7ffff000  /* Maximum transfer size in Linux-32bit or Linux-64bit */
 #define __XDMA_AXI_LITE_MMAP_SIZE__               (2 * 64 * 1024UL)  /* 2 * 64 kB address in VUPRS FPGA AXI-Lite bus address space */
+#define __XDMA_CONTROL_MMAP_SIZE__                (32 * 1024UL)  /* 32 kB address mmap */
 
 namespace vuprs
 {
     /* -----------------------------------  Aligned Data Structure --------------------------------- */
 
-    typedef struct DMATransferConfig
+    struct DMATransferConfig
     {
         uint8_t transferDmaChannel;
         uint64_t ddrOffset;
@@ -114,8 +115,11 @@ namespace vuprs
         private:
             vuprs::FPGAConfigManager fpgaConfigManager;
 
-            uint64_t AXILite_GetRegisterOffset(const int &registerSelection, bool *status = nullptr);
-            bool AXILite_FPGARegisterIO(const std::string &rd_wr, const int &registerSelection, const uint32_t &w_value, uint32_t *r_value, const uint64_t &base, const uint64_t &offset, const bool &use_mmap = false);
+            uint64_t AXILite_GetRegisterOffset(const int &registerSelection, bool *status);
+
+            bool AXI_FPGARegisterIO(
+                const std::string &deviceFile, const std::string &rd_wr, const uint32_t &w_value, uint32_t *r_value, 
+                const uint64_t &base, const uint64_t &offset, const bool &use_mmap = false);
 
             bool AXIFull_BufferIO(const vuprs::DMATransferConfig &transferConfig, vuprs::AlignedBufferDMA *buffer);
 
@@ -169,7 +173,7 @@ namespace vuprs
              *         false: write/read failed.
              * @throw std::runtime_error, std::bad_malloc
              */
-            bool AXIFull_IO(const vuprs::DMATransferConfig &transferConfig, vuprs::AlignedBufferDMA *buffer);
+            bool AXIFull_BufferTransfer(const vuprs::DMATransferConfig &transferConfig, vuprs::AlignedBufferDMA *buffer);
 
             /**
              * @brief Read data on AXI-Lite bus.
@@ -190,6 +194,32 @@ namespace vuprs
              * @throw std::runtime_error
              */
             bool AXILite_Write(const uint64_t &base, const uint64_t &offset, const uint32_t &w_value);
+
+            /**
+             * @brief Read data from AXI-Full bus.
+             * @param dmaChannel DMA channel select.
+             * @param offset offset relative to DDR.
+             * @param r_value read value
+             * @retval true: read success;
+             *         false: read failed.
+             * @throw std::runtime_error
+             */
+            bool AXIFull_Read(const uint8_t &dmaChannel, const uint64_t &offset, uint32_t *r_value);
+
+            /**
+             * @brief Write data to AXI-Full bus.
+             * @param dmaChannel DMA channel select.
+             * @param offset offset relative to DDR.
+             * @param w_value write value
+             * @retval true: write success;
+             *         false: write failed.
+             * @throw std::runtime_error
+             */
+            bool AXIFull_Write(const uint8_t &dmaChannel, const uint64_t &offset, const uint32_t &w_value);
+
+            bool XDMA_Read(const uint64_t &offset, uint32_t *r_value);
+
+            bool XDMA_Write(const uint64_t &offset, const uint32_t &w_value);
     };
 }
 

@@ -10,10 +10,8 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
 endif()
 
 if(CMAKE_CROSSCOMPILING)
-    # 交叉编译时，使用针对ARM架构的优化
     add_compile_options(-O3 -march=armv8-a)
 else()
-    # 本地编译优化选项
     add_compile_options(-O3 -march=native)
 endif()
 
