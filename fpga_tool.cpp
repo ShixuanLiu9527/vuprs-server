@@ -604,11 +604,11 @@ printf(" | ---------------------------------------------------------------------
 printf("                           [\033[92m READ AXI-FULL SUCCESS \033[0m]\n");
                     if(buffer.to_file(fpgaConfigParam.datafileName, 0, fpgaConfigParam.transferBytes))
                     {
-std::cout << "   Successfully save <" << fpgaConfigParam.transferBytes << "> bytes to file: " << fpgaConfigParam.datafileName;
+std::cout << "   Successfully save <\033[33m" << fpgaConfigParam.transferBytes << "\033[0m> bytes to file: " << fpgaConfigParam.datafileName << std::endl;
                     }
                     else
                     {
-printf("   Failed to save data to file.");
+printf("   Failed to save data to file.\n");
                     }
                 }
                 else

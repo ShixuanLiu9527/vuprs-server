@@ -10,3 +10,7 @@
     sudo make
 
 ## Usage
+
+# 读写测试工具 `FPGA-Tool`  
+
+使用手册 [`FPGA-Tool`使用手册](./ug-fpga-tool.md)  
