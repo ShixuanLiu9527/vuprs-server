@@ -1,13 +1,5 @@
 #include "fpga_control.h"
 
-#define __DIRECTION_IS_READ__(DIR) \
-(DIR == "R" || DIR == "READ" || DIR == "RD")
-
-#define __DIRECTION_IS_WRITE__(DIR) \
-(DIR == "W" || DIR == "WRITE" || DIR == "WR")
-
-void FreeAll(int fpga_fd, int file_fd, char **allocated);
-
 /* --------------------------------------------------------------------------------------------------------------- */
 /* --------------------------------------------- FPGA Controller ------------------------------------------------- */
 /* --------------------------------------------------------------------------------------------------------------- */
@@ -172,9 +164,7 @@ uint64_t vuprs::FPGAController::AXILite_GetRegisterOffset(const int &registerSel
     return axiLiteRegisterSpaceBaseAddress + registerOffset;  /* Base Address (Relative to AXI-Lite base address) + Register Offset */
 }
 
-bool vuprs::FPGAController::AXI_FPGARegisterIO(
-    const std::string &deviceFile, const std::string &rd_wr, const uint32_t &w_value, uint32_t *r_value, 
-    const uint64_t &base, const uint64_t &offset, const bool &use_mmap)
+bool vuprs::FPGAController::AXI_XDMA_WordIO(const vuprs::DMATransferConfig &transferConfig, const uint32_t &w_value, uint32_t *r_value)
 {
     /* ------------------------ Security Check Start ------------------------- */
 
@@ -183,25 +173,96 @@ bool vuprs::FPGAController::AXI_FPGARegisterIO(
         throw std::runtime_error("Config not complete.");
     }
 
-    std::string direction = rd_wr;
-
-    std::transform(direction.begin(), direction.end(), direction.begin(), ::toupper);  /* Upper */
-
-    if (!(__DIRECTION_IS_READ__(direction) || __DIRECTION_IS_WRITE__(direction)))
-    {
-        throw std::runtime_error("Invalid IO direction.");
-    }
-
     /* ------------------------- Security Check End -------------------------- */
 
     int fpga_fd = -1, writeReadStatus = -1;
-    bool registerCalculateStatus = false;
-    uint64_t registerTargetOffset = 0;
+    bool registerCalculateStatus = false, use_mmap = false;
+    uint64_t registerTargetOffset = 0, base = 0, offset = 0;
     off_t currentOffset = -1;
-    
+
+    uint64_t memoryLowerAddress;
+    uint64_t memoryUpperAddress;
+
+    std::string deviceFile;
+
+    /* Base address & accessble address */
+
+    offset = transferConfig.offset;
+
+    switch (transferConfig.transferMemorySelection)
+    {
+        case DMA_TRANSFER_MEMORY_SELECTION__DDR:
+        {
+            memoryLowerAddress = this->fpgaConfigManager.fpgaConfig.fpgaAddress.busAddress.addrBusBaseAXIFull__DDR;
+            memoryUpperAddress = memoryLowerAddress + this->fpgaConfigManager.fpgaConfig.hardwareConfig.hardwareConfigMemory.ddrMemoryCapacity_bytes - 1;
+            
+            base = 0;
+            
+            use_mmap = false;
+            if (transferConfig.transferDirectionSelection == DMA_TRANSFER_DIRECTION__FPGA_TO_HOST)
+            {
+                deviceFile = this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_c2h[transferConfig.dmaChannel];
+            }
+            else
+            {
+                deviceFile = this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_h2c[transferConfig.dmaChannel];
+            }
+            break;
+        }
+        case DMA_TRANSFER_MEMORY_SELECTION__BRAM:
+        {
+            memoryLowerAddress = this->fpgaConfigManager.fpgaConfig.fpgaAddress.busAddress.addrBusBaseAXIFull__BRAM;
+            memoryUpperAddress = memoryLowerAddress + this->fpgaConfigManager.fpgaConfig.hardwareConfig.hardwareConfigMemory.bramMemoryCapacity_bytes - 1;
+            
+            base = 0;
+            
+            use_mmap = false;
+            if (transferConfig.transferDirectionSelection == DMA_TRANSFER_DIRECTION__FPGA_TO_HOST)
+            {
+                deviceFile = this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_c2h[transferConfig.dmaChannel];
+            }
+            else
+            {
+                deviceFile = this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_h2c[transferConfig.dmaChannel];
+            }
+            break;
+        }
+        case DMA_TRANSFER_MEMORY_SELECTION__AXI_LITE_DOMAIN:
+        {
+            memoryLowerAddress = this->fpgaConfigManager.fpgaConfig.fpgaAddress.busAddress.addrBusBaseAXILite__ADC;
+            memoryUpperAddress = memoryLowerAddress + __XDMA_AXI_LITE_MMAP_SIZE__ - 1;
+
+            base = transferConfig.base;
+            
+            deviceFile = this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_user;
+            use_mmap = true;
+            break;
+        }
+        case DMA_TRANSFER_MEMORY_SELECTION__XDMA_DOMAIN:
+        {
+            memoryLowerAddress = 0;
+            memoryUpperAddress = memoryLowerAddress + __XDMA_CONTROL_MMAP_SIZE__ - 1;
+
+            base = 0;
+            
+            deviceFile = this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_control;
+            use_mmap = true;
+            break;
+        }
+        default: 
+        {
+            throw std::runtime_error("Invalid memory selection.");
+        }
+    }
+
     /* Calculate register address */
 
     registerTargetOffset = base + offset;
+
+    if (registerTargetOffset > (memoryUpperAddress - 3) || registerTargetOffset < memoryLowerAddress)
+    {
+        throw std::range_error("Invalid offset for 4 bytes transfer. (valid offset: " + std::to_string(memoryLowerAddress) + " - " + std::to_string(memoryUpperAddress - 3) + ")");
+    }
 
     /* Open device file */
 
@@ -237,11 +298,11 @@ bool vuprs::FPGAController::AXI_FPGARegisterIO(
 
         /* Write data to register */
 
-        if (__DIRECTION_IS_WRITE__(direction))
+        if (transferConfig.transferDirectionSelection == DMA_TRANSFER_DIRECTION__HOST_TO_FPGA)
         {
             writeReadStatus = write(fpga_fd, &w_value, sizeof(uint32_t));  /* All registers are 32 bit */
         }
-        else if (__DIRECTION_IS_READ__(direction))
+        else if (transferConfig.transferDirectionSelection == DMA_TRANSFER_DIRECTION__FPGA_TO_HOST)
         {
             if (r_value != nullptr)
             {
@@ -257,7 +318,7 @@ bool vuprs::FPGAController::AXI_FPGARegisterIO(
         /* Generate Memory Map */
 
         void *map_base;
-        size_t mmapSize = 0;
+        size_t mmapSize = 1024;
 
         /* Calculate mmap size */
 
@@ -269,10 +330,6 @@ bool vuprs::FPGAController::AXI_FPGARegisterIO(
         {
             mmapSize = __XDMA_AXI_LITE_MMAP_SIZE__;
         }
-        else
-        {
-            mmapSize = this->fpgaConfigManager.fpgaConfig.hardwareConfig.hardwareConfigDDR.ddrMemoryCapacity_megabytes * 1024 * 1024;
-        }
 
         map_base = mmap(0, mmapSize, PROT_READ | PROT_WRITE, MAP_SHARED, fpga_fd, 0);
 
@@ -282,7 +339,7 @@ bool vuprs::FPGAController::AXI_FPGARegisterIO(
 
             volatile uint32_t *reg_addr = (volatile uint32_t *)((uint8_t *)map_base + registerTargetOffset);
 
-            if (__DIRECTION_IS_READ__(direction)) 
+            if (transferConfig.transferDirectionSelection == DMA_TRANSFER_DIRECTION__FPGA_TO_HOST) 
             {
                 *r_value = ltohl(*reg_addr);
             }
@@ -321,6 +378,24 @@ bool vuprs::FPGAController::AXIFull_BufferIO(const vuprs::DMATransferConfig &tra
         throw std::runtime_error("Config not complete.");
     }
 
+    uint64_t memoryLowerAddress;
+    uint64_t memoryUpperAddress;
+
+    if (transferConfig.transferMemorySelection == DMA_TRANSFER_MEMORY_SELECTION__DDR)
+    {
+        memoryLowerAddress = this->fpgaConfigManager.fpgaConfig.fpgaAddress.busAddress.addrBusBaseAXIFull__DDR;
+        memoryUpperAddress = memoryLowerAddress + this->fpgaConfigManager.fpgaConfig.hardwareConfig.hardwareConfigMemory.ddrMemoryCapacity_bytes - 1;
+    }
+    else if (transferConfig.transferMemorySelection == DMA_TRANSFER_MEMORY_SELECTION__BRAM)
+    {
+        memoryLowerAddress = this->fpgaConfigManager.fpgaConfig.fpgaAddress.busAddress.addrBusBaseAXIFull__BRAM;
+        memoryUpperAddress = memoryLowerAddress + this->fpgaConfigManager.fpgaConfig.hardwareConfig.hardwareConfigMemory.bramMemoryCapacity_bytes - 1;
+    }
+    else
+    {
+        throw std::runtime_error("Invalid memory selection.");
+    }
+
     if (!IS_DMA_TRANSFER_DIRECTION(transferConfig.transferDirectionSelection))
     {
         throw std::runtime_error("Invalid direction.");
@@ -331,9 +406,14 @@ bool vuprs::FPGAController::AXIFull_BufferIO(const vuprs::DMATransferConfig &tra
         throw std::runtime_error("Read bytes is 0.");
     }
 
-    if ((transferConfig.ddrOffset + transferConfig.transferByteSize) > this->fpgaConfigManager.fpgaConfig.hardwareConfig.hardwareConfigDDR.ddrMemoryCapacity_megabytes * 1024 * 1024)
+    if (transferConfig.offset < memoryLowerAddress || transferConfig.offset > memoryUpperAddress)
     {
-        throw std::runtime_error("Read Domain of the DDR overflow.");
+        throw std::range_error("Invalid offset. (valid offset: " + std::to_string(memoryLowerAddress) + " - " + std::to_string(memoryUpperAddress) + ")");
+    }
+
+    if ((transferConfig.offset + transferConfig.transferByteSize - 1) > memoryUpperAddress)
+    {
+        throw std::runtime_error("Read Domain of the DDR overflow. (valid transfer bytes of this offset = " + std::to_string(memoryUpperAddress - transferConfig.offset + 1));
     }
 
     if (buffer == nullptr)
@@ -351,12 +431,12 @@ bool vuprs::FPGAController::AXIFull_BufferIO(const vuprs::DMATransferConfig &tra
 
     if (transferConfig.transferDirectionSelection == DMA_TRANSFER_DIRECTION__FPGA_TO_HOST)
     {
-        if (transferConfig.transferDmaChannel >= this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_c2h.size())
+        if (transferConfig.dmaChannel >= this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_c2h.size())
         {
             throw std::runtime_error(
                 "Invalid DMA channel (required: < " + \
                 std::to_string(this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_c2h.size()) + "), current = " + \
-                std::to_string(transferConfig.transferDmaChannel)
+                std::to_string(transferConfig.dmaChannel)
             );
         }
 
@@ -364,11 +444,11 @@ bool vuprs::FPGAController::AXIFull_BufferIO(const vuprs::DMATransferConfig &tra
 
 #ifdef _WIN32
 
-        fpga_fd = open((this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_c2h[transferConfig.transferDmaChannel]).c_str(), O_RDWR | O_BINARY);
+        fpga_fd = open((this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_c2h[transferConfig.dmaChannel]).c_str(), O_RDWR | O_BINARY);
 
 #else
 
-        fpga_fd = open((this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_c2h[transferConfig.transferDmaChannel]).c_str(), O_RDWR | O_SYNC);
+        fpga_fd = open((this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_c2h[transferConfig.dmaChannel]).c_str(), O_RDWR | O_SYNC);
 
 #endif
 
@@ -376,28 +456,28 @@ bool vuprs::FPGAController::AXIFull_BufferIO(const vuprs::DMATransferConfig &tra
 
         if (fpga_fd < 0)
         {
-            throw std::runtime_error("Cannot open device file: " + this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_c2h[transferConfig.transferDmaChannel]);
+            throw std::runtime_error("Cannot open device file: " + this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_c2h[transferConfig.dmaChannel]);
         }
     }
 
     else if (transferConfig.transferDirectionSelection == DMA_TRANSFER_DIRECTION__HOST_TO_FPGA)
     {
-        if (transferConfig.transferDmaChannel >= this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_h2c.size())
+        if (transferConfig.dmaChannel >= this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_h2c.size())
         {
             throw std::runtime_error(
                 "Invalid DMA channel (required: < " + \
                 std::to_string(this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_h2c.size()) + "), current = " + \
-                std::to_string(transferConfig.transferDmaChannel)
+                std::to_string(transferConfig.dmaChannel)
             );
         }
 
 #ifdef _WIN32
 
-        fpga_fd = open((this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_h2c[transferConfig.transferDmaChannel]).c_str(), O_RDWR | O_BINARY);
+        fpga_fd = open((this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_h2c[transferConfig.dmaChannel]).c_str(), O_RDWR | O_BINARY);
     
 #else
 
-        fpga_fd = open((this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_h2c[transferConfig.transferDmaChannel]).c_str(), O_RDWR | O_SYNC);
+        fpga_fd = open((this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_h2c[transferConfig.dmaChannel]).c_str(), O_RDWR | O_SYNC);
 
 #endif
 
@@ -405,7 +485,7 @@ bool vuprs::FPGAController::AXIFull_BufferIO(const vuprs::DMATransferConfig &tra
 
         if (fpga_fd < 0)
         {
-            throw std::runtime_error("Cannot open device file: " + this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_h2c[transferConfig.transferDmaChannel]);
+            throw std::runtime_error("Cannot open device file: " + this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_h2c[transferConfig.dmaChannel]);
         }
     }
 
@@ -413,7 +493,7 @@ bool vuprs::FPGAController::AXIFull_BufferIO(const vuprs::DMATransferConfig &tra
 
     /* Seek to offset relative to AXI-Full base address in FPGA */
 
-    componentOffset = this->fpgaConfigManager.fpgaConfig.fpgaAddress.busAddress.addrBusBaseAXIFull__DDR + transferConfig.ddrOffset;
+    componentOffset = this->fpgaConfigManager.fpgaConfig.fpgaAddress.busAddress.addrBusBaseAXIFull__DDR + transferConfig.offset;
     currentOffset = lseek(fpga_fd, componentOffset, SEEK_SET);
 
     if (static_cast<uint64_t>(currentOffset) != componentOffset || currentOffset < 0 || currentOffset == (off_t) - 1)
@@ -481,19 +561,31 @@ bool vuprs::FPGAController::AXILite_WriteToFPGARegister(const int &registerSelec
 {
     uint64_t writeOffset;
     bool offsetStatus = false;
+    vuprs::DMATransferConfig transferConfig;
+    
     if (!IS_AXI_LITE_RDONLY_REGISTER(registerSelection) && IS_AXI_LITE_REGISTER(registerSelection) && this->fpgaConfigManager.ConfigDown())
     {
         writeOffset = this->AXILite_GetRegisterOffset(registerSelection, &offsetStatus);
+
         if (offsetStatus)
         {
-            return this->AXI_FPGARegisterIO(
-                this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_user, 
-                "write", w_value, nullptr, 0, writeOffset, true);
+            vuprs::SetDMATransferConfigToDefault(&transferConfig);
+
+            transferConfig.transferDirectionSelection = DMA_TRANSFER_DIRECTION__HOST_TO_FPGA;
+            transferConfig.transferMemorySelection = DMA_TRANSFER_MEMORY_SELECTION__AXI_LITE_DOMAIN;
+
+            transferConfig.base = 0;
+            transferConfig.offset = writeOffset;
+
+            transferConfig.transferByteSize = 0;
+            transferConfig.dmaChannel = 0;
         }
         else
         {
             return false;
         }
+
+        return this->AXI_XDMA_WordIO(transferConfig, w_value, 0);
     }
     else
     {
@@ -505,19 +597,31 @@ bool vuprs::FPGAController::AXILite_ReadFPGARegister(const int &registerSelectio
 {
     uint64_t readOffset;
     bool offsetStatus = false;
+    vuprs::DMATransferConfig transferConfig;
+
     if (IS_AXI_LITE_REGISTER(registerSelection) && this->fpgaConfigManager.ConfigDown())
     {
         readOffset = this->AXILite_GetRegisterOffset(registerSelection, &offsetStatus);
+
         if (offsetStatus)
         {
-            return this->AXI_FPGARegisterIO(
-                this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_user, 
-                "read", 0, r_value, 0, readOffset, true);
+            vuprs::SetDMATransferConfigToDefault(&transferConfig);
+
+            transferConfig.transferDirectionSelection = DMA_TRANSFER_DIRECTION__FPGA_TO_HOST;
+            transferConfig.transferMemorySelection = DMA_TRANSFER_MEMORY_SELECTION__AXI_LITE_DOMAIN;
+
+            transferConfig.base = 0;
+            transferConfig.offset = readOffset;
+
+            transferConfig.transferByteSize = 0;
+            transferConfig.dmaChannel = 0;
         }
         else
         {
             return false;
         }
+
+        return this->AXI_XDMA_WordIO(transferConfig, 0, r_value);
     }
     else
     {
@@ -525,95 +629,47 @@ bool vuprs::FPGAController::AXILite_ReadFPGARegister(const int &registerSelectio
     }
 }
 
-bool vuprs::FPGAController::AXILite_Read(const uint64_t &base, const uint64_t &offset, uint32_t *r_value)
-{
-    if (this->fpgaConfigManager.ConfigDown())
-    {
-        return this->AXI_FPGARegisterIO(
-            this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_user, 
-            "read", 0, r_value, base, offset, true);
-    }
-    else
-    {
-        throw std::runtime_error("Config not complete.");
-    }
-}
-
-bool vuprs::FPGAController::AXILite_Write(const uint64_t &base, const uint64_t &offset, const uint32_t &w_value)
-{
-    if (this->fpgaConfigManager.ConfigDown())
-    {
-        return this->AXI_FPGARegisterIO(
-            this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_user, 
-            "write", w_value, nullptr, base, offset, true);
-    }
-    else
-    {
-        throw std::runtime_error("Config not complete.");
-    }
-}
-
-/* ------------------------------------------------ DMA-Control -------------------------------------------------- */
-
-bool vuprs::FPGAController::XDMA_Read(const uint64_t &offset, uint32_t *r_value)
-{
-    if (this->fpgaConfigManager.ConfigDown())
-    {
-        return this->AXI_FPGARegisterIO(
-            this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_control, 
-            "read", 0, r_value, 0, offset, true);
-    }
-    else
-    {
-        throw std::runtime_error("Config not complete.");
-    }
-}
-
-bool vuprs::FPGAController::XDMA_Write(const uint64_t &offset, const uint32_t &w_value)
-{
-    if (this->fpgaConfigManager.ConfigDown())
-    {
-        return this->AXI_FPGARegisterIO(
-            this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_control, 
-            "write", w_value, nullptr, 0, offset, true);
-    }
-    else
-    {
-        throw std::runtime_error("Config not complete.");
-    }
-}
-
-/* --------------------------------------------------- AXI-Full -------------------------------------------------- */
+/* -------------------------------------------- AXI-Full Buffer IO ----------------------------------------------- */
 
 bool vuprs::FPGAController::AXIFull_BufferTransfer(const vuprs::DMATransferConfig &transferConfig, vuprs::AlignedBufferDMA *buffer)
 {
+    if (!IS_DMA_BUFFER_TRANSFER_MEMORY_SELECTION(transferConfig.transferMemorySelection))
+    {
+        throw std::runtime_error("Invalid BUFFER memory selection.");
+    }
+    if (!IS_DMA_TRANSFER_DIRECTION(transferConfig.transferDirectionSelection))
+    {
+        throw std::runtime_error("Invalid BUFFER transfer direct selection.");
+    }
+
     return this->AXIFull_BufferIO(transferConfig, buffer);
 }
 
-bool vuprs::FPGAController::AXIFull_Read(const uint8_t &dmaChannel, const uint64_t &offset, uint32_t *r_value)
+/* ------------------------------------- AXI-Lite/AXI-Full/XDMA Word IO ------------------------------------------- */
+
+bool vuprs::FPGAController::AXI_XDMA_WordTransfer(const vuprs::DMATransferConfig &transferConfig, uint32_t *r_value, const uint32_t &w_value)
 {
-    if (this->fpgaConfigManager.ConfigDown() && dmaChannel < this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_c2h.size())
+    if (!IS_DMA_WORD_TRANSFER_MEMORY_SELECTION(transferConfig.transferMemorySelection))
     {
-        return this->AXI_FPGARegisterIO(
-            this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_c2h[dmaChannel],
-            "read", 0, r_value, this->fpgaConfigManager.fpgaConfig.fpgaAddress.busAddress.addrBusBaseAXIFull__DDR, offset, false);
+        throw std::runtime_error("Invalid WORD memory selection.");
     }
-    else
+    if (!IS_DMA_TRANSFER_DIRECTION(transferConfig.transferDirectionSelection))
     {
-        throw std::runtime_error("Config not complete.");
+        throw std::runtime_error("Invalid BUFFER transfer direct selection.");
     }
+
+    return this->AXI_XDMA_WordIO(transferConfig, w_value, r_value);
 }
 
-bool vuprs::FPGAController::AXIFull_Write(const uint8_t &dmaChannel, const uint64_t &offset, const uint32_t &w_value)
+void vuprs::SetDMATransferConfigToDefault(DMATransferConfig *config)
 {
-    if (this->fpgaConfigManager.ConfigDown() && dmaChannel < this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_h2c.size())
-    {
-        return this->AXI_FPGARegisterIO(
-            this->fpgaConfigManager.fpgaConfig.xdmaDriverConfig.deviceFilename_xdma_h2c[dmaChannel],
-            "write", w_value, nullptr, this->fpgaConfigManager.fpgaConfig.fpgaAddress.busAddress.addrBusBaseAXIFull__DDR, offset, false);
-    }
-    else
-    {
-        throw std::runtime_error("Config not complete.");
-    }
+    config->dmaChannel = 0;
+
+    config->base = 0;
+    config->offset = 0;
+    
+    config->transferByteSize = 0;
+
+    config->transferDirectionSelection = DMA_TRANSFER_DIRECTION__FPGA_TO_HOST;
+    config->transferMemorySelection = DMA_TRANSFER_MEMORY_SELECTION__DDR;
 }

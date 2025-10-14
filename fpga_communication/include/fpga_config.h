@@ -27,6 +27,9 @@
     #define htols(x)     __bswap_16(x)
 #endif
 
+#define __MEGABYTES__         (1024 * 1024);
+#define __KILOBYTES__         1024
+
 namespace vuprs
 {
 
@@ -42,6 +45,7 @@ namespace vuprs
         uint64_t addrBusBaseAXILite__DMA;  /* Offset of AXI-Lite interface for DMA controller configuration */
         uint64_t addrBusBaseAXILite__ADC;  /* Offset of AXI-Lite interface for ADC peripheral control */
         uint64_t addrBusBaseAXIFull__DDR;  /* Offset of AXI-Full interface for DDR3 memory access */
+        uint64_t addrBusBaseAXIFull__BRAM;  /* Offset of AXI-Full interface for BRAM memory access */
 
         bool configdown;
     };
@@ -93,9 +97,10 @@ namespace vuprs
         bool configdown;
     };
 
-    struct FPGAhardwareConfigDDR
+    struct FPGAhardwareConfigMemory
     {
-        uint64_t ddrMemoryCapacity_megabytes;
+        uint64_t ddrMemoryCapacity_bytes;
+        uint64_t bramMemoryCapacity_bytes;
         uint64_t ddrDataWidth_bits;
 
         bool configdown;
@@ -114,7 +119,7 @@ namespace vuprs
     {
         /* DDR Parameters */
 
-        FPGAhardwareConfigDDR hardwareConfigDDR;
+        FPGAhardwareConfigMemory hardwareConfigMemory;
 
         /* ADC Parameters */
 

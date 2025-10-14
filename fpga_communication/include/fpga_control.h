@@ -86,6 +86,23 @@
 #define DMA_TRANSFER_DIRECTION__FPGA_TO_HOST      0
 #define DMA_TRANSFER_DIRECTION__HOST_TO_FPGA      1
 
+#define IS_DMA_TRANSFER_DIRECTION(VAL) (VAL == DMA_TRANSFER_DIRECTION__FPGA_TO_HOST || VAL == DMA_TRANSFER_DIRECTION__HOST_TO_FPGA)
+
+#define DMA_TRANSFER_MEMORY_SELECTION__DDR         0
+#define DMA_TRANSFER_MEMORY_SELECTION__BRAM        1
+#define DMA_TRANSFER_MEMORY_SELECTION__AXI_LITE_DOMAIN  2
+#define DMA_TRANSFER_MEMORY_SELECTION__XDMA_DOMAIN 3
+
+#define IS_DMA_WORD_TRANSFER_MEMORY_SELECTION(VAL) \
+(VAL == DMA_TRANSFER_MEMORY_SELECTION__DDR        || \
+ VAL == DMA_TRANSFER_MEMORY_SELECTION__BRAM       || \
+ VAL == DMA_TRANSFER_MEMORY_SELECTION__AXI_LITE_DOMAIN || \
+ VAL == DMA_TRANSFER_MEMORY_SELECTION__XDMA_DOMAIN)
+
+#define IS_DMA_BUFFER_TRANSFER_MEMORY_SELECTION(VAL) \
+(VAL == DMA_TRANSFER_MEMORY_SELECTION__DDR        || \
+ VAL == DMA_TRANSFER_MEMORY_SELECTION__BRAM)
+
 #define IS_DMA_TRANSFER_DIRECTION(VAL) \
 (VAL == DMA_TRANSFER_DIRECTION__FPGA_TO_HOST      || \
  VAL == DMA_TRANSFER_DIRECTION__HOST_TO_FPGA)
@@ -102,9 +119,11 @@ namespace vuprs
 
     struct DMATransferConfig
     {
-        uint8_t transferDmaChannel;
-        uint64_t ddrOffset;
-        uint64_t transferByteSize;
+        uint8_t dmaChannel;
+        uint64_t base;  /* Not used in AXI-Full word/buffer transfer */
+        uint64_t offset;
+        uint64_t transferByteSize;  /* Not used in AXI-Full word transfer */
+        int transferMemorySelection;
         int transferDirectionSelection;
     };
     
@@ -117,9 +136,7 @@ namespace vuprs
 
             uint64_t AXILite_GetRegisterOffset(const int &registerSelection, bool *status);
 
-            bool AXI_FPGARegisterIO(
-                const std::string &deviceFile, const std::string &rd_wr, const uint32_t &w_value, uint32_t *r_value, 
-                const uint64_t &base, const uint64_t &offset, const bool &use_mmap = false);
+            bool AXI_XDMA_WordIO(const vuprs::DMATransferConfig &transferConfig, const uint32_t &w_value, uint32_t *r_value);
 
             bool AXIFull_BufferIO(const vuprs::DMATransferConfig &transferConfig, vuprs::AlignedBufferDMA *buffer);
 
@@ -176,37 +193,6 @@ namespace vuprs
             bool AXIFull_BufferTransfer(const vuprs::DMATransferConfig &transferConfig, vuprs::AlignedBufferDMA *buffer);
 
             /**
-             * @brief Read data on AXI-Lite bus.
-             * @param base base address of the memory space (relative to AXI-Lite).
-             * @param offset offset relative to <base>.
-             * @retval true: write success;
-             *         false: write failed.
-             * @throw std::runtime_error
-             */
-            bool AXILite_Read(const uint64_t &base, const uint64_t &offset, uint32_t *r_value);
-
-            /**
-             * @brief Write data on AXI-Lite bus.
-             * @param base base address of the memory space (relative to AXI-Lite).
-             * @param offset offset relative to <base>.
-             * @retval true: write success;
-             *         false: write failed.
-             * @throw std::runtime_error
-             */
-            bool AXILite_Write(const uint64_t &base, const uint64_t &offset, const uint32_t &w_value);
-
-            /**
-             * @brief Read data from AXI-Full bus.
-             * @param dmaChannel DMA channel select.
-             * @param offset offset relative to DDR.
-             * @param r_value read value
-             * @retval true: read success;
-             *         false: read failed.
-             * @throw std::runtime_error
-             */
-            bool AXIFull_Read(const uint8_t &dmaChannel, const uint64_t &offset, uint32_t *r_value);
-
-            /**
              * @brief Write data to AXI-Full bus.
              * @param dmaChannel DMA channel select.
              * @param offset offset relative to DDR.
@@ -215,12 +201,10 @@ namespace vuprs
              *         false: write failed.
              * @throw std::runtime_error
              */
-            bool AXIFull_Write(const uint8_t &dmaChannel, const uint64_t &offset, const uint32_t &w_value);
-
-            bool XDMA_Read(const uint64_t &offset, uint32_t *r_value);
-
-            bool XDMA_Write(const uint64_t &offset, const uint32_t &w_value);
+            bool AXI_XDMA_WordTransfer(const vuprs::DMATransferConfig &transferConfig, uint32_t *r_value, const uint32_t &w_value);
     };
+
+    void SetDMATransferConfigToDefault(DMATransferConfig *config);
 }
 
 #endif

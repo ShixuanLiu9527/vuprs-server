@@ -44,6 +44,10 @@
             "ddr": 
             {
                 "address-offset": "0x00000000"
+            },
+            "bram":
+            {
+                "address-offset": "0x60000000"
             }
         }
     },
@@ -62,6 +66,10 @@
         "dma": 
         {
             
+        },
+        "bram":
+        {
+            "memory-capacity-kilobytes": "8"
         }
     },
     "xdma-driver": 

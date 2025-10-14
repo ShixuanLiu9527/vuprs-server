@@ -17,13 +17,15 @@ endif()
 
 add_subdirectory(eigen)
 include_directories(
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/fpga_communication/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/network/include
         ${CMAKE_CURRENT_SOURCE_DIR}/eigen
         ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 file(GLOB_RECURSE SOLVER_SRC 
-        "source/*.cpp"
+    "fpga_communication/source/*.cpp"
+    "network/source/*.cpp"
 )
 
 add_executable(fpga_tool fpga_tool.cpp ${SOLVER_SRC})

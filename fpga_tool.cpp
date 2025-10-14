@@ -41,24 +41,24 @@
 (IS__FPGA_TOOL__OPERATE__READ_AXI_FULL_CMD(STR_LIST))
 
 #define IS__FPGA_TOOL__OPERATE__DEFAULT_READ_AXI_LITE_CMD(STR_LIST) \
-(STR_LIST[1] == "--DEF-OPT" && STR_LIST[3] == "--BASE" && STR_LIST[5] == "--OFFSET")
+(STR_LIST[1] == "--DOPT" && STR_LIST[3] == "--BASE" && STR_LIST[5] == "--OFFSET")
 #define IS__FPGA_TOOL__OPERATE__DEFAULT_WRITE_AXI_LITE_CMD(STR_LIST) \
-(STR_LIST[1] == "--DEF-OPT" && STR_LIST[3] == "--BASE" && STR_LIST[5] == "--OFFSET" && STR_LIST[7] == "--IO")
+(STR_LIST[1] == "--DOPT" && STR_LIST[3] == "--BASE" && STR_LIST[5] == "--OFFSET" && STR_LIST[7] == "--IO")
 
 #define IS__FPGA_TOOL__OPERATE__DEFAULT_READ_AXI_FULL_BUFFER_CMD(STR_LIST) \
-(STR_LIST[1] == "--DEF-OPT" && STR_LIST[3] == "--OFFSET" && STR_LIST[5] == "--BYTES" && STR_LIST[7] == "--IO")
+(STR_LIST[1] == "--DOPT" && STR_LIST[3] == "--OFFSET" && STR_LIST[5] == "--BYTES" && STR_LIST[7] == "--IO")
 #define IS__FPGA_TOOL__OPERATE__DEFAULT_WRITE_AXI_FULL_BUFFER_CMD(STR_LIST) \
 (IS__FPGA_TOOL__OPERATE__DEFAULT_READ_AXI_FULL_BUFFER_CMD(STR_LIST))
 
 #define IS__FPGA_TOOL__OPERATE__DEFAULT_READ_AXI_FULL_REG_CMD(STR_LIST) \
-(STR_LIST[1] == "--DEF-OPT" && STR_LIST[3] == "--OFFSET")
+(STR_LIST[1] == "--DOPT" && STR_LIST[3] == "--OFFSET")
 #define IS__FPGA_TOOL__OPERATE__DEFAULT_WRITE_AXI_FULL_REG_CMD(STR_LIST) \
-(STR_LIST[1] == "--DEF-OPT" && STR_LIST[3] == "--OFFSET" && STR_LIST[5] == "--IO")
+(STR_LIST[1] == "--DOPT" && STR_LIST[3] == "--OFFSET" && STR_LIST[5] == "--IO")
 
 #define IS__FPGA_TOOL__OPERATE__DEFAULT_READ_CONTROL_REG_CMD(STR_LIST) \
-(STR_LIST[1] == "--DEF-OPT" && STR_LIST[3] == "--OFFSET")
+(STR_LIST[1] == "--DOPT" && STR_LIST[3] == "--OFFSET")
 #define IS__FPGA_TOOL__OPERATE__DEFAULT_WRITE_CONTROL_REG_CMD(STR_LIST) \
-(STR_LIST[1] == "--DEF-OPT" && STR_LIST[3] == "--OFFSET" && STR_LIST[5] == "--IO")
+(STR_LIST[1] == "--DOPT" && STR_LIST[3] == "--OFFSET" && STR_LIST[5] == "--IO")
 
 /* Parse operation */
 
@@ -135,7 +135,7 @@ printf(" |           --offset <of> --bytes <by> --io <io>                       
 printf(" |                                                                       |\n");
 printf(" |  \033[33mCommand Method 2 (use default parameters)\033[0m:                           |\n");
 printf(" |                                                                       |\n");
-printf(" | fpga_tool --def-opt <opt> --base <b> --offset <of> --bytes <by>       |\n");
+printf(" | fpga_tool --dopt <opt> --base <b> --offset <of> --bytes <by>          |\n");
 printf(" |           --io <io>                                                   |\n");
 printf(" |                                                                       |\n");
 printf(" | [ \033[92mPARAMETERS\033[0m ]                                                        |\n");
@@ -154,7 +154,9 @@ printf(" | <rw> r = read from FPGA, w = write to FPGA;                          
 printf(" | <b>  bus selection, lite = AXI-Lite, full = AXI-Full;                 |\n");
 printf(" | <cf> config JSON file;                                                |\n");
 printf(" | <ba> base address of the address space (AXI-Lite only, AXI-Full = 0); |\n");
-printf(" | <of> register offset (AXI-Lite) or address offset (AXI-Full);         |\n");
+printf(" | <of> for AXI-Lite: register;                                          |\n");
+printf(" |      for AXI-Full: 0 - 0x1FFFFFFF, DDR domain;                        |\n");
+printf(" |      for AXI-Full: 0x60000000 - 0x60001FFF, BRAM domain;              |\n");
 printf(" | <by> read/write bytes (AXI-Full only, AXI-Lite = 4);                  |\n");
 printf(" | <io> input value (AXI-Lite) or intput/output filename (AXI-Full);     |\n");
 printf(" |                                                                       |\n");
@@ -171,17 +173,17 @@ printf(" |                                                                      
 printf(" | fpga_tool --rw \033[33mw\033[0m --bus \033[33mfull\033[0m --cfg \033[33m./cfg.json\033[0m --offset \033[33m0\033[0m --bytes \033[33m1024\033[0m  |\n");
 printf(" |           --io \033[33m./w_data.bin\033[0m                                           |\n");
 printf(" |                                                                       |\n");
-printf(" | fpga_tool --def-opt \033[33mr-lite\033[0m --base \033[33m0\033[0m --offset \033[33m0x04\033[0m                     |\n");
-printf(" | fpga_tool --def-opt \033[33mw-lite\033[0m --base \033[33m0\033[0m --offset \033[33m0x0C\033[0m --io \033[33m0x12\033[0m           |\n");
+printf(" | fpga_tool --dopt \033[33mr-lite\033[0m --base \033[33m0\033[0m --offset \033[33m0x04\033[0m                        |\n");
+printf(" | fpga_tool --dopt \033[33mw-lite\033[0m --base \033[33m0\033[0m --offset \033[33m0x0C\033[0m --io \033[33m0x12\033[0m              |\n");
 printf(" |                                                                       |\n");
-printf(" | fpga_tool --def-opt \033[33mr-full-buf\033[0m --offset \033[33m0\033[0m --bytes \033[33m65536\033[0m --io \033[33m./r.bin\033[0m  |\n");
-printf(" | fpga_tool --def-opt \033[33mw-full-buf\033[0m --offset \033[33m0\033[0m --bytes \033[33m2048\033[0m --io \033[33m./w.bin\033[0m   |\n");
+printf(" | fpga_tool --dopt \033[33mr-full-buf\033[0m --offset \033[33m0\033[0m --bytes \033[33m65536\033[0m --io \033[33m./r.bin\033[0m     |\n");
+printf(" | fpga_tool --dopt \033[33mw-full-buf\033[0m --offset \033[33m0\033[0m --bytes \033[33m2048\033[0m --io \033[33m./w.bin\033[0m      |\n");
 printf(" |                                                                       |\n");
-printf(" | fpga_tool --def-opt \033[33mr-full-reg\033[0m --offset \033[33m0\033[0m                             |\n");
-printf(" | fpga_tool --def-opt \033[33mw-full-reg\033[0m --offset \033[33m0\033[0m --io \033[33m0x1234\033[0m                 |\n");
+printf(" | fpga_tool --dopt \033[33mr-full-reg\033[0m --offset \033[33m0\033[0m                                |\n");
+printf(" | fpga_tool --dopt \033[33mw-full-reg\033[0m --offset \033[33m0\033[0m --io \033[33m0x1234\033[0m                    |\n");
 printf(" |                                                                       |\n");
-printf(" | fpga_tool --def-opt \033[33mr-ctrl\033[0m --offset \033[33m0\033[0m                                 |\n");
-printf(" | fpga_tool --def-opt \033[33mw-ctrl\033[0m --offset \033[33m0\033[0m --io \033[33m0x1234\033[0m                     |\n");
+printf(" | fpga_tool --dopt \033[33mr-ctrl\033[0m --offset \033[33m0\033[0m                                    |\n");
+printf(" | fpga_tool --dopt \033[33mw-ctrl\033[0m --offset \033[33m0\033[0m --io \033[33m0x1234\033[0m                        |\n");
 printf(" |                                                                       |\n");
 printf(" |=======================================================================|\n");
 printf("\n");
@@ -469,6 +471,8 @@ int main(int argc, char *argv[])
 
     uint32_t rValue;
 
+    vuprs::SetDMATransferConfigToDefault(&dmaTransferConfig);
+
     args.resize(argc);
 
     for (int i = 0; i < argc; i++)
@@ -519,7 +523,13 @@ printf(" \033[31mFPGA-TOOL: ERROR COMMAND!\033[0m Check the command below:  \n")
         {
             try
             {
-                if(fpgaController.AXILite_Read(fpgaConfigParam.base, fpgaConfigParam.offset, &rValue))
+                dmaTransferConfig.transferDirectionSelection = DMA_TRANSFER_DIRECTION__FPGA_TO_HOST;
+                dmaTransferConfig.transferMemorySelection = DMA_TRANSFER_MEMORY_SELECTION__AXI_LITE_DOMAIN;
+                
+                dmaTransferConfig.base = fpgaConfigParam.base;
+                dmaTransferConfig.offset = fpgaConfigParam.offset;
+
+                if(fpgaController.AXI_XDMA_WordTransfer(dmaTransferConfig, &rValue, 0))
                 {
 printf(" | --------------------------------------------------------------------- |\n");
 printf("                           [\033[92m READ AXI-LITE SUCCESS \033[0m]\n");
@@ -551,9 +561,17 @@ printf(" | ---------------------------------------------------------------------
         {
             try
             {
-                if(fpgaController.AXILite_Write(fpgaConfigParam.base, fpgaConfigParam.offset, fpgaConfigParam.writeValue))
+                dmaTransferConfig.transferDirectionSelection = DMA_TRANSFER_DIRECTION__HOST_TO_FPGA;
+                dmaTransferConfig.transferMemorySelection = DMA_TRANSFER_MEMORY_SELECTION__AXI_LITE_DOMAIN;
+                
+                dmaTransferConfig.base = fpgaConfigParam.base;
+                dmaTransferConfig.offset = fpgaConfigParam.offset;
+                
+                if(fpgaController.AXI_XDMA_WordTransfer(dmaTransferConfig, nullptr, fpgaConfigParam.writeValue))
                 {
-                    if (fpgaController.AXILite_Read(fpgaConfigParam.base, fpgaConfigParam.offset, &rValue))
+                    dmaTransferConfig.transferDirectionSelection = DMA_TRANSFER_DIRECTION__FPGA_TO_HOST;
+
+                    if (fpgaController.AXI_XDMA_WordTransfer(dmaTransferConfig, &rValue, 0))
                     {
 printf(" | --------------------------------------------------------------------- |\n");
 printf("                           [\033[92m WRITE AXI-LITE SUCCESS \033[0m]\n");
@@ -593,15 +611,29 @@ printf(" | ---------------------------------------------------------------------
         {
             try
             {
-                dmaTransferConfig.ddrOffset = fpgaConfigParam.offset;
-                dmaTransferConfig.transferByteSize = fpgaConfigParam.transferBytes;
                 dmaTransferConfig.transferDirectionSelection = DMA_TRANSFER_DIRECTION__FPGA_TO_HOST;
-                dmaTransferConfig.transferDmaChannel = 0;
+                
+                if (fpgaConfigParam.offset >= fpgaConfigManager.fpgaConfig.fpgaAddress.busAddress.addrBusBaseAXIFull__BRAM)
+                {
+printf(" Operate: Read BRAM\n");
+                    dmaTransferConfig.transferMemorySelection = DMA_TRANSFER_MEMORY_SELECTION__BRAM;
+                }
+                else
+                {
+printf(" Operate: Read DDR\n");
+                    dmaTransferConfig.transferMemorySelection = DMA_TRANSFER_MEMORY_SELECTION__DDR;
+                }
 
+                dmaTransferConfig.dmaChannel = 0;
+                dmaTransferConfig.transferByteSize = fpgaConfigParam.transferBytes;
+                
+                dmaTransferConfig.offset = fpgaConfigParam.offset;
+                
                 if(fpgaController.AXIFull_BufferTransfer(dmaTransferConfig, &buffer))
                 {
 printf(" | --------------------------------------------------------------------- |\n");
 printf("                           [\033[92m READ AXI-FULL SUCCESS \033[0m]\n");
+printf("\n");
                     if(buffer.to_file(fpgaConfigParam.datafileName, 0, fpgaConfigParam.transferBytes))
                     {
 std::cout << "   Successfully save <\033[33m" << fpgaConfigParam.transferBytes << "\033[0m> bytes to file: " << fpgaConfigParam.datafileName << std::endl;
@@ -614,8 +646,8 @@ printf("   Failed to save data to file.\n");
                 else
                 {
 printf("                           [\033[31m READ AXI-FULL FAILED \033[0m]\n");
-printf(" | --------------------------------------------------------------------- |\n");
                 }
+printf(" | --------------------------------------------------------------------- |\n");
             }
             catch(const std::exception& e)
             {
@@ -632,10 +664,23 @@ printf(" | ---------------------------------------------------------------------
         {
             try
             {
-                dmaTransferConfig.ddrOffset = fpgaConfigParam.offset;
-                dmaTransferConfig.transferByteSize = fpgaConfigParam.transferBytes;
                 dmaTransferConfig.transferDirectionSelection = DMA_TRANSFER_DIRECTION__HOST_TO_FPGA;
-                dmaTransferConfig.transferDmaChannel = 0;
+                
+                if (fpgaConfigParam.offset >= fpgaConfigManager.fpgaConfig.fpgaAddress.busAddress.addrBusBaseAXIFull__BRAM)
+                {
+printf(" Operate: Read BRAM\n");
+                    dmaTransferConfig.transferMemorySelection = DMA_TRANSFER_MEMORY_SELECTION__BRAM;
+                }
+                else
+                {
+printf(" Operate: Read DDR\n");
+                    dmaTransferConfig.transferMemorySelection = DMA_TRANSFER_MEMORY_SELECTION__DDR;
+                }
+
+                dmaTransferConfig.dmaChannel = 0;
+                dmaTransferConfig.transferByteSize = fpgaConfigParam.transferBytes;
+                
+                dmaTransferConfig.offset = fpgaConfigParam.offset;
 
                 buffer.release();
 printf(" | --------------------------------------------------------------------- |\n");
@@ -671,7 +716,24 @@ printf(" | ---------------------------------------------------------------------
         {
             try
             {
-                if(fpgaController.AXIFull_Read(0, fpgaConfigParam.offset, &rValue))
+                dmaTransferConfig.transferDirectionSelection = DMA_TRANSFER_DIRECTION__FPGA_TO_HOST;
+
+                if (fpgaConfigParam.offset >= fpgaConfigManager.fpgaConfig.fpgaAddress.busAddress.addrBusBaseAXIFull__BRAM)
+                {
+printf(" Operate: Read BRAM\n");
+                    dmaTransferConfig.transferMemorySelection = DMA_TRANSFER_MEMORY_SELECTION__BRAM;
+                }
+                else
+                {
+printf(" Operate: Read DDR\n");
+                    dmaTransferConfig.transferMemorySelection = DMA_TRANSFER_MEMORY_SELECTION__DDR;
+                }
+                
+                dmaTransferConfig.dmaChannel = 0;
+                
+                dmaTransferConfig.offset = fpgaConfigParam.offset;
+
+                if(fpgaController.AXI_XDMA_WordTransfer(dmaTransferConfig, &rValue, 0))
                 {
 printf(" | --------------------------------------------------------------------- |\n");
 printf("                           [\033[92m READ AXI-FULL SUCCESS \033[0m]\n");
@@ -702,9 +764,26 @@ printf(" | ---------------------------------------------------------------------
         {
             try
             {
-                if(fpgaController.AXIFull_Write(0, fpgaConfigParam.offset, fpgaConfigParam.writeValue))
+                dmaTransferConfig.transferDirectionSelection = DMA_TRANSFER_DIRECTION__HOST_TO_FPGA;
+                
+                if (fpgaConfigParam.offset >= fpgaConfigManager.fpgaConfig.fpgaAddress.busAddress.addrBusBaseAXIFull__BRAM)
                 {
-                    if (fpgaController.AXIFull_Read(0, fpgaConfigParam.offset, &rValue))
+printf(" Operate: Read BRAM\n");
+                    dmaTransferConfig.transferMemorySelection = DMA_TRANSFER_MEMORY_SELECTION__BRAM;
+                }
+                else
+                {
+printf(" Operate: Read DDR\n");
+                    dmaTransferConfig.transferMemorySelection = DMA_TRANSFER_MEMORY_SELECTION__DDR;
+                }
+
+                dmaTransferConfig.dmaChannel = 0;
+                
+                dmaTransferConfig.offset = fpgaConfigParam.offset;
+
+                if(fpgaController.AXI_XDMA_WordTransfer(dmaTransferConfig, nullptr, fpgaConfigParam.writeValue))
+                {
+                    if (fpgaController.AXI_XDMA_WordTransfer(dmaTransferConfig, &rValue, 0))
                     {
 printf(" | --------------------------------------------------------------------- |\n");
 printf("                           [\033[92m WRITE AXI-FULL SUCCESS \033[0m]\n");
@@ -740,7 +819,12 @@ printf(" | ---------------------------------------------------------------------
         {
             try
             {
-                if(fpgaController.XDMA_Read(fpgaConfigParam.offset, &rValue))
+                dmaTransferConfig.transferDirectionSelection = DMA_TRANSFER_DIRECTION__FPGA_TO_HOST;
+                dmaTransferConfig.transferMemorySelection = DMA_TRANSFER_MEMORY_SELECTION__XDMA_DOMAIN;
+                
+                dmaTransferConfig.offset = fpgaConfigParam.offset;
+
+                if(fpgaController.AXI_XDMA_WordTransfer(dmaTransferConfig, &rValue, 0))
                 {
 printf(" | --------------------------------------------------------------------- |\n");
 printf("                     [\033[92m READ XDMA CONTROL SUCCESS \033[0m]\n");
@@ -768,9 +852,14 @@ printf(" | ---------------------------------------------------------------------
         {
             try
             {
-                if(fpgaController.XDMA_Write(fpgaConfigParam.offset, fpgaConfigParam.writeValue))
+                dmaTransferConfig.transferDirectionSelection = DMA_TRANSFER_DIRECTION__FPGA_TO_HOST;
+                dmaTransferConfig.transferMemorySelection = DMA_TRANSFER_MEMORY_SELECTION__XDMA_DOMAIN;
+                
+                dmaTransferConfig.offset = fpgaConfigParam.offset;
+
+                if(fpgaController.AXI_XDMA_WordTransfer(dmaTransferConfig, nullptr, fpgaConfigParam.writeValue))
                 {
-                    if (fpgaController.XDMA_Read(fpgaConfigParam.offset, &rValue))
+                    if (fpgaController.AXI_XDMA_WordTransfer(dmaTransferConfig, &rValue, 0))
                     {
 printf(" | --------------------------------------------------------------------- |\n");
 printf("                     [\033[92m WRITE XDMA CONTROL SUCCESS \033[0m]\n");
