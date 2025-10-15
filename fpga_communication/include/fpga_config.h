@@ -14,6 +14,7 @@
 #include <iostream>
 
 #include "nlohmann/json.hpp"
+#include "string_parse.h"
 
 #if __BYTE_ORDER == __LITTLE_ENDIAN
     #define ltohl(x)       (x)
@@ -197,11 +198,6 @@ namespace vuprs
 
             bool ConfigDown() const;
     };
-
-    uint64_t ParseHexFromString(const std::string &dataString, bool *status);
-    int ParseIntegerFromString(const std::string &dataString, bool *status);
-
-    uint64_t ParseNumberFromString(const std::string &dataString, bool *status);
 }
 
 #endif

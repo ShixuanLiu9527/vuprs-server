@@ -4,14 +4,17 @@
             "name": "Win32",
             "includePath": [
                 "${workspaceFolder}/**",
-                "${workspaceFolder}/fpga_communication/include"
+                "${workspaceFolder}/fpga_communication/include",
+                "${workspaceFolder}/nlohmann",
+                "${workspaceFolder}/system_tools",
+                "${workspaceFolder}/server/include",
+                "${workspaceFolder}/system_tools/include"
             ],
             "defines": [
                 "_DEBUG",
                 "UNICODE",
                 "_UNICODE"
             ],
-            "compilerPath": "C:\\mingw64_v11\\bin\\gcc.exe",
             "cStandard": "c17",
             "cppStandard": "gnu++17",
             "intelliSenseMode": "windows-gcc-x64"

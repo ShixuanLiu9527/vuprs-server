@@ -3,6 +3,7 @@
 #include "fpga_config.h"
 #include "fpga_control.h"
 #include "aligned_data_structure.h"
+#include "string_parse.h"
 
 #define FPGA_TOOL__OPERATE__READ_AXI_LITE           0U
 #define FPGA_TOOL__OPERATE__WRITE_AXI_LITE          1U
@@ -616,11 +617,13 @@ printf(" | ---------------------------------------------------------------------
                 if (fpgaConfigParam.offset >= fpgaConfigManager.fpgaConfig.fpgaAddress.busAddress.addrBusBaseAXIFull__BRAM)
                 {
 printf(" Operate: Read BRAM\n");
+                    fpgaConfigParam.offset -= fpgaConfigManager.fpgaConfig.fpgaAddress.busAddress.addrBusBaseAXIFull__BRAM;
                     dmaTransferConfig.transferMemorySelection = DMA_TRANSFER_MEMORY_SELECTION__BRAM;
                 }
                 else
                 {
 printf(" Operate: Read DDR\n");
+                    fpgaConfigParam.offset -= fpgaConfigManager.fpgaConfig.fpgaAddress.busAddress.addrBusBaseAXIFull__DDR;
                     dmaTransferConfig.transferMemorySelection = DMA_TRANSFER_MEMORY_SELECTION__DDR;
                 }
 
@@ -669,11 +672,13 @@ printf(" | ---------------------------------------------------------------------
                 if (fpgaConfigParam.offset >= fpgaConfigManager.fpgaConfig.fpgaAddress.busAddress.addrBusBaseAXIFull__BRAM)
                 {
 printf(" Operate: Read BRAM\n");
+                    fpgaConfigParam.offset -= fpgaConfigManager.fpgaConfig.fpgaAddress.busAddress.addrBusBaseAXIFull__BRAM;
                     dmaTransferConfig.transferMemorySelection = DMA_TRANSFER_MEMORY_SELECTION__BRAM;
                 }
                 else
                 {
 printf(" Operate: Read DDR\n");
+                    fpgaConfigParam.offset -= fpgaConfigManager.fpgaConfig.fpgaAddress.busAddress.addrBusBaseAXIFull__DDR;
                     dmaTransferConfig.transferMemorySelection = DMA_TRANSFER_MEMORY_SELECTION__DDR;
                 }
 
@@ -721,11 +726,13 @@ printf(" | ---------------------------------------------------------------------
                 if (fpgaConfigParam.offset >= fpgaConfigManager.fpgaConfig.fpgaAddress.busAddress.addrBusBaseAXIFull__BRAM)
                 {
 printf(" Operate: Read BRAM\n");
+                    fpgaConfigParam.offset -= fpgaConfigManager.fpgaConfig.fpgaAddress.busAddress.addrBusBaseAXIFull__BRAM;
                     dmaTransferConfig.transferMemorySelection = DMA_TRANSFER_MEMORY_SELECTION__BRAM;
                 }
                 else
                 {
 printf(" Operate: Read DDR\n");
+                    fpgaConfigParam.offset -= fpgaConfigManager.fpgaConfig.fpgaAddress.busAddress.addrBusBaseAXIFull__DDR;
                     dmaTransferConfig.transferMemorySelection = DMA_TRANSFER_MEMORY_SELECTION__DDR;
                 }
                 
@@ -769,11 +776,13 @@ printf(" | ---------------------------------------------------------------------
                 if (fpgaConfigParam.offset >= fpgaConfigManager.fpgaConfig.fpgaAddress.busAddress.addrBusBaseAXIFull__BRAM)
                 {
 printf(" Operate: Read BRAM\n");
+                    fpgaConfigParam.offset -= fpgaConfigManager.fpgaConfig.fpgaAddress.busAddress.addrBusBaseAXIFull__BRAM;
                     dmaTransferConfig.transferMemorySelection = DMA_TRANSFER_MEMORY_SELECTION__BRAM;
                 }
                 else
                 {
 printf(" Operate: Read DDR\n");
+                    fpgaConfigParam.offset -= fpgaConfigManager.fpgaConfig.fpgaAddress.busAddress.addrBusBaseAXIFull__DDR;
                     dmaTransferConfig.transferMemorySelection = DMA_TRANSFER_MEMORY_SELECTION__DDR;
                 }
 

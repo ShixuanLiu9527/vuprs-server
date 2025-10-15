@@ -193,8 +193,8 @@ bool vuprs::FPGAController::AXI_XDMA_WordIO(const vuprs::DMATransferConfig &tran
     {
         case DMA_TRANSFER_MEMORY_SELECTION__DDR:
         {
-            memoryLowerAddress = this->fpgaConfigManager.fpgaConfig.fpgaAddress.busAddress.addrBusBaseAXIFull__DDR;
-            memoryUpperAddress = memoryLowerAddress + this->fpgaConfigManager.fpgaConfig.hardwareConfig.hardwareConfigMemory.ddrMemoryCapacity_bytes - 1;
+            memoryLowerAddress = 0;
+            memoryUpperAddress = this->fpgaConfigManager.fpgaConfig.hardwareConfig.hardwareConfigMemory.ddrMemoryCapacity_bytes - 1;
             
             base = 0;
             
@@ -211,8 +211,8 @@ bool vuprs::FPGAController::AXI_XDMA_WordIO(const vuprs::DMATransferConfig &tran
         }
         case DMA_TRANSFER_MEMORY_SELECTION__BRAM:
         {
-            memoryLowerAddress = this->fpgaConfigManager.fpgaConfig.fpgaAddress.busAddress.addrBusBaseAXIFull__BRAM;
-            memoryUpperAddress = memoryLowerAddress + this->fpgaConfigManager.fpgaConfig.hardwareConfig.hardwareConfigMemory.bramMemoryCapacity_bytes - 1;
+            memoryLowerAddress = 0;
+            memoryUpperAddress = this->fpgaConfigManager.fpgaConfig.hardwareConfig.hardwareConfigMemory.bramMemoryCapacity_bytes - 1;
             
             base = 0;
             
@@ -261,7 +261,9 @@ bool vuprs::FPGAController::AXI_XDMA_WordIO(const vuprs::DMATransferConfig &tran
 
     if (registerTargetOffset > (memoryUpperAddress - 3) || registerTargetOffset < memoryLowerAddress)
     {
-        throw std::range_error("Invalid offset for 4 bytes transfer. (valid offset: " + std::to_string(memoryLowerAddress) + " - " + std::to_string(memoryUpperAddress - 3) + ")");
+        char buffer[256];
+        sprintf(buffer, "Invalid offset for 4 bytes transfer. (valid offset: 0x%X - 0x%X)", memoryLowerAddress, memoryUpperAddress - 3);
+        throw std::range_error(std::string(buffer));
     }
 
     /* Open device file */
