@@ -1,5 +1,5 @@
 {
     "initialize-port": "8080",
     "max-port": "10000",
-    "accept-client-counts": 1
+    "accept-client-counts": "1"
 }

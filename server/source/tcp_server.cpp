@@ -281,7 +281,7 @@ void vuprs::TcpServer::acceptConnection()
             
                 std::cout << "[server][listening] successfully connect client: [" << this->currentSession->getClientInfo() << "]" << std::endl;
             
-                if (this->serverConnectionCallback) 
+                if (this->serverConnectionCallback)
                 {
                     this->serverConnectionCallback(true, this->currentSession->getClientInfo());
                 }

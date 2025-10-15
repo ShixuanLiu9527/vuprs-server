@@ -54,7 +54,7 @@ void vuprs::TcpSession::start()
 {
     this->running = true;
     std::cout << "[session] start with client [" << this->getClientInfo() << "]."   << std::endl;
-
+    this->sendData("[session] you are connected.");
     this->receiveLoop();
 }
 
@@ -91,19 +91,19 @@ void vuprs::TcpSession::setMessageHandler(SessionMessageHandler handler)
 void vuprs::TcpSession::receiveLoop() 
 {
     char buffer[__SOCKET_RECEIVE_BUFFER_SIZE_BYTES__];
-    uint64_t tryCount = 0;
+    uint64_t tryCount = 0, recvBytes = 0;
     ssize_t recvReturn;
     bool recvStatus = false;
     
     while (this->running && this->client_fd >= 0) 
     {
-        recvStatus = vuprs::SocketRecvData(this->client_fd, buffer, __SOCKET_RECEIVE_BUFFER_SIZE_BYTES__, &recvReturn);
+        recvStatus = vuprs::SocketRecvData(this->client_fd, buffer, __SOCKET_RECEIVE_BUFFER_SIZE_BYTES__, &recvReturn, &recvBytes);
         
-        if (recvStatus > 0)
+        if (recvStatus)
         {
             /* Get message from client */
 
-            buffer[static_cast<uint64_t>(recvReturn)] = '\0';
+            buffer[static_cast<uint64_t>(recvBytes)] = '\0';
             std::string message(buffer);
             
             std::cout << "[session] received data from client [" << getClientInfo() << "]: " << message << std::endl;
@@ -115,7 +115,7 @@ void vuprs::TcpSession::receiveLoop()
             else
             {
                 std::string response = this->DefaultMessageProcess(message);
-                vuprs::SocketSendData(this->client_fd, response.c_str(), response.length());
+                this->sendData(response);
             }
             if (message == "quit" || message == "exit")
             {
@@ -127,21 +127,15 @@ void vuprs::TcpSession::receiveLoop()
             std::cout << "[session] client disconnected. [" << getClientInfo() << "]"  << std::endl;
             break;
         }
-        else
-        {
-            if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)  /* wait */
-            {
-                std::cerr << "receive error. [" << strerror(errno) << "]"  << std::endl;
-                break;
-            }
-        }
+        // else
+        // {
+        //     if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)  /* wait */
+        //     {
+        //         std::cerr << "receive error. [" << strerror(errno) << "]"  << std::endl;
+        //         break;
+        //     }
+        // }
 
-        if (tryCount >= __SOCKET_TIMEOUT_MAXIMUM_ITERATION_COUNT__)
-        {
-            break;
-        }
-
-        tryCount++;
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     
@@ -150,7 +144,8 @@ void vuprs::TcpSession::receiveLoop()
     std::cout << "[session] client service end. [" << getClientInfo() << "]" << std::endl;
 }
 
-std::string vuprs::TcpSession::DefaultMessageProcess(const std::string& message) {
+std::string vuprs::TcpSession::DefaultMessageProcess(const std::string& message) 
+{
     if (message == "hello") 
     {
         return "This is vuprs server.";
@@ -171,137 +166,244 @@ std::string vuprs::TcpSession::DefaultMessageProcess(const std::string& message)
 
 bool vuprs::SocketSendData(int fd, const char *buf, const uint64_t &sendLength, ssize_t *origin_ret)
 {
-    uint64_t sentBytes = 0, tryCount = 0;
-    ssize_t sendReturn = 0;
-    bool retValue = false;
-
-    if (fd < 0 || !buf)
+    if (fd < 0 || !buf || sendLength == 0) 
     {
+        if (origin_ret) *origin_ret = 0;
         return false;
     }
 
-    while(true)
+    uint64_t sentBytes = 0;
+    const uint64_t max_tries = 100;
+    uint64_t tryCount = 0;
+    
+    while (sentBytes < sendLength && tryCount < max_tries) 
     {
-        sendReturn = send(fd, buf + sentBytes, sendLength - sentBytes, 0);
+        ssize_t sendReturn = send(fd, buf + sentBytes, sendLength - sentBytes, 0);
 
-        if (sendReturn < 0)
+        if (sendReturn > 0) 
         {
-            if (errno == EWOULDBLOCK)
+            sentBytes += sendReturn;
+            tryCount = 0;
+            continue;
+        }
+        else if (sendReturn == 0) 
+        {
+            break;
+        }
+        else 
+        { // sendReturn < 0
+            if (errno == EINTR) 
             {
                 continue;
             }
-            else if (errno == EINTR)
+            else if (errno == EWOULDBLOCK || errno == EAGAIN) 
             {
+                tryCount++;
+                usleep(100000); // 100ms
                 continue;
             }
-            else
+            else 
             {
-                retValue = false;
                 break;
             }
         }
-        else if (sendReturn == 0)
-        {
-            retValue = false;
-            break;
-        }
-        if (tryCount > __SOCKET_TIMEOUT_MAXIMUM_ITERATION_COUNT__)
-        {
-            retValue = false;
-            break;
-        }
-
-        sentBytes += sendReturn;
-
-        if (sentBytes >= sendLength)
-        {
-            retValue = true;
-            break;
-        }
-
-        tryCount++;
-
-#ifdef _WIN32
-        Sleep(1);
-#else
-        usleep(1);
-#endif
-
     }
 
-    if (origin_ret)
+    bool success = (sentBytes == sendLength);
+    
+    if (origin_ret) 
     {
-        (*origin_ret) = sendReturn;
+        *origin_ret = sentBytes;
     }
-
-    return retValue;
+    
+    return success;
 }
 
-bool vuprs::SocketRecvData(int fd, char* buf, const uint64_t &recvLength, ssize_t *origin_ret)
+// bool vuprs::SocketSendData(int fd, const char *buf, const uint64_t &sendLength, ssize_t *origin_ret)
+// {
+//     uint64_t sentBytes = 0, tryCount = 0;
+//     ssize_t sendReturn = 0;
+//     bool retValue = false;
+
+//     if (fd < 0 || !buf)
+//     {
+//         return false;
+//     }
+
+//     while(true)
+//     {
+//         sendReturn = send(fd, buf + sentBytes, sendLength - sentBytes, 0);
+
+//         if (sendReturn < 0)
+//         {
+//             if (errno == EWOULDBLOCK) {}
+//             else if (errno == EINTR) {}
+//             else
+//             {
+//                 retValue = false;
+//                 break;
+//             }
+//         }
+//         else if (sendReturn == 0)
+//         {
+//             retValue = false;
+//             break;
+//         }
+//         if (tryCount > __SOCKET_TIMEOUT_MAXIMUM_ITERATION_COUNT__)
+//         {
+//             retValue = false;
+//             break;
+//         }
+
+//         if (sendReturn > 0)
+//         {
+//             sentBytes += sendReturn;
+//         }
+
+//         if (sentBytes >= sendLength)
+//         {
+//             retValue = true;
+//             break;
+//         }
+
+//         tryCount++;
+//         usleep(100000);
+//     }
+
+//     if (origin_ret)
+//     {
+//         (*origin_ret) = sentBytes;
+//     }
+
+//     return retValue;
+// }
+
+bool waitSocketReadable(int fd, int timeout_ms) 
 {
-    uint64_t receivedBytes = 0, tryCount = 0;
-    ssize_t recvReturn = 0;
-    bool retValue = false;
+    fd_set readfds;
+    FD_ZERO(&readfds);
+    FD_SET(fd, &readfds);
 
-    if (fd < 0 || !buf)
+    struct timeval tv;
+    tv.tv_sec = timeout_ms / 1000;
+    tv.tv_usec = (timeout_ms % 1000) * 1000;
+
+    int ret = select(fd + 1, &readfds, NULL, NULL, &tv);
+    if (ret > 0 && FD_ISSET(fd, &readfds)) 
     {
-        return false;
+        return true;
     }
-
-    while (true)
-    {
-        recvReturn = recv(fd, buf + receivedBytes, recvLength - receivedBytes, 0);
-
-        if (recvReturn < 0)
-        {
-            if (errno == EWOULDBLOCK || errno == EAGAIN)
-            {
-                continue;
-            }
-            else if (errno == EINTR)
-            {
-                continue;
-            }
-            else
-            {
-                retValue = false;
-                break;
-            }
-        }
-        else if (recvReturn == 0)
-        {
-            retValue = false;
-            break;
-        }
-
-        if (tryCount > __SOCKET_TIMEOUT_MAXIMUM_ITERATION_COUNT__)
-        {
-            retValue = false;
-            break;
-        }
-
-        receivedBytes += recvReturn;
-
-        if (receivedBytes >= recvLength)
-        {
-            retValue = true;
-            break;
-        }
-
-        tryCount++;
-
-#ifdef _WIN32
-        Sleep(1);
-#else
-        usleep(1);
-#endif
-
-    }
-
-    if (origin_ret)
-    {
-        (*origin_ret) = recvReturn;
-    }
-
-    return retValue;
+    return false;
 }
+
+bool vuprs::SocketRecvData(int fd, char* buf, const uint64_t &max_recvLength, ssize_t *origin_ret, uint64_t *recvBytes)
+{
+    uint64_t receivedBytes = 0;
+    ssize_t recvReturn = 1;
+    const auto timeout = std::chrono::seconds(5);
+    auto start = std::chrono::steady_clock::now();
+    bool timeoutFlag = false;
+    
+    while (receivedBytes < max_recvLength) 
+    {
+        
+        if (std::chrono::steady_clock::now() - start > timeout) 
+        {
+            timeoutFlag = true;
+            break;
+        }
+        
+        if (!waitSocketReadable(fd, 100)) continue;
+        
+        recvReturn = recv(fd, buf + receivedBytes, max_recvLength - receivedBytes, 0);
+        
+        if (recvReturn > 0) 
+        {
+            receivedBytes += recvReturn;
+        }
+        else if (recvReturn == 0) 
+        {
+            break;
+        }
+        else 
+        {
+            if (errno == EINTR) continue;
+            if (errno == EWOULDBLOCK || errno == EAGAIN) continue;
+            break;
+        }
+        
+        if (receivedBytes > 0) 
+        {
+            break;
+        }
+    }
+    
+    if (timeoutFlag)
+    {
+        if (origin_ret) *origin_ret = 1;  /* not disconnect */
+    }
+    else
+    {
+        if (origin_ret) *origin_ret = recvReturn;
+    }
+    if (recvBytes) *recvBytes = receivedBytes;
+    
+    return receivedBytes > 0;
+}
+
+// bool vuprs::SocketRecvData(int fd, char* buf, const uint64_t &recvLength, ssize_t *origin_ret)
+// {
+//     uint64_t receivedBytes = 0, tryCount = 0;
+//     ssize_t recvReturn = 0;
+//     bool retValue = false;
+
+//     if (fd < 0 || !buf)
+//     {
+//         return false;
+//     }
+
+//     while (true)
+//     {
+//         recvReturn = recv(fd, buf + receivedBytes, recvLength - receivedBytes, 0);
+
+//         if (recvReturn < 0)
+//         {
+//             if (errno == EWOULDBLOCK || errno == EAGAIN) {}
+//             else if (errno == EINTR) {}
+//             else
+//             {
+//                 retValue = false;
+//                 break;
+//             }
+//         }
+//         else if (recvReturn == 0)
+//         {
+//             retValue = false;
+//             break;
+//         }
+
+//         if (tryCount > __SOCKET_TIMEOUT_MAXIMUM_ITERATION_COUNT__)
+//         {
+//             retValue = false;
+//             break;
+//         }
+
+//         receivedBytes += recvReturn;
+
+//         if (receivedBytes >= recvLength)
+//         {
+//             retValue = true;
+//             break;
+//         }
+
+//         tryCount++;
+//         usleep(100000);
+//     }
+
+//     if (origin_ret)
+//     {
+//         (*origin_ret) = receivedBytes;
+//     }
+
+//     return retValue;
+// }

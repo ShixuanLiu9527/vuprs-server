@@ -6,6 +6,9 @@
 #include <memory>
 #include <functional>
 #include <thread>
+#include <sys/socket.h>
+#include <unistd.h>
+#include <errno.h>
 
 #define __SOCKET_TIMEOUT_MAXIMUM_ITERATION_COUNT__   20
 #define __SOCKET_RECEIVE_BUFFER_SIZE_BYTES__         1024UL
@@ -78,7 +81,7 @@ namespace vuprs
     };
 
     bool SocketSendData(int fd, const char *buf, const uint64_t &sendLength, ssize_t *origin_ret = nullptr);
-    bool SocketRecvData(int fd, char* buf, const uint64_t &recvLength, ssize_t *origin_ret = nullptr);
+    bool SocketRecvData(int fd, char* buf, const uint64_t &recvLength, ssize_t *origin_ret, uint64_t *recvBytes);
 }
 
 #endif
