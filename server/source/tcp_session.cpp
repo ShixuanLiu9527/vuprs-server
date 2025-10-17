@@ -1,10 +1,4 @@
 #include "tcp_session.h"
-#include "nerwork_exception.h"
-#include <iostream>
-#include <unistd.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <cstring>
 
 vuprs::TcpSession::TcpSession(int client_fd, const struct sockaddr_in& client_addr)
 {
@@ -31,7 +25,7 @@ vuprs::TcpSession::TcpSession(TcpSession&& other) noexcept
 
 vuprs::TcpSession& vuprs::TcpSession::operator=(TcpSession&& other) noexcept 
 {
-    if (this != &other) 
+    if (this != &other)
     {
         this->stop();
         this->client_fd = other.client_fd;
@@ -53,7 +47,7 @@ bool vuprs::TcpSession::sendData(const std::string &message)
 void vuprs::TcpSession::start() 
 {
     this->running = true;
-    std::cout << "[session] start with client [" << this->getClientInfo() << "]."   << std::endl;
+    std::cout << "[session][" << this->getClientInfo() << "] start receive loop."   << std::endl;
     this->sendData("[session] you are connected.");
     this->receiveLoop();
 }
@@ -62,7 +56,7 @@ void vuprs::TcpSession::stop()
 {
     /* Close client file descriptor */
 
-    if (this->client_fd >= 0) 
+    if (this->client_fd >= 0)
     {
         close(this->client_fd);
         this->client_fd = -1;
@@ -79,7 +73,11 @@ bool vuprs::TcpSession::isRunning() const
 std::string vuprs::TcpSession::getClientInfo() const 
 {
     char ip[INET_ADDRSTRLEN];
+
+    /* Calculate IP & Port */
+
     inet_ntop(AF_INET, &this->client_addr.sin_addr, ip, INET_ADDRSTRLEN);
+
     return std::string(ip) + ":" + std::to_string(ntohs(this->client_addr.sin_port));
 }
 
@@ -106,7 +104,7 @@ void vuprs::TcpSession::receiveLoop()
             buffer[static_cast<uint64_t>(recvBytes)] = '\0';
             std::string message(buffer);
             
-            std::cout << "[session] received data from client [" << getClientInfo() << "]: " << message << std::endl;
+            std::cout << "[session][" << getClientInfo() << "] received data from client: " << message << std::endl;
             
             if (this->messageHandler != nullptr)
             {
@@ -124,12 +122,12 @@ void vuprs::TcpSession::receiveLoop()
         }
         else if (recvReturn == 0)  /* Connect shut down */
         {
-            std::cout << "[session] client disconnected. [" << getClientInfo() << "]"  << std::endl;
+            std::cout << "[session][" << getClientInfo() << "] disconnected."  << std::endl;
             break;
         }
         // else
         // {
-        //     if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)  /* wait */
+        //     if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)
         //     {
         //         std::cerr << "receive error. [" << strerror(errno) << "]"  << std::endl;
         //         break;
@@ -141,7 +139,7 @@ void vuprs::TcpSession::receiveLoop()
     
     running = false;
 
-    std::cout << "[session] client service end. [" << getClientInfo() << "]" << std::endl;
+    std::cout << "[session][" << getClientInfo() << "] client service end." << std::endl;
 }
 
 std::string vuprs::TcpSession::DefaultMessageProcess(const std::string& message) 
@@ -158,7 +156,7 @@ std::string vuprs::TcpSession::DefaultMessageProcess(const std::string& message)
     {
         return "server quit.";
     } 
-    else 
+    else
     {
         return "echo: " + message;
     }
@@ -199,7 +197,7 @@ bool vuprs::SocketSendData(int fd, const char *buf, const uint64_t &sendLength, 
             else if (errno == EWOULDBLOCK || errno == EAGAIN) 
             {
                 tryCount++;
-                usleep(100000); // 100ms
+                usleep(100 * 000); // 100ms
                 continue;
             }
             else 
@@ -218,65 +216,6 @@ bool vuprs::SocketSendData(int fd, const char *buf, const uint64_t &sendLength, 
     
     return success;
 }
-
-// bool vuprs::SocketSendData(int fd, const char *buf, const uint64_t &sendLength, ssize_t *origin_ret)
-// {
-//     uint64_t sentBytes = 0, tryCount = 0;
-//     ssize_t sendReturn = 0;
-//     bool retValue = false;
-
-//     if (fd < 0 || !buf)
-//     {
-//         return false;
-//     }
-
-//     while(true)
-//     {
-//         sendReturn = send(fd, buf + sentBytes, sendLength - sentBytes, 0);
-
-//         if (sendReturn < 0)
-//         {
-//             if (errno == EWOULDBLOCK) {}
-//             else if (errno == EINTR) {}
-//             else
-//             {
-//                 retValue = false;
-//                 break;
-//             }
-//         }
-//         else if (sendReturn == 0)
-//         {
-//             retValue = false;
-//             break;
-//         }
-//         if (tryCount > __SOCKET_TIMEOUT_MAXIMUM_ITERATION_COUNT__)
-//         {
-//             retValue = false;
-//             break;
-//         }
-
-//         if (sendReturn > 0)
-//         {
-//             sentBytes += sendReturn;
-//         }
-
-//         if (sentBytes >= sendLength)
-//         {
-//             retValue = true;
-//             break;
-//         }
-
-//         tryCount++;
-//         usleep(100000);
-//     }
-
-//     if (origin_ret)
-//     {
-//         (*origin_ret) = sentBytes;
-//     }
-
-//     return retValue;
-// }
 
 bool waitSocketReadable(int fd, int timeout_ms) 
 {
@@ -340,7 +279,7 @@ bool vuprs::SocketRecvData(int fd, char* buf, const uint64_t &max_recvLength, ss
     
     if (timeoutFlag)
     {
-        if (origin_ret) *origin_ret = 1;  /* not disconnect */
+        if (origin_ret) *origin_ret = 1;  /* not disconnect when timeout */
     }
     else
     {
@@ -350,60 +289,3 @@ bool vuprs::SocketRecvData(int fd, char* buf, const uint64_t &max_recvLength, ss
     
     return receivedBytes > 0;
 }
-
-// bool vuprs::SocketRecvData(int fd, char* buf, const uint64_t &recvLength, ssize_t *origin_ret)
-// {
-//     uint64_t receivedBytes = 0, tryCount = 0;
-//     ssize_t recvReturn = 0;
-//     bool retValue = false;
-
-//     if (fd < 0 || !buf)
-//     {
-//         return false;
-//     }
-
-//     while (true)
-//     {
-//         recvReturn = recv(fd, buf + receivedBytes, recvLength - receivedBytes, 0);
-
-//         if (recvReturn < 0)
-//         {
-//             if (errno == EWOULDBLOCK || errno == EAGAIN) {}
-//             else if (errno == EINTR) {}
-//             else
-//             {
-//                 retValue = false;
-//                 break;
-//             }
-//         }
-//         else if (recvReturn == 0)
-//         {
-//             retValue = false;
-//             break;
-//         }
-
-//         if (tryCount > __SOCKET_TIMEOUT_MAXIMUM_ITERATION_COUNT__)
-//         {
-//             retValue = false;
-//             break;
-//         }
-
-//         receivedBytes += recvReturn;
-
-//         if (receivedBytes >= recvLength)
-//         {
-//             retValue = true;
-//             break;
-//         }
-
-//         tryCount++;
-//         usleep(100000);
-//     }
-
-//     if (origin_ret)
-//     {
-//         (*origin_ret) = receivedBytes;
-//     }
-
-//     return retValue;
-// }

@@ -40,24 +40,29 @@
 
 namespace vuprs
 {
-    class AlignedBufferDMA
+    class AlignedBuffer
     {
         private:
             uint64_t byteSize;
             uint64_t byteCapacity;
             void* allocated;
+
+        protected:
+            void set_bytesize(const uint64_t &bytesize);
+            void set_capacity(const uint64_t &capacity);
+            void set_allocated(void* allocated);
         
         public:
-            AlignedBufferDMA() : byteSize(0), byteCapacity(0), allocated(nullptr) {}
+            AlignedBuffer();
         
-            explicit AlignedBufferDMA(uint64_t byteSize);
+            explicit AlignedBuffer(uint64_t byteSize);
 
-            ~AlignedBufferDMA();
+            virtual ~AlignedBuffer();
 
             /* Copy is disabled */
         
-            AlignedBufferDMA(const AlignedBufferDMA&) = delete;
-            AlignedBufferDMA& operator=(const AlignedBufferDMA&) = delete;
+            AlignedBuffer(const AlignedBuffer&) = delete;
+            AlignedBuffer& operator=(const AlignedBuffer&) = delete;
 
             /* release & malloc */
         
@@ -73,7 +78,7 @@ namespace vuprs
              * @retval true: create success
              *         false: create failed
              */
-            bool malloc(uint64_t byteSize);
+            virtual bool malloc(uint64_t byteSize) = 0;
             bool is_allocated() const;
 
             /* size & data* */
@@ -159,6 +164,38 @@ namespace vuprs
             { 
                 return reinterpret_cast<T*>(this->allocated); 
             }
+    };
+
+    /**
+     * @brief aligned buffer for FPGA DMA transfer
+     * @note aligned byte size = 4096 UL
+     */
+    class AlignedBufferDMA: public AlignedBuffer
+    {
+        public:
+            AlignedBufferDMA() = default;
+            explicit AlignedBufferDMA(uint64_t byteSize) : AlignedBuffer(byteSize) {}
+
+            ~AlignedBufferDMA() override = default;
+
+            bool malloc(uint64_t byteSize) override;
+
+    };
+
+    /**
+     * @brief aligned buffer for TCP server
+     * @note aligned byte size = 4 UL
+     */
+    class AlignedBufferServer: public AlignedBuffer
+    {
+        public:
+            AlignedBufferServer() = default;
+            explicit AlignedBufferServer(uint64_t byteSize) : AlignedBuffer(byteSize) {}
+            
+            ~AlignedBufferServer() override = default;
+
+            bool malloc(uint64_t byteSize) override;
+
     };
 }
 

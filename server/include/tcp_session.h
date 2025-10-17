@@ -9,6 +9,11 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <errno.h>
+#include <iostream>
+#include <arpa/inet.h>
+#include <cstring>
+
+#include "nerwork_exception.h"
 
 #define __SOCKET_TIMEOUT_MAXIMUM_ITERATION_COUNT__   20
 #define __SOCKET_RECEIVE_BUFFER_SIZE_BYTES__         1024UL

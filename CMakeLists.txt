@@ -5,6 +5,8 @@ project(vuprs)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+find_package(Threads REQUIRED)
+
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
     add_compile_options(-std=c++17)
 endif()
@@ -17,16 +19,18 @@ endif()
 
 add_subdirectory(eigen)
 include_directories(
-        ${CMAKE_CURRENT_SOURCE_DIR}/fpga_communication/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/network/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/fpga/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/server/include
         ${CMAKE_CURRENT_SOURCE_DIR}/eigen
+        ${CMAKE_CURRENT_SOURCE_DIR}/system_tools/include
         ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-file(GLOB_RECURSE SOLVER_SRC 
-    "fpga_communication/source/*.cpp"
-    "network/source/*.cpp"
-)
+file(GLOB_RECURSE FPGA_SRC "fpga/source/*.cpp")
+file(GLOB_RECURSE NETWORK_SRC "server/source/*.cpp")
+file(GLOB_RECURSE SYS_TOOL_SRC "system_tools/source/*.cpp")
 
-add_executable(fpga_tool fpga_tool.cpp ${SOLVER_SRC})
-add_executable(vuprs_server main.cpp ${SOLVER_SRC})
+add_executable(fpga_tool fpga_tool.cpp ${FPGA_SRC} ${SYS_TOOL_SRC})
+add_executable(vuprs_server test_server.cpp ${NETWORK_SRC} ${SYS_TOOL_SRC})
+
+target_link_libraries(vuprs_server PRIVATE Threads::Threads)

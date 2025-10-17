@@ -1,4 +1,6 @@
 #include <iostream>
+#include <time.h>
+#include <stdio.h>
 
 #include "fpga_config.h"
 #include "fpga_control.h"
@@ -111,7 +113,14 @@ struct FPGA_TOOL_AXIParameters
 };
 
 void FPGA_TOOL__PrintHelp();
+void FPGA_TOOL__ShowNeedHelp();
+double GetTimeDiff(struct timespec *start, struct timespec *end);
 FPGA_TOOL_AXIParameters FPGA_TOOL__ParseCommandParameters(const std::vector<std::string> &cmdList);
+
+double GetTimeDiff(struct timespec *start, struct timespec *end) 
+{
+    return (end->tv_sec - start->tv_sec) + (end->tv_nsec - start->tv_nsec) / 1e9;
+}
 
 void FPGA_TOOL__PrintHelp()
 {
@@ -188,6 +197,13 @@ printf(" | fpga_tool --dopt \033[33mw-ctrl\033[0m --offset \033[33m0\033[0m --io
 printf(" |                                                                       |\n");
 printf(" |=======================================================================|\n");
 printf("\n");
+}
+
+void FPGA_TOOL__ShowNeedHelp()
+{
+std::cout << " \033[31mcommand/value error\033[0m\n" << std::endl;
+printf(" see help: fpga_tool --help\n");
+printf("           fpga_tool -h\n\n");
 }
 
 FPGA_TOOL_AXIParameters FPGA_TOOL__ParseCommandParameters(const std::vector<std::string> &cmdList)
@@ -470,6 +486,8 @@ int main(int argc, char *argv[])
     vuprs::AlignedBufferDMA buffer;
     vuprs::DMATransferConfig dmaTransferConfig;
 
+    struct timespec start, end;
+
     uint32_t rValue;
 
     vuprs::SetDMATransferConfigToDefault(&dmaTransferConfig);
@@ -513,8 +531,7 @@ std::cout << " \033[92mSuccessfully load configuration from\033[0m: \033[34m" <<
         }
         case FPGA_TOOL__OPERATE__ERROR: 
         {
-printf(" \033[31mFPGA-TOOL: ERROR COMMAND!\033[0m Check the command below:  \n");
-            FPGA_TOOL__PrintHelp();
+            FPGA_TOOL__ShowNeedHelp();
             break;
         }
 
@@ -632,11 +649,16 @@ printf(" Operate: Read DDR\n");
                 
                 dmaTransferConfig.offset = fpgaConfigParam.offset;
                 
+                clock_gettime(CLOCK_MONOTONIC, &start);  /* Start timing */
+
                 if(fpgaController.AXIFull_BufferTransfer(dmaTransferConfig, &buffer))
                 {
+                    clock_gettime(CLOCK_MONOTONIC, &end);  /* End timing */
+                    double elapsed = GetTimeDiff(&start, &end);
 printf(" | --------------------------------------------------------------------- |\n");
 printf("                           [\033[92m READ AXI-FULL SUCCESS \033[0m]\n");
 printf("\n");
+std::cout << "   Transfer speed (read) \033[33m" << std::fixed << std::setprecision(2) << ((double)fpgaConfigParam.transferBytes / (1024.0 * 1024.0)) / elapsed << "\033[0m MB/sec" << std::endl;
                     if(buffer.to_file(fpgaConfigParam.datafileName, 0, fpgaConfigParam.transferBytes))
                     {
 std::cout << "   Successfully save <\033[33m" << fpgaConfigParam.transferBytes << "\033[0m> bytes to file: " << fpgaConfigParam.datafileName << std::endl;
@@ -645,6 +667,7 @@ std::cout << "   Successfully save <\033[33m" << fpgaConfigParam.transferBytes <
                     {
 printf("   Failed to save data to file.\n");
                     }
+printf("\n");
                 }
                 else
                 {
@@ -691,18 +714,27 @@ printf(" Operate: Read DDR\n");
 printf(" | --------------------------------------------------------------------- |\n");
                 if (buffer.from_file(fpgaConfigParam.datafileName, 0, fpgaConfigParam.transferBytes))
                 {
+                    clock_gettime(CLOCK_MONOTONIC, &start);  /* Start timing */
                     if(fpgaController.AXIFull_BufferTransfer(dmaTransferConfig, &buffer))
                     {
+                        clock_gettime(CLOCK_MONOTONIC, &end);  /* End timing */
+                        double elapsed = GetTimeDiff(&start, &end);
 printf("                         [\033[92m WRITE AXI-FULL SUCCESS \033[0m]\n");
+printf("\n");
+std::cout << "   Successfully write <\033[33m" << fpgaConfigParam.transferBytes << "\033[0m> bytes from file: " << fpgaConfigParam.datafileName << "to FPGA." << std::endl;
+std::cout << "   Transfer speed (write) \033[33m" << std::fixed << std::setprecision(2) << ((double)fpgaConfigParam.transferBytes / (1024.0 * 1024.0)) / elapsed << "\033[0m MB/sec" << std::endl;
+printf("\n");
                     }
                     else
                     {
 printf("                         [\033[31m WRITE AXI-FULL FAILED \033[0m]\n");
+printf("\n");
                     }
                 }
                 else
                 {
 std::cout << "   Failed to load data from: " << fpgaConfigParam.datafileName << std::endl;
+printf("\n");
                 }
 printf(" | --------------------------------------------------------------------- |\n");
             }

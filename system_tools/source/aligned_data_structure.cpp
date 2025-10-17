@@ -4,7 +4,14 @@
 /* ---------------------------------------- Aligned Data Structure ----------------------------------------------- */
 /* --------------------------------------------------------------------------------------------------------------- */
 
-vuprs::AlignedBufferDMA::AlignedBufferDMA(uint64_t byteSize)
+vuprs::AlignedBuffer::AlignedBuffer()
+{
+    this->byteSize = 0;
+    this->byteCapacity = 0;
+    this->allocated = nullptr;
+}
+
+vuprs::AlignedBuffer::AlignedBuffer(uint64_t byteSize)
 {
     if (!this->malloc(byteSize))
     {
@@ -12,12 +19,27 @@ vuprs::AlignedBufferDMA::AlignedBufferDMA(uint64_t byteSize)
     }
 }
 
-vuprs::AlignedBufferDMA::~AlignedBufferDMA()
+vuprs::AlignedBuffer::~AlignedBuffer()
 {
     this->release();
 }
 
-void vuprs::AlignedBufferDMA::release()
+void vuprs::AlignedBuffer::set_bytesize(const uint64_t &bytesize)
+{
+    this->byteSize = bytesize;
+}
+
+void vuprs::AlignedBuffer::set_capacity(const uint64_t &capacity)
+{
+    this->byteCapacity = capacity;
+}
+
+void vuprs::AlignedBuffer::set_allocated(void* allocated)
+{
+    this->allocated = allocated;
+}
+
+void vuprs::AlignedBuffer::release()
 {
     if (this->allocated != nullptr)
     {
@@ -37,68 +59,27 @@ void vuprs::AlignedBufferDMA::release()
     this->allocated = nullptr;
 }
 
-bool vuprs::AlignedBufferDMA::malloc(uint64_t byteSize)
-{
-    this->release();
-
-#ifdef _WIN32
-
-    /*
-        To ensure address is aligned, size <- size + __XDMA_DMA_ALIGNMENT_BYTES__
-    */
-    this->allocated = _aligned_malloc(byteSize + __XDMA_DMA_ALIGNMENT_BYTES__, __XDMA_DMA_ALIGNMENT_BYTES__);
-
-#else
-
-    /*
-        To ensure address is aligned, size <- size + __XDMA_DMA_ALIGNMENT_BYTES__
-    */
-    if (posix_memalign(&this->allocated, __XDMA_DMA_ALIGNMENT_BYTES__, byteSize + __XDMA_DMA_ALIGNMENT_BYTES__) != 0)
-    {
-        this->allocated = nullptr;
-    }
-
-#endif
-
-    if (this->allocated == nullptr)
-    {
-        this->release();
-        return false;
-    }
-    else  /* Check aligned result */
-    {
-        uintptr_t allocated_check = reinterpret_cast<uintptr_t>(this->allocated);
-        if (allocated_check % __XDMA_DMA_ALIGNMENT_BYTES__ != 0)
-        {
-            this->release();
-        }
-    }
-    this->byteSize = byteSize;
-    this->byteCapacity = byteSize + __XDMA_DMA_ALIGNMENT_BYTES__;
-    return true;
-}
-
-uint64_t vuprs::AlignedBufferDMA::size() const 
+uint64_t vuprs::AlignedBuffer::size() const 
 { 
     return this->byteSize; 
 }
 
-uint64_t vuprs::AlignedBufferDMA::capacity() const
+uint64_t vuprs::AlignedBuffer::capacity() const
 {
     return this->byteCapacity;
 }
 
-void* vuprs::AlignedBufferDMA::data() const 
+void* vuprs::AlignedBuffer::data() const 
 { 
     return this->allocated; 
 }
 
-bool vuprs::AlignedBufferDMA::is_allocated() const 
+bool vuprs::AlignedBuffer::is_allocated() const 
 { 
     return this->allocated != nullptr; 
 }
 
-bool vuprs::AlignedBufferDMA::to_file(const std::string &fileName, const uint64_t &fileOffset, uint64_t writeBytes) const
+bool vuprs::AlignedBuffer::to_file(const std::string &fileName, const uint64_t &fileOffset, uint64_t writeBytes) const
 {
     if (!this->is_allocated() || this->byteSize == 0 || writeBytes == 0)
     {
@@ -150,7 +131,7 @@ bool vuprs::AlignedBufferDMA::to_file(const std::string &fileName, const uint64_
     return true;
 }
 
-bool vuprs::AlignedBufferDMA::from_file(const std::string &fileName, const uint64_t &fileOffset, uint64_t loadBytes)
+bool vuprs::AlignedBuffer::from_file(const std::string &fileName, const uint64_t &fileOffset, uint64_t loadBytes)
 {
     if (fileName.empty())
     {
@@ -203,5 +184,51 @@ bool vuprs::AlignedBufferDMA::from_file(const std::string &fileName, const uint6
     }
     
     close(file_fd);
+    return true;
+}
+
+bool vuprs::AlignedBufferDMA::malloc(uint64_t byteSize)
+{
+    void* _allocated;
+    
+    this->release();  /* free all */
+
+#ifdef _WIN32
+
+    /*
+        To ensure address is aligned, size <- size + __XDMA_DMA_ALIGNMENT_BYTES__
+    */
+    this->allocated = _aligned_malloc(byteSize + __XDMA_DMA_ALIGNMENT_BYTES__, __XDMA_DMA_ALIGNMENT_BYTES__);
+
+#else
+
+    /*
+        To ensure address is aligned, size <- size + __XDMA_DMA_ALIGNMENT_BYTES__
+    */
+    if (posix_memalign(&_allocated, __XDMA_DMA_ALIGNMENT_BYTES__, byteSize + __XDMA_DMA_ALIGNMENT_BYTES__) != 0)
+    {
+        _allocated = nullptr;
+    }
+
+#endif
+
+    if (_allocated == nullptr)
+    {
+        this->release();
+        return false;
+    }
+    else  /* Check aligned result */
+    {
+        uintptr_t allocated_check = reinterpret_cast<uintptr_t>(_allocated);
+        if (allocated_check % __XDMA_DMA_ALIGNMENT_BYTES__ != 0)
+        {
+            this->release();
+        }
+    }
+
+    this->set_bytesize(byteSize);
+    this->set_capacity(byteSize + __XDMA_DMA_ALIGNMENT_BYTES__);
+    this->set_allocated(_allocated);
+
     return true;
 }
