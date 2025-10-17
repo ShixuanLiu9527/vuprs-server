@@ -16,6 +16,7 @@
 #include "nerwork_exception.h"
 #include "string_parse.h"
 #include "nlohmann/json.hpp"
+#include "log_manager.h"
 
 #define __DEFAULT_INITIALIZE_PORT__        8080
 #define __DEFAULT_MAX_PORT__               10000
@@ -36,7 +37,33 @@ namespace vuprs
     };
     
     class TcpServer {
+
+        private:
+        
+            uint16_t port;
+            int server_fd;
+            ServerConfig serverConfig;
+            std::shared_ptr<spdlog::logger> serverLogger;
+
+            std::atomic<bool> running;  /* running status */
+            std::thread serverThread;  /* Listening thread */
+            std::unique_ptr<vuprs::TcpSession> currentSession;
+
+            ServerConnectionCallback serverConnectionCallback;
+            vuprs::SessionMessageHandler sessionMessageHandler;  /* give to session */
+
+            bool initializeSocket();
+            void acceptConnection();
+
+            /* log */
+
+            void Info(const std::string &info);
+            void Warn(const std::string &warn);
+            void Error(const std::string &err);
+            void Critical(const std::string &critical);
+
         public:
+
             TcpServer(const std::string& configJsonFilename);
             TcpServer(const uint64_t& port = 8080);
             ~TcpServer();
@@ -48,8 +75,9 @@ namespace vuprs
             void stop();
             bool isRunning() const;
 
-            bool loadConfigFromJson(const std::string& jsonFilename);
-            bool sendToClient(const std::string& message);
+            bool LoadConfigFromJson(const std::string& jsonFilename);
+            void InitLogger(const std::string &loggerName, const std::string &loggerFilename);
+            bool SendToClient(const std::string& message);
 
             /**
              * @brief Define connect callback operate function.
@@ -57,7 +85,7 @@ namespace vuprs
              *       2. Show some message when connected and disconnected.
              * @param callback call back function pointer.
              */
-            void setServerConnectionCallback(ServerConnectionCallback callback);
+            void SetServerConnectionCallback(ServerConnectionCallback callback);
 
             /**
              * @brief Define message handler operate function (for session).
@@ -65,22 +93,7 @@ namespace vuprs
              *       2. Perform the main operation in this function (FPGA control & Fault processing).
              * @param handler call back function pointer.
              */
-            void setSessionMessageHandler(vuprs::SessionMessageHandler handler);
-
-        private:
-            uint16_t port;
-            int server_fd;
-            ServerConfig serverConfig;
-
-            std::atomic<bool> running;  /* running status */
-            std::thread serverThread;  /* Listening thread */
-            std::unique_ptr<vuprs::TcpSession> currentSession;
-
-            ServerConnectionCallback serverConnectionCallback;
-            vuprs::SessionMessageHandler sessionMessageHandler;  /* give to session */
-
-            bool initializeSocket();
-            void acceptConnection();
+            void SetSessionMessageHandler(vuprs::SessionMessageHandler handler);
     };
 }
 

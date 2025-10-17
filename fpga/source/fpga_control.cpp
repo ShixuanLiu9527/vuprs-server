@@ -19,6 +19,32 @@ vuprs::FPGAController::~FPGAController()
 
 }
 
+void vuprs::FPGAController::Info(const std::string &info)
+{
+    if (this->fpgaControllerLogger) this->fpgaControllerLogger->info(info);
+}
+
+void vuprs::FPGAController::Warn(const std::string &warn)
+{
+    if (this->fpgaControllerLogger) this->fpgaControllerLogger->warn(warn);
+}
+
+void vuprs::FPGAController::Error(const std::string &err)
+{
+    if (this->fpgaControllerLogger) this->fpgaControllerLogger->error(err);
+}
+
+void vuprs::FPGAController::Critical(const std::string &critical)
+{
+    if (this->fpgaControllerLogger) this->fpgaControllerLogger->critical(critical);
+}
+
+void vuprs::FPGAController::InitLogger(const std::string &loggerName, const std::string &loggerFilename)
+{
+    this->fpgaControllerLogger = vuprs::LogManager::getLogger(loggerName, loggerFilename);
+    this->Info("FPGA controller logger started.");
+}
+
 bool vuprs::FPGAController::LoadFPGAConfig(const vuprs::FPGAConfigManager &newFPGAConfig)
 {
     if (newFPGAConfig.ConfigDown())

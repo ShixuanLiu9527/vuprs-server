@@ -4,7 +4,7 @@
 
 #include "fpga_config.h"
 #include "fpga_control.h"
-#include "aligned_data_structure.h"
+#include "aligned_buffer.h"
 #include "string_parse.h"
 
 #define FPGA_TOOL__OPERATE__READ_AXI_LITE           0U

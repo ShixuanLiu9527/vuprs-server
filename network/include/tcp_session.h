@@ -14,18 +14,34 @@
 #include <cstring>
 
 #include "nerwork_exception.h"
+#include "aligned_buffer.h"
 
 #define __SOCKET_TIMEOUT_MAXIMUM_ITERATION_COUNT__   20
 #define __SOCKET_RECEIVE_BUFFER_SIZE_BYTES__         1024UL
+#define __SOCKET_SEND_PACKAGE_SIZE_BYTES__           1024UL
 
 namespace vuprs
 {
     /**
      * @brief use: void(int client_fd, const struct sockaddr_in& client_addr, const std::string& message)
+     * @param client_fd file descripter of client.
+     * @param client_addr client information struct.
+     * @param message message(command) to deal with.
      */
     using SessionMessageHandler = std::function<void(int client_fd, const struct sockaddr_in& client_addr, const std::string& message)>;
 
     class TcpSession {
+
+        private:
+        
+            int client_fd;
+            struct sockaddr_in client_addr;
+            bool running;
+            SessionMessageHandler messageHandler;
+
+            void receiveLoop();
+            std::string DefaultMessageProcess(const std::string& message);
+
         public:
 
             /** 
@@ -74,19 +90,12 @@ namespace vuprs
              * @param handler call back function pointer.
              */
             void setMessageHandler(SessionMessageHandler handler);
-        
-        private:
-            void receiveLoop();
-            std::string DefaultMessageProcess(const std::string& message);
-
-            int client_fd;
-            struct sockaddr_in client_addr;
-            bool running;
-            SessionMessageHandler messageHandler;
     };
 
-    bool SocketSendData(int fd, const char *buf, const uint64_t &sendLength, ssize_t *origin_ret = nullptr);
-    bool SocketRecvData(int fd, char* buf, const uint64_t &recvLength, ssize_t *origin_ret, uint64_t *recvBytes);
+    bool SocketSendData(int client_fd, const char *buf, const uint64_t &sendLength, ssize_t *origin_ret, uint64_t *sendBytes);
+    bool SocketRecvData(int client_fd, char* buf, const uint64_t &recvLength, ssize_t *origin_ret, uint64_t *recvBytes);
+
+    bool SocketSendFile(int client_fd, const std::string &filename);
 }
 
 #endif

@@ -21,9 +21,15 @@
 #endif
 
 #include <fcntl.h>
+#include <filesystem>
+
+#include "spdlog/spdlog.h"
+#include "spdlog/sinks/rotating_file_sink.h"
+#include "spdlog/sinks/stdout_color_sinks.h"
 
 #include "fpga_config.h"
-#include "aligned_data_structure.h"
+#include "aligned_buffer.h"
+#include "log_manager.h"
 
 /* --------------------------------------- AXI-Lite Registers --------------------------------------- */
 
@@ -132,13 +138,22 @@ namespace vuprs
     class FPGAController
     {
         private:
+        
             vuprs::FPGAConfigManager fpgaConfigManager;
+            std::shared_ptr<spdlog::logger> fpgaControllerLogger;
 
             uint64_t AXILite_GetRegisterOffset(const int &registerSelection, bool *status);
 
             bool AXI_XDMA_WordIO(const vuprs::DMATransferConfig &transferConfig, const uint32_t &w_value, uint32_t *r_value);
 
             bool AXIFull_BufferIO(const vuprs::DMATransferConfig &transferConfig, vuprs::AlignedBufferDMA *buffer);
+
+            /* log */
+
+            void Info(const std::string &info);
+            void Warn(const std::string &warn);
+            void Error(const std::string &err);
+            void Critical(const std::string &critical);
 
         public:
 
@@ -147,6 +162,9 @@ namespace vuprs
             FPGAController(const std::string &configJsonFilename);
 
             ~FPGAController();
+
+            FPGAController(const FPGAController&) = delete;
+            FPGAController& operator=(const FPGAController&) = delete;
 
             /**
              * @brief Load config data from JSON file.
@@ -157,6 +175,8 @@ namespace vuprs
              * @throws std::runtime_error
              */
             bool LoadFPGAConfig(const vuprs::FPGAConfigManager &newFPGAConfig);
+
+            void InitLogger(const std::string &loggerName, const std::string &loggerFilename);
 
             /**
              * @brief Write word (32 bit) to register on AXI-Lite bus of FPGA (use Simple method).

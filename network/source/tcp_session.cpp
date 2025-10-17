@@ -7,7 +7,7 @@ vuprs::TcpSession::TcpSession(int client_fd, const struct sockaddr_in& client_ad
     this->running = false;
 }
 
-vuprs::TcpSession::~TcpSession() 
+vuprs::TcpSession::~TcpSession()
 {
     this->stop();
 }
@@ -41,7 +41,7 @@ vuprs::TcpSession& vuprs::TcpSession::operator=(TcpSession&& other) noexcept
 
 bool vuprs::TcpSession::sendData(const std::string &message)
 {
-    return vuprs::SocketSendData(this->client_fd, message.c_str(), message.length());
+    return vuprs::SocketSendData(this->client_fd, message.c_str(), message.length(), nullptr, nullptr);
 }
 
 void vuprs::TcpSession::start() 
@@ -104,7 +104,7 @@ void vuprs::TcpSession::receiveLoop()
             buffer[static_cast<uint64_t>(recvBytes)] = '\0';
             std::string message(buffer);
             
-            std::cout << "[session][" << getClientInfo() << "] received data from client: " << message << std::endl;
+            std::cout << "[session][" << this->getClientInfo() << "] received data from client: " << message << std::endl;
             
             if (this->messageHandler != nullptr)
             {
@@ -122,7 +122,7 @@ void vuprs::TcpSession::receiveLoop()
         }
         else if (recvReturn == 0)  /* Connect shut down */
         {
-            std::cout << "[session][" << getClientInfo() << "] disconnected."  << std::endl;
+            std::cout << "[session][" << this->getClientInfo() << "] disconnected."  << std::endl;
             break;
         }
         // else
@@ -162,25 +162,28 @@ std::string vuprs::TcpSession::DefaultMessageProcess(const std::string& message)
     }
 }
 
-bool vuprs::SocketSendData(int fd, const char *buf, const uint64_t &sendLength, ssize_t *origin_ret)
+bool vuprs::SocketSendData(int client_fd, const char *buf, const uint64_t &sendLength, ssize_t *origin_ret, uint64_t *sendBytes)
 {
-    if (fd < 0 || !buf || sendLength == 0) 
+    if (client_fd < 0 || !buf || sendLength == 0) 
     {
-        if (origin_ret) *origin_ret = 0;
+        if (origin_ret) *origin_ret = 1;
+        if (sendBytes) *sendBytes = 0;
         return false;
     }
 
-    uint64_t sentBytes = 0;
+    ssize_t sendReturn;
+    uint64_t currentSentBytes = 0;
     const uint64_t max_tries = 100;
     uint64_t tryCount = 0;
+    bool timeoutFlag = false;
     
-    while (sentBytes < sendLength && tryCount < max_tries) 
+    while (currentSentBytes < sendLength && tryCount < max_tries) 
     {
-        ssize_t sendReturn = send(fd, buf + sentBytes, sendLength - sentBytes, 0);
+        sendReturn = send(client_fd, buf + currentSentBytes, sendLength - currentSentBytes, 0);
 
         if (sendReturn > 0) 
         {
-            sentBytes += sendReturn;
+            currentSentBytes += sendReturn;
             tryCount = 0;
             continue;
         }
@@ -197,7 +200,7 @@ bool vuprs::SocketSendData(int fd, const char *buf, const uint64_t &sendLength, 
             else if (errno == EWOULDBLOCK || errno == EAGAIN) 
             {
                 tryCount++;
-                usleep(100 * 000); // 100ms
+                usleep(100 * 1000); // 100ms
                 continue;
             }
             else 
@@ -207,12 +210,10 @@ bool vuprs::SocketSendData(int fd, const char *buf, const uint64_t &sendLength, 
         }
     }
 
-    bool success = (sentBytes == sendLength);
+    bool success = (currentSentBytes == sendLength);
     
-    if (origin_ret) 
-    {
-        *origin_ret = sentBytes;
-    }
+    if (origin_ret) *origin_ret = sendReturn;
+    if (sendBytes) *sendBytes = currentSentBytes;
     
     return success;
 }
@@ -235,7 +236,7 @@ bool waitSocketReadable(int fd, int timeout_ms)
     return false;
 }
 
-bool vuprs::SocketRecvData(int fd, char* buf, const uint64_t &max_recvLength, ssize_t *origin_ret, uint64_t *recvBytes)
+bool vuprs::SocketRecvData(int client_fd, char* buf, const uint64_t &max_recvLength, ssize_t *origin_ret, uint64_t *recvBytes)
 {
     uint64_t receivedBytes = 0;
     ssize_t recvReturn = 1;
@@ -252,9 +253,9 @@ bool vuprs::SocketRecvData(int fd, char* buf, const uint64_t &max_recvLength, ss
             break;
         }
         
-        if (!waitSocketReadable(fd, 100)) continue;
+        if (!waitSocketReadable(client_fd, 100)) continue;
         
-        recvReturn = recv(fd, buf + receivedBytes, max_recvLength - receivedBytes, 0);
+        recvReturn = recv(client_fd, buf + receivedBytes, max_recvLength - receivedBytes, 0);
         
         if (recvReturn > 0) 
         {
@@ -288,4 +289,71 @@ bool vuprs::SocketRecvData(int fd, char* buf, const uint64_t &max_recvLength, ss
     if (recvBytes) *recvBytes = receivedBytes;
     
     return receivedBytes > 0;
+}
+
+bool vuprs::SocketSendFile(int client_fd, const std::string &filename)
+{
+    vuprs::AlignedBufferServer buffer;
+
+    /* Load data from file */
+
+    if (!buffer.from_file(filename))
+    {
+        return false;
+    }
+
+    /* Slice file */
+
+    ssize_t reserveBytes, oneSendBytes, sendRet;
+    uint64_t transferBytes = buffer.size(), sendCount = 0, sentBytes;
+    uint64_t slices = (transferBytes % __SOCKET_SEND_PACKAGE_SIZE_BYTES__ == 0)? transferBytes / __SOCKET_SEND_PACKAGE_SIZE_BYTES__: 
+                      transferBytes / __SOCKET_SEND_PACKAGE_SIZE_BYTES__ + 1;
+    char* buffer_char = buffer.as<char>(), *startPointer;
+    uint64_t tries = 0;
+
+    /* Send data */
+
+    reserveBytes = transferBytes;
+    sendCount = 0;
+
+    while(reserveBytes > 0)
+    {
+        /* pointer */
+
+        startPointer = buffer_char + sendCount * __SOCKET_SEND_PACKAGE_SIZE_BYTES__;
+
+        /* package bytes */
+
+        if (reserveBytes >= __SOCKET_SEND_PACKAGE_SIZE_BYTES__)
+        {
+            oneSendBytes = __SOCKET_SEND_PACKAGE_SIZE_BYTES__;
+        }
+        else
+        {
+            oneSendBytes = reserveBytes;
+        }
+
+        /* send */
+
+        if (vuprs::SocketSendData(client_fd, startPointer, oneSendBytes, &sendRet, &sentBytes))
+        {
+            sendCount++;
+            reserveBytes -= oneSendBytes;
+        }
+        else
+        {
+            tries++;
+        }
+
+        /* break */
+
+        if (reserveBytes <= 0) break;
+
+        if (sendRet == 0) return false;  /* disconnect here */
+        if (tries >= 100) return false;
+    }
+
+    buffer.release();
+    
+    return true;
 }

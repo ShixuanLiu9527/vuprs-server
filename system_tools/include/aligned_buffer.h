@@ -37,22 +37,28 @@
 #endif
 
 #define __XDMA_DMA_ALIGNMENT_BYTES__              4096U        /* 4 kB alignment */
+#define __SERVER_ALIGNMENT_BYTES__                4U           /* 4 B alignment */
+#define __DEFAULT_ALIGNMENT_BYTES__               4U           /* 4 B alignment */
 
 namespace vuprs
 {
+
     class AlignedBuffer
     {
         private:
+
             uint64_t byteSize;
             uint64_t byteCapacity;
             void* allocated;
 
         protected:
+
             void set_bytesize(const uint64_t &bytesize);
             void set_capacity(const uint64_t &capacity);
             void set_allocated(void* allocated);
         
         public:
+
             AlignedBuffer();
         
             explicit AlignedBuffer(uint64_t byteSize);
@@ -78,7 +84,7 @@ namespace vuprs
              * @retval true: create success
              *         false: create failed
              */
-            virtual bool malloc(uint64_t byteSize) = 0;
+            virtual bool malloc(uint64_t byteSize);
             bool is_allocated() const;
 
             /* size & data* */
@@ -96,8 +102,10 @@ namespace vuprs
 
             /* file IO */
 
-            bool to_file(const std::string &fileName, const uint64_t &fileOffset = 0, uint64_t writeBytes = 65536) const;
-            bool from_file(const std::string &fileName, const uint64_t &fileOffset = 0, uint64_t loadBytes = 65536);
+            bool to_file(const std::string &fileName, const uint64_t &fileOffset, uint64_t writeBytes) const;
+            bool to_file(const std::string &fileName);
+            bool from_file(const std::string &fileName, const uint64_t &fileOffset, uint64_t loadBytes);
+            bool from_file(const std::string &fileName);
         
             /**
              * @brief Convert buffer to vector
@@ -173,6 +181,7 @@ namespace vuprs
     class AlignedBufferDMA: public AlignedBuffer
     {
         public:
+
             AlignedBufferDMA() = default;
             explicit AlignedBufferDMA(uint64_t byteSize) : AlignedBuffer(byteSize) {}
 
@@ -189,6 +198,7 @@ namespace vuprs
     class AlignedBufferServer: public AlignedBuffer
     {
         public:
+        
             AlignedBufferServer() = default;
             explicit AlignedBufferServer(uint64_t byteSize) : AlignedBuffer(byteSize) {}
             

@@ -1,6 +1,32 @@
 #include "tcp_server.h"
 
-bool vuprs::TcpServer::loadConfigFromJson(const std::string& jsonFilename)
+void vuprs::TcpServer::InitLogger(const std::string &loggerName, const std::string &loggerFilename)
+{
+    this->serverLogger = vuprs::LogManager::getLogger(loggerName, loggerFilename);
+    this->Info("Server logger started");
+}
+
+void vuprs::TcpServer::Info(const std::string &info)
+{
+    if (this->serverLogger) this->serverLogger->info(info);
+}
+
+void vuprs::TcpServer::Warn(const std::string &warn)
+{
+    if (this->serverLogger) this->serverLogger->warn(warn);
+}
+
+void vuprs::TcpServer::Error(const std::string &err)
+{
+    if (this->serverLogger) this->serverLogger->error(err);
+}
+
+void vuprs::TcpServer::Critical(const std::string &critical)
+{
+    if (this->serverLogger) this->serverLogger->critical(critical);
+}
+
+bool vuprs::TcpServer::LoadConfigFromJson(const std::string& jsonFilename)
 {
     std::ifstream configJsonFile;
     uint64_t value;
@@ -58,19 +84,22 @@ bool vuprs::TcpServer::loadConfigFromJson(const std::string& jsonFilename)
         retvalue = false;
     }
 
+    if (!retvalue)
+    {
+        this->serverConfig.initializePort = __DEFAULT_INITIALIZE_PORT__;
+        this->serverConfig.maximumPort = __DEFAULT_MAX_PORT__;
+        this->serverConfig.acceptClientCounts = __DEFAULT_ACCEPT_CLIENT_COUNT__;
+    }
+
     return retvalue;
 }
 
 vuprs::TcpServer::TcpServer(const std::string& configJsonFilename)
 {
     std::cout << "[server] load config information from: " << configJsonFilename << std::endl;
-    if (!this->loadConfigFromJson(configJsonFilename))
+    if (!this->LoadConfigFromJson(configJsonFilename))
     {
         std::cout << "[server] failed to load config information, the default parameters are used." << std::endl;
-
-        this->serverConfig.initializePort = __DEFAULT_INITIALIZE_PORT__;
-        this->serverConfig.maximumPort = __DEFAULT_MAX_PORT__;
-        this->serverConfig.acceptClientCounts = __DEFAULT_ACCEPT_CLIENT_COUNT__;
     }
     this->port = this->serverConfig.initializePort;
     this->server_fd = -1;
@@ -136,7 +165,7 @@ bool vuprs::TcpServer::isRunning() const
     return this->running;
 }
 
-bool vuprs::TcpServer::sendToClient(const std::string& message) 
+bool vuprs::TcpServer::SendToClient(const std::string& message) 
 {
     if (!(this->currentSession && this->currentSession->isRunning())) 
     {
@@ -156,12 +185,12 @@ bool vuprs::TcpServer::sendToClient(const std::string& message)
     }
 }
 
-void vuprs::TcpServer::setServerConnectionCallback(ServerConnectionCallback callback)
+void vuprs::TcpServer::SetServerConnectionCallback(ServerConnectionCallback callback)
 {
     this->serverConnectionCallback = std::move(callback);
 }
 
-void vuprs::TcpServer::setSessionMessageHandler(vuprs::SessionMessageHandler handler)
+void vuprs::TcpServer::SetSessionMessageHandler(vuprs::SessionMessageHandler handler)
 {
     this->sessionMessageHandler = std::move(handler);
 }
@@ -286,7 +315,7 @@ void vuprs::TcpServer::acceptConnection()
                     this->serverConnectionCallback(true, this->currentSession->getClientInfo());
                 }
             
-                this->sendToClient("[server] you have successfully connected.");
+                this->SendToClient("[server] you have successfully connected.");
             }
         }
         

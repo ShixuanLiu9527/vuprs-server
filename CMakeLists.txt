@@ -21,13 +21,16 @@ add_subdirectory(eigen)
 include_directories(
         ${CMAKE_CURRENT_SOURCE_DIR}/fpga/include
         ${CMAKE_CURRENT_SOURCE_DIR}/server/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/eigen
+        ${CMAKE_CURRENT_SOURCE_DIR}/network/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/logger/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/algorithm/include
         ${CMAKE_CURRENT_SOURCE_DIR}/system_tools/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/eigen
         ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 file(GLOB_RECURSE FPGA_SRC "fpga/source/*.cpp")
-file(GLOB_RECURSE NETWORK_SRC "server/source/*.cpp")
+file(GLOB_RECURSE NETWORK_SRC "network/source/*.cpp")
 file(GLOB_RECURSE SYS_TOOL_SRC "system_tools/source/*.cpp")
 
 add_executable(fpga_tool fpga_tool.cpp ${FPGA_SRC} ${SYS_TOOL_SRC})

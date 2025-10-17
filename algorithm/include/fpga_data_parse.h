@@ -13,7 +13,7 @@
 #include <stdint.h>
 
 #include "fpga_config.h"
-#include "aligned_data_structure.h"
+#include "aligned_buffer.h"
 
 /**
  * 
