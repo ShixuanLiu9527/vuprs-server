@@ -4,10 +4,13 @@
             "name": "Win32",
             "includePath": [
                 "${workspaceFolder}/**",
-                "${workspaceFolder}/fpga_communication/include",
+                "${workspaceFolder}/fpga/include",
+                "${workspaceFolder}/algorithm/include",
                 "${workspaceFolder}/nlohmann",
                 "${workspaceFolder}/system_tools",
+                "${workspaceFolder}/network/include",
                 "${workspaceFolder}/server/include",
+                "${workspaceFolder}/logger/include",
                 "${workspaceFolder}/system_tools/include"
             ],
             "defines": [

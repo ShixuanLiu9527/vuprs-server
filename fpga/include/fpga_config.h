@@ -85,6 +85,7 @@ namespace vuprs
         uint64_t addrRegisterBaseADC__STR;  /* Sampling Trigger & Ready */
         uint64_t addrRegisterBaseADC__NGF;  /* Number of Generated Frames */
         uint64_t addrRegisterBaseADC__ERR;  /* Error Flags of ADC */
+        uint64_t addrRegisterBaseADC__RST;  /* Reset of ADC */
 
         bool configdown;
     };
@@ -111,6 +112,7 @@ namespace vuprs
     {
 
         uint64_t adcMaxSamplingFrequency_Hz;
+        uint64_t adcWorkClockFrequency_Hz;
         double adcVoltageRangeRadius;
 
         bool configdown;

@@ -108,3 +108,10 @@ uint64_t vuprs::ParseNumberFromString(const std::string &dataString, bool *statu
 
     return 0;
 }
+
+std::string vuprs::Number2HexString(const uint64_t &num)
+{
+    std::stringstream ss;
+    ss << "0x" << std::hex << std::uppercase << num;
+    return ss.str();
+}

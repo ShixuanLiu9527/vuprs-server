@@ -21,11 +21,6 @@
 #endif
 
 #include <fcntl.h>
-#include <filesystem>
-
-#include "spdlog/spdlog.h"
-#include "spdlog/sinks/rotating_file_sink.h"
-#include "spdlog/sinks/stdout_color_sinks.h"
 
 #include "fpga_config.h"
 #include "aligned_buffer.h"
@@ -41,19 +36,20 @@
 #define AXI_LITE_REGISTER__ADC__STR               3
 #define AXI_LITE_REGISTER__ADC__NGF               4
 #define AXI_LITE_REGISTER__ADC__ERR               5
+#define AXI_LITE_REGISTER__ADC__RST               6
 
 /* AXI-Lite DMA Registers */
 
-#define AXI_LITE_REGISTER__DMA__S2MM_DMACR        6
-#define AXI_LITE_REGISTER__DMA__S2MM_DMASR        7
-#define AXI_LITE_REGISTER__DMA__SG_CTL            8
-#define AXI_LITE_REGISTER__DMA__S2MM_CURDESC      9
-#define AXI_LITE_REGISTER__DMA__S2MM_CURDESC_MSB  10
-#define AXI_LITE_REGISTER__DMA__S2MM_TAILDESC     11
-#define AXI_LITE_REGISTER__DMA__S2MM_TAILDESC_MSB 12
-#define AXI_LITE_REGISTER__DMA__S2MM_DA           13
-#define AXI_LITE_REGISTER__DMA__S2MM_DA_MSB       14
-#define AXI_LITE_REGISTER__DMA__S2MM_LENGTH       15
+#define AXI_LITE_REGISTER__DMA__S2MM_DMACR        7
+#define AXI_LITE_REGISTER__DMA__S2MM_DMASR        8
+#define AXI_LITE_REGISTER__DMA__SG_CTL            9
+#define AXI_LITE_REGISTER__DMA__S2MM_CURDESC      10
+#define AXI_LITE_REGISTER__DMA__S2MM_CURDESC_MSB  11
+#define AXI_LITE_REGISTER__DMA__S2MM_TAILDESC     12
+#define AXI_LITE_REGISTER__DMA__S2MM_TAILDESC_MSB 13
+#define AXI_LITE_REGISTER__DMA__S2MM_DA           14
+#define AXI_LITE_REGISTER__DMA__S2MM_DA_MSB       15
+#define AXI_LITE_REGISTER__DMA__S2MM_LENGTH       16
 
 /* AXI-Lite User Access */
 
@@ -65,7 +61,8 @@
  VAL == AXI_LITE_REGISTER__ADC__SF                || \
  VAL == AXI_LITE_REGISTER__ADC__STR               || \
  VAL == AXI_LITE_REGISTER__ADC__NGF               || \
- VAL == AXI_LITE_REGISTER__ADC__ERR)
+ VAL == AXI_LITE_REGISTER__ADC__ERR               || \
+ VAL == AXI_LITE_REGISTER__ADC__RST)
 
 #define IS_AXI_LITE_RDONLY_REGISTER(VAL) \
 (VAL == AXI_LITE_REGISTER__ADC__NGF               || \
@@ -224,7 +221,15 @@ namespace vuprs
             bool AXI_XDMA_WordTransfer(const vuprs::DMATransferConfig &transferConfig, uint32_t *r_value, const uint32_t &w_value);
     };
 
+    /**
+     * @brief Set struct DMATransferConfig to default value.
+     */
     void SetDMATransferConfigToDefault(DMATransferConfig *config);
+
+    /**
+     * @brief Calculate optimal value of register SCI for the given target frequency.
+     */
+    uint32_t GetOptimalValueSCI(const double &targetSamplingFreq);
 }
 
 #endif

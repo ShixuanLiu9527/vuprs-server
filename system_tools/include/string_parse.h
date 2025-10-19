@@ -7,6 +7,8 @@
 #include <iostream>
 #include <algorithm>
 #include <cctype>
+#include <sstream>
+#include <iomanip>
 
 namespace vuprs
 {
@@ -14,6 +16,8 @@ namespace vuprs
     int ParseIntegerFromString(const std::string &dataString, bool *status);
 
     uint64_t ParseNumberFromString(const std::string &dataString, bool *status);
+
+    std::string Number2HexString(const uint64_t &num);
 } 
 
 #endif

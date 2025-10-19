@@ -122,6 +122,11 @@ uint64_t vuprs::FPGAController::AXILite_GetRegisterOffset(const int &registerSel
             registerOffset = this->fpgaConfigManager.fpgaConfig.fpgaAddress.registerAddressADC.addrRegisterBaseADC__ERR;
             break;
         }
+        case AXI_LITE_REGISTER__ADC__RST:
+        {
+            registerOffset = this->fpgaConfigManager.fpgaConfig.fpgaAddress.registerAddressADC.addrRegisterBaseADC__RST;
+            break;
+        }
 
         /* DMA Controller Registers */
 
@@ -255,7 +260,7 @@ bool vuprs::FPGAController::AXI_XDMA_WordIO(const vuprs::DMATransferConfig &tran
         }
         case DMA_TRANSFER_MEMORY_SELECTION__AXI_LITE_DOMAIN:
         {
-            memoryLowerAddress = this->fpgaConfigManager.fpgaConfig.fpgaAddress.busAddress.addrBusBaseAXILite__ADC;
+            memoryLowerAddress = 0;
             memoryUpperAddress = memoryLowerAddress + __XDMA_AXI_LITE_MMAP_SIZE__ - 1;
 
             base = transferConfig.base;
@@ -374,6 +379,7 @@ bool vuprs::FPGAController::AXI_XDMA_WordIO(const vuprs::DMATransferConfig &tran
             else 
             {
                 *reg_addr = htoll(w_value);
+                std::cout << "write: " << vuprs::Number2HexString(w_value) << " to addr: " << vuprs::Number2HexString(registerTargetOffset) << std::endl;
             }
             
             munmap(map_base, mmapSize);
@@ -700,4 +706,33 @@ void vuprs::SetDMATransferConfigToDefault(DMATransferConfig *config)
 
     config->transferDirectionSelection = DMA_TRANSFER_DIRECTION__FPGA_TO_HOST;
     config->transferMemorySelection = DMA_TRANSFER_MEMORY_SELECTION__DDR;
+}
+
+uint32_t vuprs::GetOptimalValueSCI(const double &targetSamplingFreq)
+{
+    uint32_t valueUpper, valueLower;
+    double freqUpper, freqLower;
+
+    if (fabs(targetSamplingFreq) > 1e-6)
+    {
+
+        valueUpper = static_cast<uint32_t>(ceil(50. * 1000000. / (2. * targetSamplingFreq)));
+        valueLower = static_cast<uint32_t>(ceil(50. * 1000000. / (2. * targetSamplingFreq)));
+
+        freqUpper = 50. * 1000000. / (2. * (double)valueUpper);
+        freqLower = 50. * 1000000. / (2. * (double)valueLower);
+
+        if (fabs(valueLower - targetSamplingFreq) > fabs(valueUpper - targetSamplingFreq))
+        {
+            return valueUpper;
+        }
+        else
+        {
+            return valueLower;
+        }
+    }
+    else
+    {
+        return 0xFFFFFFFF;
+    }
 }

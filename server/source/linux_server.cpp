@@ -16,7 +16,7 @@ vuprs::LinuxServer::~LinuxServer()
 
 bool vuprs::LinuxServer::SystemSelfTest()
 {
-
+    /* Test FPGA */
 }
 
 bool vuprs::LinuxServer::StartUpCondition()

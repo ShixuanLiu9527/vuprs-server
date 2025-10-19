@@ -93,7 +93,6 @@ bool vuprs::FPGAConfigManager::LoadFPGAConfigFromJson(const std::string &configJ
             configSuccessCount++;
         }
     }
-
     if (configSuccessCount == 5)
     {
         this->configDown = true;
@@ -225,7 +224,8 @@ bool vuprs::FPGAConfigManager::ParseRegisterAddressADC(const nlohmann::json &jso
         "SF-address-offset",
         "STR-address-offset",
         "NGF-address-offset",
-        "ERR-address-offset"
+        "ERR-address-offset",
+        "RST-address-offset"
     };
 
     std::vector<uint64_t*> registerAddressTarget = {
@@ -234,7 +234,8 @@ bool vuprs::FPGAConfigManager::ParseRegisterAddressADC(const nlohmann::json &jso
         &this->fpgaConfig.fpgaAddress.registerAddressADC.addrRegisterBaseADC__SF,
         &this->fpgaConfig.fpgaAddress.registerAddressADC.addrRegisterBaseADC__STR,
         &this->fpgaConfig.fpgaAddress.registerAddressADC.addrRegisterBaseADC__NGF,
-        &this->fpgaConfig.fpgaAddress.registerAddressADC.addrRegisterBaseADC__ERR
+        &this->fpgaConfig.fpgaAddress.registerAddressADC.addrRegisterBaseADC__ERR,
+        &this->fpgaConfig.fpgaAddress.registerAddressADC.addrRegisterBaseADC__RST
     };
 
     bool parseHexStatus;
@@ -355,6 +356,15 @@ bool vuprs::FPGAConfigManager::ParseHardwareFeatures(const nlohmann::json &jsonD
         {
             parseResultValue = vuprs::ParseNumberFromString(adcHardware["voltage-range-radius-v"].get<std::string>(), &parseIntegerStatus);
             if (parseIntegerStatus) this->fpgaConfig.hardwareConfig.hardwareConfigADC.adcVoltageRangeRadius = static_cast<double>(parseResultValue);
+            else parseSuccessADC = false;
+        }
+
+        /* ADC Work Clock Frequency */
+
+        if (adcHardware.contains("work-clock-frequency-hz"))
+        {
+            parseResultValue = vuprs::ParseNumberFromString(adcHardware["work-clock-frequency-hz"].get<std::string>(), &parseIntegerStatus);
+            if (parseIntegerStatus) this->fpgaConfig.hardwareConfig.hardwareConfigADC.adcWorkClockFrequency_Hz = parseResultValue;
             else parseSuccessADC = false;
         }
 

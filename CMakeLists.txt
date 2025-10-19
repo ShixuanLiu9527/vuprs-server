@@ -32,8 +32,12 @@ include_directories(
 file(GLOB_RECURSE FPGA_SRC "fpga/source/*.cpp")
 file(GLOB_RECURSE NETWORK_SRC "network/source/*.cpp")
 file(GLOB_RECURSE SYS_TOOL_SRC "system_tools/source/*.cpp")
+file(GLOB_RECURSE LOGGER_SRC "logger/source/*.cpp")
+file(GLOB_RECURSE ALGORITHM_SRC "algorithm/source/*.cpp")
+file(GLOB_RECURSE SERVER_SRC "server/source/*.cpp")
 
-add_executable(fpga_tool fpga_tool.cpp ${FPGA_SRC} ${SYS_TOOL_SRC})
-add_executable(vuprs_server test_server.cpp ${NETWORK_SRC} ${SYS_TOOL_SRC})
+add_executable(fpga_tool fpga_tool.cpp ${FPGA_SRC} ${SYS_TOOL_SRC} ${LOGGER_SRC})
+add_executable(vuprs_server test_server.cpp ${NETWORK_SRC} ${SYS_TOOL_SRC} ${LOGGER_SRC})
+add_executable(sampling_test test_sampling.cpp ${FPGA_SRC} ${SYS_TOOL_SRC} ${LOGGER_SRC})
 
 target_link_libraries(vuprs_server PRIVATE Threads::Threads)

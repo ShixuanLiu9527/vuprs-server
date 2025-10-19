@@ -120,14 +120,14 @@ bool vuprs::BufferData2ADCChannels(const vuprs::AlignedBufferDMA *buffer, std::v
 uint8_t vuprs::CRC8List::CalculateCRC(const uint8_t &source, const uint16_t &crcPolynomialCode)
 {
     uint8_t crc;
-    uint8_t CRC8_CDMA2000 = CRC8_POLYNOMIAL_CDMA2000 & (0xFF);
+    uint8_t CRC8_CDMA2000 = crcPolynomialCode & (0xFF);
     crc = source;
     
     for (int i = 0; i < 8; i++) 
     {
         if(crc & 0x80)
         {
-            crc = (crc << 1) ^ CRC8_POLYNOMIAL_CDMA2000;
+            crc = (crc << 1) ^ crcPolynomialCode;
         }
         else
         {
