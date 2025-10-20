@@ -78,13 +78,25 @@ namespace vuprs
             void release();
 
             /**
-             * @brief Aligned malloc buffer
+             * @brief Aligned malloc buffer.
+             * 
              * @note release() will be called in this method before malloc, and do not need release in external.
-             * @param byteSize buffer size in bytes
-             * @retval true: create success
-             *         false: create failed
+             * 
+             * @param byteSize buffer size in bytes.
+             * 
+             * @retval true: create success.
+             * @retval false: create failed.
+             * 
+             * @throw std::bad_loc() when error occurred.
              */
             virtual bool malloc(uint64_t byteSize);
+
+            /**
+             * @brief Indicates whether the memory has been allocated.
+             * 
+             * @retval true, the memory has been allocated.
+             * @retval false, the memory not allocated.
+             */
             bool is_allocated() const;
 
             /* size & data* */
@@ -102,16 +114,72 @@ namespace vuprs
 
             /* file IO */
 
+            /**
+             * @brief Save data from memory to file.
+             * 
+             * @param fileName target file name.
+             * @param fileOffset offset of file of the first data is saved.
+             * @param writeBytes length of saved data.
+             * 
+             * @retval true, save success.
+             * @retval false, save failed.
+             * 
+             * @throw std::runtime_error() when the file name is invalid.
+             */
             bool to_file(const std::string &fileName, const uint64_t &fileOffset, uint64_t writeBytes) const;
+
+            /**
+             * @brief Save data from memory to file.
+             * 
+             * @note Save all of the data to file.
+             * 
+             * @param fileName target file name.
+             * 
+             * @retval true, save success.
+             * @retval false, save failed.
+             * 
+             * @throw std::runtime_error() when the file name is invalid.
+             */
             bool to_file(const std::string &fileName);
+
+            /**
+             * @brief Load data from file.
+             * 
+             * @param fileName target file name.
+             * @param fileOffset offset of file of the first data is loaded.
+             * @param writeBytes length of loaded data.
+             * 
+             * @retval true, load success.
+             * @retval false, load failed.
+             * 
+             * @throw std::runtime_error() when the file name is invalid.
+             * @throw std::bad_loc() when failed to allocate.
+             */
             bool from_file(const std::string &fileName, const uint64_t &fileOffset, uint64_t loadBytes);
+
+            /**
+             * @brief Load data from file.
+             * @note Load all of the data from the certain file.
+             * 
+             * @param fileName target file name.
+             * 
+             * @retval true, load success.
+             * @retval false, load failed.
+             * 
+             * @throw std::runtime_error() when the file name is invalid.
+             * @throw std::bad_loc() when failed to allocate.
+             */
             bool from_file(const std::string &fileName);
         
             /**
              * @brief Convert buffer to vector
+             * 
              * @note must ensure: elementCounts * sizeof(T) <= this->byteSize
+             * 
              * @param elementCounts element counts of generated vector
+             * 
              * @retval vector
+             * 
              * @throw std::out_of_range
              */
             template<typename T>
@@ -128,7 +196,9 @@ namespace vuprs
 
             /**
              * @brief Convert buffer to vector (convert all of the data)
+             * 
              * @retval vector
+             * 
              * @throw std::out_of_range
              */
             template<typename T>
@@ -167,6 +237,11 @@ namespace vuprs
 
             /* type transfer */
 
+            /**
+             * @brief Modify the type of the memory pointer.
+             * 
+             * @retval Designated type of the memory pointer.
+             */
             template <typename T>
             T* as() const
             { 
@@ -176,6 +251,7 @@ namespace vuprs
 
     /**
      * @brief aligned buffer for FPGA DMA transfer
+     * 
      * @note aligned byte size = 4096 UL
      */
     class AlignedBufferDMA: public AlignedBuffer
@@ -193,6 +269,7 @@ namespace vuprs
 
     /**
      * @brief aligned buffer for TCP server
+     * 
      * @note aligned byte size = 4 UL
      */
     class AlignedBufferServer: public AlignedBuffer

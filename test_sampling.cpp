@@ -26,42 +26,42 @@ int main()
 
     std::cout << "--- Reset ADC ---" << std::endl;
 
-    controller.AXILite_WriteToFPGARegister(AXI_LITE_REGISTER__ADC__RST, 1);
-    do {controller.AXILite_ReadFPGARegister(AXI_LITE_REGISTER__ADC__STR, &readValue);} 
+    controller.AXILite_WriteRegister(AXI_LITE_REGISTER__ADC__RST, 1);
+    do {controller.AXILite_ReadRegister(AXI_LITE_REGISTER__ADC__STR, &readValue);} 
     while (!(readValue & 0x00000001));
 
     std::cout << "--- Reset DMA ---" << std::endl;
 
-    controller.AXILite_ReadFPGARegister(AXI_LITE_REGISTER__DMA__S2MM_DMACR, &readValue);
+    controller.AXILite_ReadRegister(AXI_LITE_REGISTER__DMA__S2MM_DMACR, &readValue);
 
     writeValue = readValue | 0x00000004;
 
-    controller.AXILite_WriteToFPGARegister(AXI_LITE_REGISTER__DMA__S2MM_DMACR, writeValue);
+    controller.AXILite_WriteRegister(AXI_LITE_REGISTER__DMA__S2MM_DMACR, writeValue);
 
-    do {controller.AXILite_ReadFPGARegister(AXI_LITE_REGISTER__DMA__S2MM_DMASR, &readValue);} 
+    do {controller.AXILite_ReadRegister(AXI_LITE_REGISTER__DMA__S2MM_DMASR, &readValue);} 
     while (!(readValue & 0x00000001));
 
     /* ADC configuration (not startup) */
 
     std::cout << "--- write ADC_SF ---" << std::endl;
 
-    controller.AXILite_WriteToFPGARegister(AXI_LITE_REGISTER__ADC__SF, sf);
+    controller.AXILite_WriteRegister(AXI_LITE_REGISTER__ADC__SF, sf);
 
-    controller.AXILite_ReadFPGARegister(AXI_LITE_REGISTER__ADC__SF, &readValue);
+    controller.AXILite_ReadRegister(AXI_LITE_REGISTER__ADC__SF, &readValue);
     std::cout << "readback: " << vuprs::Number2HexString(readValue) << std::endl;
 
     std::cout << "--- write ADC_SP ---" << std::endl;
 
-    controller.AXILite_WriteToFPGARegister(AXI_LITE_REGISTER__ADC__SP, sp);
+    controller.AXILite_WriteRegister(AXI_LITE_REGISTER__ADC__SP, sp);
     
-    controller.AXILite_ReadFPGARegister(AXI_LITE_REGISTER__ADC__SP, &readValue);
+    controller.AXILite_ReadRegister(AXI_LITE_REGISTER__ADC__SP, &readValue);
     std::cout << "readback: " << vuprs::Number2HexString(readValue) << std::endl;
 
     std::cout << "--- write ADC_SCI ---" << std::endl;
 
-    controller.AXILite_WriteToFPGARegister(AXI_LITE_REGISTER__ADC__SCI, clockIncrement);
+    controller.AXILite_WriteRegister(AXI_LITE_REGISTER__ADC__SCI, clockIncrement);
 
-    controller.AXILite_ReadFPGARegister(AXI_LITE_REGISTER__ADC__SCI, &readValue);
+    controller.AXILite_ReadRegister(AXI_LITE_REGISTER__ADC__SCI, &readValue);
     std::cout << "readback: " << vuprs::Number2HexString(readValue) << std::endl;
 
     /* DMA configuration */
@@ -70,7 +70,7 @@ int main()
 
     std::cout << "--- read S2MM_DMACR ---" << std::endl;
     
-    controller.AXILite_ReadFPGARegister(AXI_LITE_REGISTER__DMA__S2MM_DMACR, &readValue);
+    controller.AXILite_ReadRegister(AXI_LITE_REGISTER__DMA__S2MM_DMACR, &readValue);
 
     /* set S2MM_DMACR.RS = 1 */
 
@@ -83,16 +83,16 @@ int main()
 
     std::cout << "write S2MM_DMACR: " << vuprs::Number2HexString(writeValue) << std::endl;
 
-    controller.AXILite_WriteToFPGARegister(AXI_LITE_REGISTER__DMA__S2MM_DMACR, writeValue);
+    controller.AXILite_WriteRegister(AXI_LITE_REGISTER__DMA__S2MM_DMACR, writeValue);
 
-    controller.AXILite_ReadFPGARegister(AXI_LITE_REGISTER__DMA__S2MM_DMACR, &readValue);
+    controller.AXILite_ReadRegister(AXI_LITE_REGISTER__DMA__S2MM_DMACR, &readValue);
     std::cout << "readback: " << vuprs::Number2HexString(readValue) << std::endl;
 
     /* Check DMA start */
 
     std::cout << "waiting for DMA start ..." << std::endl;
 
-    do {controller.AXILite_ReadFPGARegister(AXI_LITE_REGISTER__DMA__S2MM_DMASR, &readValue);} 
+    do {controller.AXILite_ReadRegister(AXI_LITE_REGISTER__DMA__S2MM_DMASR, &readValue);} 
     while (readValue & 0x00000001);  /* Check S2MM_DMASR.halted */
 
     /* Set destination address DDR (0x00000000) */
@@ -101,18 +101,18 @@ int main()
 
     std::cout << "--- write S2MM_DA ---" << std::endl;
 
-    controller.AXILite_WriteToFPGARegister(AXI_LITE_REGISTER__DMA__S2MM_DA, destination_addr);
+    controller.AXILite_WriteRegister(AXI_LITE_REGISTER__DMA__S2MM_DA, destination_addr);
 
-    controller.AXILite_ReadFPGARegister(AXI_LITE_REGISTER__DMA__S2MM_DA, &readValue);
+    controller.AXILite_ReadRegister(AXI_LITE_REGISTER__DMA__S2MM_DA, &readValue);
     std::cout << "readback: " << vuprs::Number2HexString(readValue) << std::endl;
 
     /* Set DMA transfer size, and start DMA */
 
     std::cout << "--- write S2MM_LENGTH ---" << std::endl;
 
-    controller.AXILite_WriteToFPGARegister(AXI_LITE_REGISTER__DMA__S2MM_LENGTH, length);
+    controller.AXILite_WriteRegister(AXI_LITE_REGISTER__DMA__S2MM_LENGTH, length);
 
-    controller.AXILite_ReadFPGARegister(AXI_LITE_REGISTER__DMA__S2MM_LENGTH, &readValue);
+    controller.AXILite_ReadRegister(AXI_LITE_REGISTER__DMA__S2MM_LENGTH, &readValue);
     std::cout << "readback: " << vuprs::Number2HexString(readValue) << std::endl;
 
     usleep(1000);
@@ -121,9 +121,9 @@ int main()
 
     std::cout << "--- write ADC_STR ---" << std::endl;
 
-    controller.AXILite_WriteToFPGARegister(AXI_LITE_REGISTER__ADC__STR, 1);
+    controller.AXILite_WriteRegister(AXI_LITE_REGISTER__ADC__STR, 1);
 
-    controller.AXILite_ReadFPGARegister(AXI_LITE_REGISTER__ADC__STR, &readValue);
+    controller.AXILite_ReadRegister(AXI_LITE_REGISTER__ADC__STR, &readValue);
     std::cout << "readback: " << vuprs::Number2HexString(readValue) << std::endl;
 
     return 0;

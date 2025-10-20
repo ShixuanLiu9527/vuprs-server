@@ -118,6 +118,14 @@ namespace vuprs
         bool configdown;
     };
 
+    struct FPGAhardwareConfigDMA
+    {
+
+        uint64_t s2mm_length_width_bits;
+
+        bool configdown;
+    };
+
     struct FPGAhardwareConfig
     {
         /* DDR Parameters */
@@ -127,6 +135,10 @@ namespace vuprs
         /* ADC Parameters */
 
         FPGAhardwareConfigADC hardwareConfigADC;
+
+        /* DMA Parameters */
+
+        FPGAhardwareConfigDMA hardwareConfigDMA;
 
         bool configdown;
     };

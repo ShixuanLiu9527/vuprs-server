@@ -28,32 +28,46 @@
 
 /* --------------------------------------- AXI-Lite Registers --------------------------------------- */
 
-/* AXI-Lite ADC Registers */
+/**
+ * @defgroup AXI_LITE_REGISTERS__ADC
+ * @brief AXI-Lite ADC Registers selection
+ * @{
+ */
 
-#define AXI_LITE_REGISTER__ADC__SCI               0
-#define AXI_LITE_REGISTER__ADC__SP                1
-#define AXI_LITE_REGISTER__ADC__SF                2
-#define AXI_LITE_REGISTER__ADC__STR               3
-#define AXI_LITE_REGISTER__ADC__NGF               4
-#define AXI_LITE_REGISTER__ADC__ERR               5
-#define AXI_LITE_REGISTER__ADC__RST               6
+#define AXI_LITE_REGISTER__ADC__SCI               0x0000
+#define AXI_LITE_REGISTER__ADC__SP                0x0001
+#define AXI_LITE_REGISTER__ADC__SF                0x0002
+#define AXI_LITE_REGISTER__ADC__STR               0x0003
+#define AXI_LITE_REGISTER__ADC__NGF               0x0004
+#define AXI_LITE_REGISTER__ADC__ERR               0x0005
+#define AXI_LITE_REGISTER__ADC__RST               0x0006
 
-/* AXI-Lite DMA Registers */
+/**
+ * @}
+ */
 
-#define AXI_LITE_REGISTER__DMA__S2MM_DMACR        7
-#define AXI_LITE_REGISTER__DMA__S2MM_DMASR        8
-#define AXI_LITE_REGISTER__DMA__SG_CTL            9
-#define AXI_LITE_REGISTER__DMA__S2MM_CURDESC      10
-#define AXI_LITE_REGISTER__DMA__S2MM_CURDESC_MSB  11
-#define AXI_LITE_REGISTER__DMA__S2MM_TAILDESC     12
-#define AXI_LITE_REGISTER__DMA__S2MM_TAILDESC_MSB 13
-#define AXI_LITE_REGISTER__DMA__S2MM_DA           14
-#define AXI_LITE_REGISTER__DMA__S2MM_DA_MSB       15
-#define AXI_LITE_REGISTER__DMA__S2MM_LENGTH       16
+/**
+ * @defgroup AXI_LITE_REGISTER__DMA
+ * @brief AXI-Lite DMA Registers selection
+ * @{
+ */
 
-/* AXI-Lite User Access */
+#define AXI_LITE_REGISTER__DMA__S2MM_DMACR        0x0007
+#define AXI_LITE_REGISTER__DMA__S2MM_DMASR        0x0008
+#define AXI_LITE_REGISTER__DMA__SG_CTL            0x0009
+#define AXI_LITE_REGISTER__DMA__S2MM_CURDESC      0x000A
+#define AXI_LITE_REGISTER__DMA__S2MM_CURDESC_MSB  0x000B
+#define AXI_LITE_REGISTER__DMA__S2MM_TAILDESC     0x000C
+#define AXI_LITE_REGISTER__DMA__S2MM_TAILDESC_MSB 0x000D
+#define AXI_LITE_REGISTER__DMA__S2MM_DA           0x000E
+#define AXI_LITE_REGISTER__DMA__S2MM_DA_MSB       0x000F
+#define AXI_LITE_REGISTER__DMA__S2MM_LENGTH       0x0010
 
-#define __AXI_LITE__DMA_USER_ADDRESS              16
+/**
+ * @}
+ */
+
+/* AXI_LITE_REGISTER__DMA Parameter check */
 
 #define IS_AXI_LITE_REGISTER__ADC(VAL) \
 (VAL == AXI_LITE_REGISTER__ADC__SCI               || \
@@ -86,15 +100,41 @@
 
 /* -------------------------------------- AXI-Full DMA Direction ------------------------------------ */
 
-#define DMA_TRANSFER_DIRECTION__FPGA_TO_HOST      0
-#define DMA_TRANSFER_DIRECTION__HOST_TO_FPGA      1
+/**
+ * @defgroup DMA_TRANSFER_DIRECTION
+ * @brief DMA transfer direction
+ * @{
+ */
 
-#define IS_DMA_TRANSFER_DIRECTION(VAL) (VAL == DMA_TRANSFER_DIRECTION__FPGA_TO_HOST || VAL == DMA_TRANSFER_DIRECTION__HOST_TO_FPGA)
+#define DMA_TRANSFER_DIRECTION__FPGA_TO_HOST                   0x0000
+#define DMA_TRANSFER_DIRECTION__HOST_TO_FPGA                   0x0001
 
-#define DMA_TRANSFER_MEMORY_SELECTION__DDR         0
-#define DMA_TRANSFER_MEMORY_SELECTION__BRAM        1
-#define DMA_TRANSFER_MEMORY_SELECTION__AXI_LITE_DOMAIN  2
-#define DMA_TRANSFER_MEMORY_SELECTION__XDMA_DOMAIN 3
+/**
+ * @}
+ */
+
+/* DMA_TRANSFER_DIRECTION Parameter check */
+
+#define IS_DMA_TRANSFER_DIRECTION(VAL) \
+(VAL == DMA_TRANSFER_DIRECTION__FPGA_TO_HOST || \
+ VAL == DMA_TRANSFER_DIRECTION__HOST_TO_FPGA)
+
+/**
+ * @defgroup DMA_TRANSFER_MEMORY_SELECTION
+ * @brief DMA transfer memory selection
+ * @{
+ */
+
+#define DMA_TRANSFER_MEMORY_SELECTION__DDR                     0x0000
+#define DMA_TRANSFER_MEMORY_SELECTION__BRAM                    0x0001
+#define DMA_TRANSFER_MEMORY_SELECTION__AXI_LITE_DOMAIN         0x0002
+#define DMA_TRANSFER_MEMORY_SELECTION__XDMA_DOMAIN             0x0003
+
+/**
+ * @}
+ */
+
+/* DMA_TRANSFER_MEMORY_SELECTION Parameter check */
 
 #define IS_DMA_WORD_TRANSFER_MEMORY_SELECTION(VAL) \
 (VAL == DMA_TRANSFER_MEMORY_SELECTION__DDR        || \
@@ -112,9 +152,9 @@
 
 /* ----------------------------------- Fixed Transfer Parameters ------------------------------------ */
 
-#define __LINUX_DMA_MAX_TRANSFER_BYTES__          0x7ffff000  /* Maximum transfer size in Linux-32bit or Linux-64bit */
+#define __LINUX_DMA_MAX_TRANSFER_BYTES__          0x7ffff000         /* Maximum transfer size in Linux-32bit or Linux-64bit */
 #define __XDMA_AXI_LITE_MMAP_SIZE__               (2 * 64 * 1024UL)  /* 2 * 64 kB address in VUPRS FPGA AXI-Lite bus address space */
-#define __XDMA_CONTROL_MMAP_SIZE__                (32 * 1024UL)  /* 32 kB address mmap */
+#define __XDMA_CONTROL_MMAP_SIZE__                (32 * 1024UL)      /* 32 kB address mmap */
 
 namespace vuprs
 {
@@ -122,11 +162,54 @@ namespace vuprs
 
     struct DMATransferConfig
     {
+        /**
+         * @brief DMA Channel.
+         * 
+         * @note Not used in AXI-Lite word/buffer transfer (AXI-Lite use MMAP instead of DMA)
+         * @note For AXI-Full word/buffer transfer, the device file name in fpga_config.json must be used.
+         *       (xdma0_c2h_{dmaChannel} & xdma0_h2c_{dmaChannel})
+         */
         uint8_t dmaChannel;
-        uint64_t base;  /* Not used in AXI-Full word/buffer transfer */
+
+        /**
+         * @brief Transfer base address.
+         * 
+         * @note 1. Not used in AXI-Full word/buffer transfer.
+         *          For DDR access, equal to 0x00000000. 
+         *          For BRAM access, equal to 0x60000000.
+         * @note 2. Full address = base + offset.
+         */
+        uint64_t base;
+
+        /**
+         * @brief Transfer offset in FPGA.
+         * 
+         * @note For AXI-Full word/buffer DDR transfer, valid offset = 0x0000_0000 - 0x1FFF_FFFF.
+         * @note For AXI-Full word/buffer BRAM transfer, valid offset = 0x600_00000 - 0x6000_1FFF.
+         * @note Full address = base + offset.
+         */
         uint64_t offset;
-        uint64_t transferByteSize;  /* Not used in AXI-Full word transfer */
+
+        /**
+         * @brief Transfer length (unit is bytes)
+         * 
+         * @note Cannot exceed __LINUX_DMA_MAX_TRANSFER_BYTES__.
+         * @note Not used in AXI-Full/Lite word transfer (equal to 4 bytes).
+         */
+        uint64_t transferByteSize;
+
+        /**
+         * @brief Transfer memory selection
+         * 
+         * @note valid value are defined in DMA_TRANSFER_MEMORY_SELECTION.
+         */
         int transferMemorySelection;
+
+        /**
+         * @brief Transfer direction FPGA to Host (reading) or Host to FPGA (writing).
+         * 
+         * @note Valid values are defined in DMA_TRANSFER_DIRECTION.
+         */
         int transferDirectionSelection;
     };
     
@@ -165,57 +248,136 @@ namespace vuprs
 
             /**
              * @brief Load config data from JSON file.
+             * 
              * @note The JSON file must be the required format.
+             * 
              * @param configJsonFilename file name of the JSON file. (e.g. ./usr/config.json)
+             * 
              * @retval true: load data success;
-             *         false: load data failed.
+             * @retval false: load data failed.
+             * 
              * @throws std::runtime_error
              */
             bool LoadFPGAConfig(const vuprs::FPGAConfigManager &newFPGAConfig);
 
             void InitLogger(const std::string &loggerName, const std::string &loggerFilename);
 
+            /* ---------------------------- Register IO ----------------------------------- */
+
             /**
              * @brief Write word (32 bit) to register on AXI-Lite bus of FPGA (use Simple method).
-             * @param registerSelection target register.
+             * 
+             * @param registerSelection target register, see AXI_LITE_REGISTER__ADC and AXI_LITE_REGISTER__DMA.
              * @param w_value value to write.
+             * 
              * @retval true: write success;
-             *         false: write failed.
+             * @retval false: write failed.
+             * 
              * @throw std::runtime_error
              */
-            bool AXILite_WriteToFPGARegister(const int &registerSelection, const uint32_t &w_value);
+            bool AXILite_WriteRegister(const int &registerSelection, const uint32_t &w_value);
+            
+            /**
+             * @brief Write 0 or 1 to a certain bit of the register.
+             * 
+             * @param registerSelection target register, see AXI_LITE_REGISTER__ADC and AXI_LITE_REGISTER__DMA.
+             * @param whichBits which bit to write. 0, 1, 2, ...
+             * @param value write value, 0 or 1.
+             * 
+             * @throw std::runtime_error
+             */
+            bool AXILite_WriteRegister(const int &registerSelection, const uint32_t &whichBits, const bool &value);
+
+            /**
+             * @brief Write value to a certain interval of the register.
+             * 
+             * @note The function will write the value into the interval [lowerBits, upperBits],
+             *       and containing both lowerBits and upperBits.
+             * 
+             * @param registerSelection target register, see AXI_LITE_REGISTER__ADC and AXI_LITE_REGISTER__DMA.
+             * @param lowerBits lower bits of the interval.
+             * @param upperBits upper bits of the interval.
+             * @param value write value.
+             * 
+             * @throw std::runtime_error
+             */
+            bool AXILite_WriteRegister(const int &registerSelection, const uint32_t &lowerBits, const uint32_t &upperBits, const uint32_t &value);
 
             /**
              * @brief Read word (32 bit) from register on AXI-Lite bus of FPGA (use Simple method).
-             * @param registerSelection target register.
+             * 
+             * @param registerSelection target register. see AXI_LITE_REGISTER__ADC and AXI_LITE_REGISTER__DMA.
              * @param r_value read value.
+             * 
              * @retval true: read success;
-             *         false: read failed.
+             * @retval false: read failed.
+             * 
              * @throw std::runtime_error
              */
-            bool AXILite_ReadFPGARegister(const int &registerSelection, uint32_t *r_value);
+            bool AXILite_ReadRegister(const int &registerSelection, uint32_t *r_value);
 
             /**
-             * @brief Write/Read data to/from DDR on AXI-Full bus of FPGA (use DMA method).
-             * @param transferConfig transfer config parameters.
+             * @brief Read certain bit of the register on AXI-Lite bus of FPGA (use Simple method).
+             * 
+             * @param registerSelection target register. see AXI_LITE_REGISTER__ADC and AXI_LITE_REGISTER__DMA.
+             * @param whichBit which bit to read. 0, 1, 2, ...
+             * @param r_value read value of the bit.
+             * 
+             * @retval true: read success;
+             * @retval false: read failed.
+             * 
+             * @throw std::runtime_error
+             */
+            bool AXILite_ReadRegister(const int &registerSelection, const uint32_t &whichBit, uint32_t *r_value);
+
+            /**
+             * @brief Read certain bits interval of the register on AXI-Lite bus of FPGA (use Simple method).
+             * @note The function will read the value into the interval [lowerBits, upperBits],
+             *       and containing both lowerBits and upperBits.
+             * 
+             * @param registerSelection target register. see AXI_LITE_REGISTER__ADC and AXI_LITE_REGISTER__DMA.
+             * @param lowerBits lower bits of the interval.
+             * @param upperBits upper bits of the interval.
+             * @param r_value read value of the bits interval.
+             * 
+             * @retval true: read success;
+             * @retval false: read failed.
+             * 
+             * @throw std::runtime_error
+             */
+            bool AXILite_ReadRegister(const int &registerSelection, const uint32_t &lowerBits, const uint32_t &upperBits, uint32_t *r_value);
+
+            /* ---------------------------- AXI-Full Transfer -------------------------------- */
+
+            /**
+             * @brief Write/Read data to/from DDR/BRAM on AXI-Full bus of FPGA (use DMA method).
+             * 
+             * @param transferConfig transfer config.
              * @param buffer send/receive buffer. 
-             *               In read mode (DMA_TRANSFER_DIRECTION__FPGA_TO_HOST), the method will
+             *               In reading mode (DMA_TRANSFER_DIRECTION__FPGA_TO_HOST), the method will
              *               automatically configure the buffer.
-             *               In write mode (DMA_TRANSFER_DIRECTION__HOST_TO_FPGA), data must be written
+             *               In writing mode (DMA_TRANSFER_DIRECTION__HOST_TO_FPGA), data must be written
              *               to the buffer in advance.
              * @retval true: write/read success;
-             *         false: write/read failed.
-             * @throw std::runtime_error, std::bad_malloc
+             * @retval false: write/read failed.
+             * 
+             * @throw std::runtime_error
+             * @throw std::bad_malloc
              */
             bool AXIFull_BufferTransfer(const vuprs::DMATransferConfig &transferConfig, vuprs::AlignedBufferDMA *buffer);
 
+            /* --------------------- AXI Word Transfer (for any address) -------------------- */
+
             /**
-             * @brief Write data to AXI-Full bus.
-             * @param dmaChannel DMA channel select.
-             * @param offset offset relative to DDR.
-             * @param w_value write value
+             * @brief Read/Write word (32 bit) from/to AXI-Full/Lite bus of FPGA.
+             * 
+             * @param transferConfig transfer config.
+             * @param r_value read value (if not used, pass in nullptr).
+             * @param w_value write value (if not used, pass in 0).
+             * 
              * @retval true: write success;
-             *         false: write failed.
+             * @retval false: write failed.
+             * 
              * @throw std::runtime_error
              */
             bool AXI_XDMA_WordTransfer(const vuprs::DMATransferConfig &transferConfig, uint32_t *r_value, const uint32_t &w_value);
@@ -228,6 +390,13 @@ namespace vuprs
 
     /**
      * @brief Calculate optimal value of register SCI for the given target frequency.
+     * 
+     * @note This function will calculate an optimal value for SCI register.
+     *       If target frequency == 0, the output will be 0xffffffff.
+     * 
+     * @param targetSamplingFreq target sampling frequency.
+     * 
+     * @retval optimal value of SCI.
      */
     uint32_t GetOptimalValueSCI(const double &targetSamplingFreq);
 }

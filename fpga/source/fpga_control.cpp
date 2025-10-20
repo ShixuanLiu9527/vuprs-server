@@ -591,7 +591,7 @@ bool vuprs::FPGAController::AXIFull_BufferIO(const vuprs::DMATransferConfig &tra
 
 /* --------------------------------------------------- AXI-Lite -------------------------------------------------- */
 
-bool vuprs::FPGAController::AXILite_WriteToFPGARegister(const int &registerSelection, const uint32_t &w_value)
+bool vuprs::FPGAController::AXILite_WriteRegister(const int &registerSelection, const uint32_t &w_value)
 {
     uint64_t writeOffset;
     bool offsetStatus = false;
@@ -627,7 +627,7 @@ bool vuprs::FPGAController::AXILite_WriteToFPGARegister(const int &registerSelec
     }
 }
 
-bool vuprs::FPGAController::AXILite_ReadFPGARegister(const int &registerSelection, uint32_t *r_value)
+bool vuprs::FPGAController::AXILite_ReadRegister(const int &registerSelection, uint32_t *r_value)
 {
     uint64_t readOffset;
     bool offsetStatus = false;
@@ -661,6 +661,105 @@ bool vuprs::FPGAController::AXILite_ReadFPGARegister(const int &registerSelectio
     {
         throw std::runtime_error("Register is read only: " + std::to_string(registerSelection));
     }
+}
+
+bool vuprs::FPGAController::AXILite_WriteRegister(const int &registerSelection, const uint32_t &whichBits, const bool &value)
+{
+    return this->AXILite_WriteRegister(registerSelection, whichBits, whichBits, value);
+}
+
+bool vuprs::FPGAController::AXILite_WriteRegister(const int &registerSelection, const uint32_t &lowerBits, const uint32_t &upperBits, const uint32_t &value)
+{
+    uint32_t readValue, writeValue, intervalWidth;
+    uint32_t bitmask_l, bitmask;
+    
+    if (lowerBits > 31 || upperBits > 31)
+    {
+        throw std::runtime_error("Bits must smaller than 31.");
+    }
+
+    intervalWidth = std::max(lowerBits, upperBits) - std::min(lowerBits, upperBits) + 1;
+
+    bitmask_l = ((uint32_t)(-1)) >> (32 - intervalWidth);  // 00...001111
+    bitmask = bitmask_l << lowerBits;  // 000...011110...0
+
+    /* Read the register */
+
+    try
+    {
+        if (!this->AXILite_ReadRegister(registerSelection, &readValue))
+        {
+            return false;
+        }
+    }
+    catch(const std::exception &e)
+    {
+        throw std::runtime_error("Error occurred when reading register: " + std::string(e.what()));
+    }
+
+    /* Calculate new value */
+
+    writeValue = readValue & (~bitmask);  /* Clear certain bits */
+    writeValue = writeValue | ((bitmask_l & value) << std::min(lowerBits, upperBits));  /* Set certain bits */
+
+    /* Write the register */
+
+    try
+    {
+        if (this->AXILite_WriteRegister(registerSelection, writeValue))
+        {
+            return true;
+        }
+    }
+    catch(const std::exception &e)
+    {
+        throw std::runtime_error("Error occurred when writing register: " + std::string(e.what()));
+    }
+
+    return false;
+}
+
+bool vuprs::FPGAController::AXILite_ReadRegister(const int &registerSelection, const uint32_t &lowerBits, const uint32_t &upperBits, uint32_t *r_value)
+{
+    uint32_t readValue, intervalWidth;
+    uint32_t bitmask_l, bitmask;
+    
+    if (lowerBits > 31 || upperBits > 31)
+    {
+        throw std::runtime_error("Bits must smaller than 31.");
+    }
+
+    intervalWidth = std::max(lowerBits, upperBits) - std::min(lowerBits, upperBits) + 1;
+
+    bitmask_l = ((uint32_t)(-1)) >> (32 - intervalWidth);  // 00...001111
+    bitmask = bitmask_l << lowerBits;  // 000...011110...0
+
+    try
+    {
+        if (!this->AXILite_ReadRegister(registerSelection, &readValue))
+        {
+            return false;
+        }
+    }
+    catch(const std::exception& e)
+    {
+        throw std::runtime_error("Error occurred when reading register: " + std::string(e.what()));
+    }
+
+    readValue &= bitmask;
+    readValue = readValue >> std::min(lowerBits, upperBits);
+    
+    if (r_value != nullptr)
+    {
+        *r_value = readValue;
+    }
+
+    return true;
+}
+
+bool vuprs::FPGAController::AXILite_ReadRegister(const int &registerSelection, const uint32_t &whichBit, uint32_t *r_value)
+{
+    return this->AXILite_ReadRegister(registerSelection, whichBit, whichBit, r_value);
 }
 
 /* -------------------------------------------- AXI-Full Buffer IO ----------------------------------------------- */

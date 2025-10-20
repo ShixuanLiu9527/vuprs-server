@@ -81,16 +81,20 @@ namespace vuprs
 
             /**
              * @brief Define connect callback operate function.
+             * 
              * @note 1. The input function will be called when connection is established;
              *       2. Show some message when connected and disconnected.
+             * 
              * @param callback call back function pointer.
              */
             void SetServerConnectionCallback(ServerConnectionCallback callback);
 
             /**
              * @brief Define message handler operate function (for session).
+             * 
              * @note 1. The input function will be given to session when connected;
              *       2. Perform the main operation in this function (FPGA control & Fault processing).
+             * 
              * @param handler call back function pointer.
              */
             void SetSessionMessageHandler(vuprs::SessionMessageHandler handler);

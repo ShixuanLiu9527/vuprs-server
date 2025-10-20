@@ -65,8 +65,9 @@
             "memory-capacity-megabytes": "512",
             "data-width-bits": "32"
         },
-        "dma": 
+        "axi-dma": 
         {
+            "s2mm-length-register-width": "26"
             
         },
         "bram":

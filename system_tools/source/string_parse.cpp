@@ -52,6 +52,8 @@ uint64_t vuprs::ParseHexFromString(const std::string &dataString, bool *status)
 
 int vuprs::ParseIntegerFromString(const std::string &dataString, bool *status)
 {
+    std::string parseString = dataString;
+
     if (status != nullptr)
     {
         (*status) = false;
@@ -63,10 +65,12 @@ int vuprs::ParseIntegerFromString(const std::string &dataString, bool *status)
 
     try
     {
+        parseString.erase(std::remove(parseString.begin(), parseString.end(), '_'), parseString.end());
+
         /* Check Digital Value */
-        for (size_t i = 0; i < dataString.length(); i++)
+        for (size_t i = 0; i < parseString.length(); i++)
         {
-            if (!std::isdigit(dataString[i]))
+            if (!std::isdigit(parseString[i]))
             {
                 return 0;
             }
@@ -75,7 +79,7 @@ int vuprs::ParseIntegerFromString(const std::string &dataString, bool *status)
         {
             (*status) = true;
         }
-        return std::stoi(dataString);
+        return std::stoi(parseString);
     }
     catch (const std::exception &e)
     {

@@ -1,5 +1,7 @@
 # VUPRS Server - 车下故障识别与定位系统板端服务器.
 
+<img src="./docs/server_structure.jpg" alt="Server" style="width:600px; height:auto;" /> 
+
 ## Build
 
 在项目根目录输入以下指令:  

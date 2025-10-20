@@ -35,7 +35,15 @@ bool vuprs::FPGAConfigManager::LoadFPGAConfigFromJson(const std::string &configJ
 
     nlohmann::json configJsonData;
     int configSuccessCount = 0;
-    configJsonFile >> configJsonData;
+
+    try
+    {
+        configJsonFile >> configJsonData;
+    }
+    catch(...)
+    {
+        throw std::runtime_error("Error occurred when parsing JSON file.");
+    }
 
     /* security check */
 
@@ -332,7 +340,7 @@ bool vuprs::FPGAConfigManager::ParseRegisterAddressDMA(const nlohmann::json &jso
 
 bool vuprs::FPGAConfigManager::ParseHardwareFeatures(const nlohmann::json &jsonData)
 {
-    bool parseIntegerStatus, parseSuccessADC = true, parseSuccessDDR = true;
+    bool parseIntegerStatus, parseSuccessADC = true, parseSuccessDDR = true, parseSuccessDMA = true;
     int parseResultValue;
 
     /* ADC Hardware Features */
@@ -434,7 +442,32 @@ bool vuprs::FPGAConfigManager::ParseHardwareFeatures(const nlohmann::json &jsonD
         }
     }
 
-    return parseSuccessADC && parseSuccessDDR;
+    /* DMA Hardware Features */
+
+    if (jsonData.contains("axi-dma"))
+    {
+        auto dmaHardware = jsonData["axi-dma"];
+
+        /* ADC Work Clock Frequency */
+
+        if (dmaHardware.contains("s2mm-length-register-width"))
+        {
+            parseResultValue = vuprs::ParseNumberFromString(dmaHardware["s2mm-length-register-width"].get<std::string>(), &parseIntegerStatus);
+            if (parseIntegerStatus) this->fpgaConfig.hardwareConfig.hardwareConfigDMA.s2mm_length_width_bits = parseResultValue;
+            else parseSuccessDMA = false;
+        }
+
+        if (parseSuccessDMA)
+        {
+            this->fpgaConfig.hardwareConfig.hardwareConfigDMA.configdown = true;
+        }
+        else
+        {
+            this->fpgaConfig.hardwareConfig.hardwareConfigDMA.configdown = false;
+        }
+    }
+
+    return parseSuccessADC && parseSuccessDDR && parseSuccessDMA;
 }
 
 bool vuprs::FPGAConfigManager::ParseXDMADriverConfig(const nlohmann::json &jsonData)

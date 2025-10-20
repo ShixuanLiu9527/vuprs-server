@@ -17,7 +17,8 @@
                     "SF-address-offset": "0x08",
                     "STR-address-offset": "0x0c",
                     "NGF-address-offset": "0x10",
-                    "ERR-address-offset": "0x14"
+                    "ERR-address-offset": "0x14",
+                    "RST-address-offset": "0x18"
                 }
             },
             "dma": 
@@ -56,20 +57,22 @@
         "adc": 
         {
             "max-sampling-frequency-hz": "120000",
-            "voltage-range-radius-v": "10"
+            "voltage-range-radius-v": "10",
+            "work-clock-frequency-hz": "50000000"
         },
         "ddr": 
         {
             "memory-capacity-megabytes": "512",
             "data-width-bits": "32"
         },
-        "dma": 
+        "axi-dma": 
         {
+            "s2mm-length-register-width": "26"
             
         },
         "bram":
         {
-            "memory-capacity-bytes": "8192"
+            "memory-capacity-kilobytes": "8"
         }
     },
     "xdma-driver": 
