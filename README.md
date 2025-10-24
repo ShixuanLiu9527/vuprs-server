@@ -1,4 +1,4 @@
-# VUPRS Server - 车下故障识别与定位系统板端服务器.
+# VUPRS Server - 车下故障声学定位与识别系统 `Linux` 服务器.
 
 <img src="./docs/server_structure.jpg" alt="Server" style="width:600px; height:auto;" /> 
 
