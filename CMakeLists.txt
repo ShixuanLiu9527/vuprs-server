@@ -18,6 +18,8 @@ else()
 endif()
 
 add_subdirectory(eigen)
+add_subdirectory(gsl)
+
 include_directories(
         ${CMAKE_CURRENT_SOURCE_DIR}/fpga/include
         ${CMAKE_CURRENT_SOURCE_DIR}/server/include

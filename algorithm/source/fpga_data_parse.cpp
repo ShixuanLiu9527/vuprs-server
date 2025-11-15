@@ -2,7 +2,7 @@
 
 vuprs::CRC8List globalCRCList(CRC8_POLYNOMIAL_CDMA2000);
 
-bool vuprs::BufferData2ADCChannels(const vuprs::AlignedBufferDMA *buffer, std::vector<std::vector<double>> *result, const vuprs::FPGAhardwareConfigADC &adcFeatures)
+bool vuprs::BufferData2ADCChannels(const vuprs::AlignedBufferServer *buffer, std::vector<std::vector<double>> *result, const vuprs::FPGAhardwareConfigADC &adcFeatures)
 {
     /* ------------------------ Security Check Start ------------------------- */
 
@@ -53,6 +53,8 @@ bool vuprs::BufferData2ADCChannels(const vuprs::AlignedBufferDMA *buffer, std::v
     dataHeaderPointer = 0;
     dataTailerPointer = 0;
 
+    /* Get frame data */
+
     while (dataHeaderPointer < wordsElements)
     {
         if (originData[dataHeaderPointer] == ADC_DATA_HEADER)  /* Find header */
@@ -63,11 +65,16 @@ bool vuprs::BufferData2ADCChannels(const vuprs::AlignedBufferDMA *buffer, std::v
                 if (originData[dataTailerPointer] == ADC_DATA_TAILER)
                 {
                     /* Push data */
+
                     for (uint64_t i = 0; i < (ADC_FRAME_WORD_LENGTH - 2); i++)
                     {
                         oneADCFrame.UpdateData(i, originData[dataHeaderPointer + i]);
                     }
                     adcFrames.push_back(oneADCFrame);
+                }
+                else  /* Stop */
+                {
+                    break;
                 }
             }
         

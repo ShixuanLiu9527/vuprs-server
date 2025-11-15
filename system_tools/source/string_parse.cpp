@@ -87,6 +87,32 @@ int vuprs::ParseIntegerFromString(const std::string &dataString, bool *status)
     }
 }
 
+double ParseDoubleFromString(const std::string &dataString, bool *status)
+{
+    if (status != nullptr)
+    {
+        (*status) = false;
+    }
+    if (dataString.empty())
+    {
+        return 0.0;
+    }
+
+    try
+    {
+        double retValue = std::stod(dataString);
+        if (status != nullptr)
+        {
+            (*status) = true;
+        }
+        return retValue;
+    }
+    catch (const std::exception &e)
+    {
+        return 0.0;
+    }
+}
+
 uint64_t vuprs::ParseNumberFromString(const std::string &dataString, bool *status)
 {
     bool parseStatus = false;

@@ -122,7 +122,7 @@ namespace vuprs
      * @throw 1. std::runtime_error("Buffer is empty, convert disabled"), when buffer is empty;
      *        2. std::runtime_error("Do not find ADC features, convert disabled"), when adc features are empty.
      */
-    bool BufferData2ADCChannels(const vuprs::AlignedBufferDMA *buffer, std::vector<std::vector<double>> *result, const vuprs::FPGAhardwareConfigADC &adcFeatures);
+    bool BufferData2ADCChannels(const vuprs::AlignedBufferServer *buffer, std::vector<std::vector<double>> *result, const vuprs::FPGAhardwareConfigADC &adcFeatures);
 
     class CRC8List
     {

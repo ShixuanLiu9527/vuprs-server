@@ -1,0 +1,13 @@
+#ifndef ALIGNED_EIGEN_VECTOR
+#define ALIGNED_EIGEN_VECTOR
+
+#include <Eigen/Dense>
+#include <vector>
+
+namespace vuprs
+{
+    template<typename T>
+    using AlignedEigenVector = std::vector<T, Eigen::aligned_allocator<T>>;
+}
+
+#endif
