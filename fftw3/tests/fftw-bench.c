@@ -215,7 +215,6 @@ int can_do(bench_problem *p)
 
 void setup(bench_problem *p)
 {
-     FFTW(plan) plan;
      double tim;
 
      setup_sigfpe_handler();
@@ -241,13 +240,11 @@ void setup(bench_problem *p)
 #endif
 
      timer_start(USER_TIMER);
-     plan = mkplan(p, preserve_input_flags(p) | the_flags);
+     the_plan = mkplan(p, preserve_input_flags(p) | the_flags);
      tim = timer_stop(USER_TIMER);
      if (verbose > 1) printf("planner time: %g s\n", tim);
 
-     the_plan = FFTW(copy_plan)(plan); /* test copy_plan */
      BENCH_ASSERT(the_plan);
-     FFTW(destroy_plan)(plan); /* the_plan should still exist */
 
      {
 	  double add, mul, nfma, cost, pcost;
@@ -293,6 +290,14 @@ void cleanup(void)
 #else
      FFTW(cleanup)();
 #endif
+
+#    ifdef FFTW_DEBUG_MALLOC
+     {
+	  /* undocumented memory checker */
+	  FFTW_EXTERN void FFTW(malloc_print_minfo)(int v);
+	  FFTW(malloc_print_minfo)(verbose);
+     }
+#    endif
 
      final_cleanup();
 }

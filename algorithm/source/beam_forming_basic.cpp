@@ -28,7 +28,7 @@ vuprs::BeamFormingArray::BeamFormingArray(const std::string &filename)
 
 vuprs::BeamFormingArray::~BeamFormingArray()
 {
-    vuprs::AlignedEigenVector<vuprs::BeamFormingElement>().swap(this->array);
+    vuprs::AlignedEigenVector<vuprs::BeamFormingElement>().swap(this->elementArray);
 }
 
 bool vuprs::BeamFormingArray::LoadArrayFromJson(const std::string &filename)
@@ -61,28 +61,29 @@ bool vuprs::BeamFormingArray::LoadArrayFromJson(const std::string &filename)
             if (beamFormingArray.is_array())
             {
                 int arraySize = arrayData.size();
-                this->array.resize(arraySize);
+                this->elementArray.resize(arraySize);
                 for (int i = 0; i < arraySize; i++)
                 {
                     if (arrayData[i].contains("index") && arrayData[i].contains("position_x") && arrayData[i].contains("position_y") &&
                         arrayData[i].contains("position_z") && arrayData[i].contains("adc_channel"))
                     {
                         double x = 0, y = 0, z = 0;
-                        int adcChannel = 0, successCount = 0;
+                        int successCount = 0;
                         bool status = false;
+                        std::string adcChannel;
 
                         x = vuprs::ParseDoubleFromString(arrayData[i]["position_x"].get<std::string>(), &status);
-                        if (status) {this->array[i].positionVector(0, 0) = x; successCount++;}
+                        if (status) {this->elementArray[i].positionVector(0, 0) = x; successCount++;}
 
                         y = vuprs::ParseDoubleFromString(arrayData[i]["position_y"].get<std::string>(), &status);
-                        if (status) {this->array[i].positionVector(1, 0) = y; successCount++;}
+                        if (status) {this->elementArray[i].positionVector(1, 0) = y; successCount++;}
 
                         z = vuprs::ParseDoubleFromString(arrayData[i]["position_z"].get<std::string>(), &status);
-                        if (status) {this->array[i].positionVector(2, 0) = z; successCount++;}
+                        if (status) {this->elementArray[i].positionVector(2, 0) = z; successCount++;}
 
-                        adcChannel = vuprs::ParseNumberFromString(arrayData[i]["adc_channel"].get<std::string>(), &status);
-                        if (status) {this->array[i].adcChannel = adcChannel; successCount++;}
-
+                        adcChannel = arrayData[i]["adc_channel"].get<std::string>();
+                        if (!adcChannel.empty()) {this->elementArray[i].adcChannel = adcChannel;}
+                        
                         if (successCount < 4)
                         {
                             throw std::runtime_error("Parse array data error.");
@@ -108,18 +109,48 @@ bool vuprs::BeamFormingArray::LoadArrayFromJson(const std::string &filename)
     {
         throw std::runtime_error("Missing element [beam_forming_array]");
     }
-    
+
     return true;
 }
 
-void vuprs::BeamFormingArray::UpdataTimeDelay(const double &targetAlt, const double &targetAz, const double &waveVelocity)
+void vuprs::BeamFormingArray::UpdateTimeDelay(const double &targetAlt, const double &targetAz, const double &waveVelocity)
 {
-    int arraySize = this->array.size();
+    int arraySize = this->elementArray.size();
     this->timeDelayVector.resize(arraySize, 1);
     for (int i = 0; i < arraySize; i++)
     {
-        this->array[i].UpdataTimeDelay(targetAlt, targetAz, waveVelocity);
-        this->timeDelayVector(i, 0) = this->array[i].timeDelay;
+        this->elementArray[i].UpdataTimeDelay(targetAlt, targetAz, waveVelocity);
+        this->timeDelayVector(i, 0) = this->elementArray[i].timeDelay;
+    }
+}
+
+void vuprs::BeamFormingArray::InputElementSignal(const vuprs::SignalData &adcData)
+{
+    if (this->elementArray.size() <= 0)
+    {
+        throw std::runtime_error("Cannot input signal to an empty array.");
+    }
+
+    int arraySize = this->elementArray.size();
+
+    for (int i = 0; i < arraySize; i++)
+    {
+        if (adcData.contains(this->elementArray[i].adcChannel))
+        {
+            adcData.GetChannelData(this->elementArray[i].adcChannel, &this->elementArray[i].elementSignalTimeDomain);
+        }
+    }
+}
+
+bool vuprs::BeamFormingArray::empty() const
+{
+    if (this->elementArray.size() <= 0)
+    {
+        return true;
+    }
+    else
+    {
+        return false;
     }
 }
 

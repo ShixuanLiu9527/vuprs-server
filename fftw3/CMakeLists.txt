@@ -279,7 +279,7 @@ if (HAVE_AVX2)
   list (APPEND SOURCEFILES ${fftw_dft_simd_avx2_SOURCE} ${fftw_rdft_simd_avx2_SOURCE})
 endif ()
 
-set (FFTW_VERSION 3.3.10)
+set (FFTW_VERSION 3.3.9)
 
 set (PREC_SUFFIX)
 if (ENABLE_FLOAT)
@@ -310,37 +310,23 @@ endif ()
 
 add_library (${fftw3_lib} ${SOURCEFILES})
 target_include_directories (${fftw3_lib} INTERFACE $<INSTALL_INTERFACE:include>)
-if (MSVC)
-  if (CMAKE_C_COMPILER_ID STREQUAL "Clang")
-    add_compile_options(-bigobj)
-  elseif (CMAKE_C_COMPILER_ID STREQUAL "MSVC")
-    add_compile_options(/bigobj)
-  endif ()
+if (MSVC AND NOT (CMAKE_C_COMPILER_ID STREQUAL "Intel"))
+  target_compile_definitions (${fftw3_lib} PRIVATE /bigobj)
 endif ()
 if (HAVE_SSE)
-  set_source_files_properties (${fftw_dft_simd_sse2_SOURCE}
-                               ${fftw_rdft_simd_sse2_SOURCE}
-                               PROPERTIES COMPILE_FLAGS "${SSE_FLAG}")
+  target_compile_options (${fftw3_lib} PRIVATE ${SSE_FLAG})
 endif ()
 if (HAVE_SSE2)
-  set_source_files_properties (${fftw_dft_simd_sse2_SOURCE}
-                               ${fftw_rdft_simd_sse2_SOURCE}
-                               PROPERTIES COMPILE_FLAGS "${SSE2_FLAG}")
+  target_compile_options (${fftw3_lib} PRIVATE ${SSE2_FLAG})
 endif ()
 if (HAVE_AVX)
-  set_source_files_properties (${fftw_dft_simd_avx_SOURCE}
-                               ${fftw_rdft_simd_avx_SOURCE}
-                               PROPERTIES COMPILE_FLAGS "${AVX_FLAG}")
+  target_compile_options (${fftw3_lib} PRIVATE ${AVX_FLAG})
 endif ()
 if (HAVE_AVX2)
-  set_source_files_properties (${fftw_dft_simd_avx2_SOURCE}
-                               ${fftw_rdft_simd_avx2_SOURCE}
-                               PROPERTIES COMPILE_FLAGS "${AVX2_FLAG}")
+  target_compile_options (${fftw3_lib} PRIVATE ${AVX2_FLAG})
 endif ()
 if (HAVE_FMA)
-  set_source_files_properties (${fftw_dft_simd_avx2_SOURCE}
-                               ${fftw_rdft_simd_avx2_SOURCE}
-                               PROPERTIES COMPILE_FLAGS "${FMA_FLAG}")
+  target_compile_options (${fftw3_lib} PRIVATE ${FMA_FLAG})
 endif ()
 if (HAVE_LIBM)
   target_link_libraries (${fftw3_lib} m)
@@ -383,10 +369,10 @@ install(TARGETS ${fftw3_lib}
           ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
 install (FILES api/fftw3.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-if (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/api/fftw3.f)
+if (EXISTS ${CMAKE_SOURCE_DIR}/api/fftw3.f)
   install (FILES api/fftw3.f api/fftw3l.f03 api/fftw3q.f03 DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 endif ()
-if (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/api/fftw3.f03.in)
+if (EXISTS ${CMAKE_SOURCE_DIR}/api/fftw3.f03.in)
   file (READ api/fftw3.f03.in FFTW3_F03_IN OFFSET 42)
   file (WRITE ${CMAKE_CURRENT_BINARY_DIR}/fftw3.f03 "! Generated automatically.  DO NOT EDIT!\n\n")
   file (APPEND ${CMAKE_CURRENT_BINARY_DIR}/fftw3.f03 "  integer, parameter :: C_FFTW_R2R_KIND = ${C_FFTW_R2R_KIND}\n\n")

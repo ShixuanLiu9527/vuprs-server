@@ -20,7 +20,7 @@
 
 /* detection of alignment.  This is complicated because a machine may
    support multiple SIMD extensions (e.g. SSE2 and AVX) but only one
-   set of alignment constraints.  So this alignment stuff cannot be
+   set of alignment contraints.  So this alignment stuff cannot be
    defined in the SIMD header files.  Rather than defining a separate
    set of "machine" header files, we just do this ugly ifdef here. */
 #if defined(HAVE_SSE2) || defined(HAVE_AVX) || defined(HAVE_AVX2) || defined(HAVE_AVX_128_FMA) || defined(HAVE_AVX512)
@@ -34,7 +34,7 @@
 #elif defined(HAVE_ALTIVEC)
 #  define ALIGNMENT 8     /* Alignment for the LD/ST macros */
 #  define ALIGNMENTA 16   /* Alignment for the LDA/STA macros */
-#elif defined(HAVE_NEON) || defined(HAVE_VSX) || defined(HAVE_SVE)
+#elif defined(HAVE_NEON) || defined(HAVE_VSX)
 #  define ALIGNMENT 8     /* Alignment for the LD/ST macros */
 #  define ALIGNMENTA 8    /* Alignment for the LDA/STA macros */
 #elif defined(HAVE_KCVI)
@@ -44,14 +44,6 @@
 #    define ALIGNMENT 16     /* Alignment for the LD/ST macros */
 #  endif
 #  define ALIGNMENTA 64   /* Alignment for the LDA/STA macros */
-#elif defined(HAVE_LSX) || defined(HAVE_LASX)
-#  if defined(FFTW_SINGLE)
-#    define ALIGNMENT 8
-#    define ALIGNMENTA 16
-#  else
-#    define ALIGNMENT 16
-#    define ALIGNMENTA 16
-#  endif
 #elif defined(HAVE_GENERIC_SIMD256)
 #  if defined(FFTW_SINGLE)
 #    define ALIGNMENT 8
@@ -80,7 +72,8 @@
 #endif
 
 /* rename for precision and for SIMD extensions */
-#define XSIMD(name) CONCAT2(X(name), SIMD_SUFFIX)
+#define XSIMD0(name, suffix) CONCAT(name, suffix)
+#define XSIMD(name) XSIMD0(X(name), SIMD_SUFFIX)
 #define XSIMD_STRING(x) x STRINGIZE(SIMD_SUFFIX)
 
 /* TAINT_BIT is set if pointers are not guaranteed to be multiples of
@@ -102,13 +95,4 @@
 #define SIMD_STRIDE_OK(x) (!(((x) * sizeof(R)) % ALIGNMENT))
 #define SIMD_STRIDE_OKA(x) (!(((x) * sizeof(R)) % ALIGNMENTA))
 #define SIMD_VSTRIDE_OK SIMD_STRIDE_OK
-
-/* macrology to call DEFX N times */
-#define REPEAT_1(DEFX, v, x) DEFX(v, x)
-#define REPEAT_2(DEFX, v, x) REPEAT_1(DEFX, v, x), REPEAT_1(DEFX, (v)+1, x)
-#define REPEAT_4(DEFX, v, x) REPEAT_2(DEFX, v, x), REPEAT_2(DEFX, (v)+2, x)
-#define REPEAT_8(DEFX, v, x) REPEAT_4(DEFX, v, x), REPEAT_4(DEFX, (v)+4, x)
-#define REPEAT_16(DEFX, v, x) REPEAT_8(DEFX, v, x), REPEAT_8(DEFX,(v)+8, x)
-#define REPEAT_32(DEFX, v, x) REPEAT_16(DEFX, v, x), REPEAT_16(DEFX, (v)+16, x)
-#define REPEAT_64(DEFX, v, x) REPEAT_32(DEFX, v, x), REPEAT_32(DEFX, (v)+32, x)
 

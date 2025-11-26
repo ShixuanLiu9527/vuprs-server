@@ -6,28 +6,28 @@
                 "position_x": "0.0",
                 "position_y": "0.0",
                 "position_z": "0.0",
-                "adc_channel": "0"
+                "adc_channel": "CH-A-1"
             },
             {
                 "index": "0",
                 "position_x": "0.0",
                 "position_y": "0.0",
                 "position_z": "0.0",
-                "adc_channel": "0"
+                "adc_channel": "CH-A-2"
             },
             {
                 "index": "0",
                 "position_x": "0.0",
                 "position_y": "0.0",
                 "position_z": "0.0",
-                "adc_channel": "0"
+                "adc_channel": "CH-A-3"
             },
             {
                 "index": "0",
                 "position_x": "0.0",
                 "position_y": "0.0",
                 "position_z": "0.0",
-                "adc_channel": "0"
+                "adc_channel": "CH-A-4"
             }
         ]
     }

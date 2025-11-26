@@ -103,7 +103,7 @@ Include the @emph{same} @code{<fftw3.h>} header file.
 Replace all lowercase instances of @samp{fftw_} with @samp{fftwf_} or
 @samp{fftwl_} for single or long-double precision, respectively.
 (@code{fftw_complex} becomes @code{fftwf_complex}, @code{fftw_execute}
-becomes @code{fftwf_execute}, etc.)
+becomes @code{fftwf_execute}, etcetera.)
 
 @item
 Uppercase names, i.e. names beginning with @samp{FFTW_}, remain the
@@ -176,7 +176,7 @@ fftw_complex *fftw_alloc_complex(size_t n);
 @findex fftw_alloc_complex
 
 The equivalent functions in other precisions allocate arrays of @code{n}
-elements in that precision, e.g. @code{fftwf_alloc_real(n)} is
+elements in that precision.  e.g. @code{fftwf_alloc_real(n)} is
 equivalent to @code{(float *) fftwf_malloc(sizeof(float) * n)}.
 @cindex precision
 
@@ -214,20 +214,6 @@ void fftw_destroy_plan(fftw_plan plan);
 @findex fftw_destroy_plan
 deallocates the @code{plan} and all its associated data.
 
-Sometimes, it is useful to make a copy of an @code{fftw_plan}
-instance so that it is safe to call @code{fftw_destroy_plan}
-on the original. You can do this by calling:
-@example
-fftw_plan fftw_copy_plan(fftw_plan plan);
-@end example
-@findex fftw_copy_plan
-(Technically, @code{fftw_copy_plan} currently returns the same
-@code{plan} with an internal reference count incremented, analogous
-to a @code{std::shared_ptr} in C++, which is safe since plan usage is
-effectively read-only; this is why plan execution is thread-safe.
-The plan is not deallocated until you call @code{fftw_destroy_plan}
-on @emph{both} the original and the ``copy''.)
-
 FFTW's planner saves some other persistent data, such as the
 accumulated wisdom and a list of algorithms available in the current
 configuration.  If you want to deallocate all of that and reset FFTW
@@ -248,7 +234,7 @@ accumulating wisdom information again.
 memory leaks, you must still call @code{fftw_destroy_plan} before
 executing @code{fftw_cleanup}.
 
-Occasionally, it may be useful to know FFTW's internal ``cost'' metric
+Occasionally, it may useful to know FFTW's internal ``cost'' metric
 that it uses to compare plans to one another; this cost is
 proportional to an execution time of the plan, in undocumented units,
 if the plan was created with the @code{FFTW_MEASURE} or other
@@ -272,7 +258,7 @@ The following two routines are provided purely for academic purposes
 (that is, for entertainment).
 
 @example
-void fftw_flops(const fftw_plan plan,
+void fftw_flops(const fftw_plan plan, 
                 double *add, double *mul, double *fma);
 @end example
 @findex fftw_flops
@@ -297,7 +283,7 @@ char *fftw_sprint_plan(const fftw_plan plan);
 @findex fftw_print_plan
 
 This outputs a ``nerd-readable'' representation of the @code{plan} to
-the given file, to @code{stdout}, or to a newly allocated
+the given file, to @code{stdout}, or two a newly allocated
 NUL-terminated string (which the caller is responsible for deallocating
 with @code{free}), respectively.
 
@@ -376,7 +362,7 @@ copy of one number from input to output.
 @code{n0}, @code{n1}, @code{n2}, or @code{n[0..rank-1]} (as appropriate
 for each routine) specify the size of the transform dimensions.  They
 can be any positive integer.
-
+ 
 @itemize @minus
 @item
 @cindex row-major
@@ -633,7 +619,7 @@ for each routine) specify the size of the transform dimensions.  They
 can be any positive integer.  This is different in general from the
 @emph{physical} array dimensions, which are described in @ref{Real-data
 DFT Array Format}.
-
+ 
 @itemize @minus
 @item
 FFTW is best at handling sizes of the form
@@ -836,7 +822,7 @@ of one number from input to output.
 @code{n}, or @code{n0}/@code{n1}/@code{n2}, or @code{n[rank]},
 respectively, gives the (physical) size of the transform dimensions.
 They can be any positive integer.
-
+ 
 @itemize @minus
 @item
 @cindex row-major
@@ -904,7 +890,7 @@ introduction to these transform kinds, see @ref{More DFTs of Real Data}.
 For dimension of size @code{n}, there is a corresponding ``logical''
 dimension @code{N} that determines the normalization (and the optimal
 factorization); the formula for @code{N} is given for each kind below.
-Also, with each transform kind is listed its corresponding inverse
+Also, with each transform kind is listed its corrsponding inverse
 transform.  FFTW computes unnormalized transforms: a transform followed
 by its inverse will result in the original data multiplied by @code{N}
 (or the product of the @code{N}'s for each dimension, in
@@ -1058,7 +1044,7 @@ row-major subarrays of larger rank-@code{rank} arrays, described by
 and @code{n} should be elementwise less than or equal to
 @{@code{i},@code{o}@}@code{nembed}.  Passing @code{NULL} for an
 @code{nembed} parameter is equivalent to passing @code{n} (i.e. same
-physical and logical dimensions, as in the basic interface).
+physical and logical dimensions, as in the basic interface.)
 
 The @code{stride} parameters indicate that the @code{j}-th element of
 the input or output arrays is located at @code{j*istride} or
@@ -1108,7 +1094,7 @@ Transform each column of a 2d array with 10 rows and 3 columns:
    int n[] = @{10@}; /* 1d transforms of length 10 */
    int howmany = 3;
    int idist = odist = 1;
-   int istride = ostride = 3; /* distance between two elements in
+   int istride = ostride = 3; /* distance between two elements in 
                                  the same column */
    int *inembed = n, *onembed = n;
 @end example
@@ -1139,7 +1125,7 @@ Like @code{fftw_plan_many_dft}, these two functions add @code{howmany},
 @code{fftw_plan_dft_r2c} and @code{fftw_plan_dft_c2r} functions, but
 otherwise behave the same as the basic interface.
 
-The interpretation of @code{howmany}, @code{stride}, and @code{dist} is
+The interpretation of @code{howmany}, @code{stride}, and @code{dist} are
 the same as for @code{fftw_plan_many_dft}, above.  Note that the
 @code{stride} and @code{dist} for the real array are in units of
 @code{double}, and for the complex array are in units of
@@ -1176,10 +1162,10 @@ fftw_plan fftw_plan_many_r2r(int rank, const int *n, int howmany,
 @end example
 @findex fftw_plan_many_r2r
 
-Like @code{fftw_plan_many_dft}, this function adds @code{howmany},
+Like @code{fftw_plan_many_dft}, this functions adds @code{howmany},
 @code{nembed}, @code{stride}, and @code{dist} parameters to the
-@code{fftw_plan_r2r} function, but otherwise behaves the same as the
-basic interface.  The interpretation of those additional parameters is
+@code{fftw_plan_r2r} function, but otherwise behave the same as the
+basic interface.  The interpretation of those additional parameters are
 the same as for @code{fftw_plan_many_dft}.  (Of course, the
 @code{stride} and @code{dist} parameters are now in units of
 @code{double}, not @code{fftw_complex}.)
@@ -1296,7 +1282,7 @@ A row-major multidimensional array with dimensions @code{n[rank]}
 (@pxref{Row-major Format}) corresponds to @code{dims[i].n} =
 @code{n[i]} and the recurrence @code{dims[i].is} = @code{n[i+1] *
 dims[i+1].is} (similarly for @code{os}).  The stride of the last
-(@code{i=rank-1}) dimension is the overall stride of the array,
+(@code{i=rank-1}) dimension is the overall stride of the array.
 e.g. to be equivalent to the advanced complex-DFT interface, you would
 have @code{dims[rank-1].is} = @code{istride} and
 @code{dims[rank-1].os} = @code{ostride}.
@@ -1580,7 +1566,7 @@ detailed below, provided that the following conditions are met:
 @itemize @bullet
 
 @item
-The array size, strides, etc. are the same (since those are set by
+The array size, strides, etcetera are the same (since those are set by
 the plan).
 
 @item
@@ -1629,23 +1615,23 @@ int fftw_alignment_of(double *p);
 @end example
 Two arrays have equivalent alignment (for the purposes of applying a
 plan) if and only if @code{fftw_alignment_of} returns the same value
-for the corresponding pointers to their data (typecast to @code{double*}
+for the corresponding pointers to their data (typecast to @code{double*} 
 if necessary).
 
 If you are tempted to use the new-array execute interface because you
 want to transform a known bunch of arrays of the same size, you should
 probably go use the advanced interface instead (@pxref{Advanced
-Interface}).
+Interface})).
 
 The new-array execute functions are:
 
 @example
 void fftw_execute_dft(
-     const fftw_plan p,
+     const fftw_plan p, 
      fftw_complex *in, fftw_complex *out);
 
 void fftw_execute_split_dft(
-     const fftw_plan p,
+     const fftw_plan p, 
      double *ri, double *ii, double *ro, double *io);
 
 void fftw_execute_dft_r2c(
@@ -1665,7 +1651,7 @@ void fftw_execute_split_dft_c2r(
      double *ri, double *ii, double *out);
 
 void fftw_execute_r2r(
-     const fftw_plan p,
+     const fftw_plan p, 
      double *in, double *out);
 @end example
 @findex fftw_execute_dft
@@ -1737,7 +1723,7 @@ convenience, the following three ``wrapper'' routines are provided:
 @code{filename} (which is created or overwritten), returning @code{1}
 on success and @code{0} on failure.  A lower-level function, which
 requires you to open and close the file yourself (e.g. if you want to
-write wisdom to a portion of a larger file), is
+write wisdom to a portion of a larger file) is
 @code{fftw_export_wisdom_to_file}.  This writes the wisdom to the
 current position in @code{output_file}, which should be open with
 write permission; upon exit, the file remains open and is positioned
@@ -1785,7 +1771,7 @@ the following three ``wrapper'' routines are provided:
 @code{fftw_import_wisdom_from_filename} reads wisdom from a file named
 @code{filename}.  A lower-level function, which requires you to open
 and close the file yourself (e.g. if you want to read wisdom from a
-portion of a larger file), is @code{fftw_import_wisdom_from_file}. This
+portion of a larger file) is @code{fftw_import_wisdom_from_file}. This
 reads wisdom from the current position in @code{input_file} (which
 should be open with read permission); upon exit, the file remains
 open, but the position of the read pointer is unspecified.
@@ -1826,7 +1812,7 @@ merely summarize them here, since they come with their own @code{man}
 pages for Unix and GNU systems (with HTML versions on our web site).
 
 The first program is @code{fftw-wisdom} (or @code{fftwf-wisdom} in
-single precision, etc.), which can be used to create a wisdom file
+single precision, etcetera), which can be used to create a wisdom file
 containing plans for any of the transform sizes and types supported by
 FFTW.  It is preferable to create wisdom directly from your executable
 (@pxref{Caveats in Using Wisdom}), but this program is useful for
@@ -1964,7 +1950,7 @@ As a result of this symmetry, half of the output @math{Y} is redundant
 (being the complex conjugate of the other half), and so the 1d r2c
 transforms only output elements @math{0}@dots{}@math{n/2} of @math{Y}
 (@math{n/2+1} complex numbers), where the division by @math{2} is
-rounded down.
+rounded down. 
 
 Moreover, the Hermitian symmetry implies that
 @tex
@@ -2378,7 +2364,7 @@ Y[k_1, k_2, \ldots, k_d] =
         \sum_{j_2 = 0}^{n_2 - 1}
            \cdots
               \sum_{j_d = 0}^{n_d - 1}
-                  X[j_1, j_2, \ldots, j_d]
+                  X[j_1, j_2, \ldots, j_d] 
                       \omega_1^{-j_1 k_1}
                       \omega_2^{-j_2 k_2}
                       \cdots
@@ -2392,7 +2378,7 @@ Y[k_1, k_2, \ldots, k_d] =
         \sum_{j_2 = 0}^{n_2 - 1}
            \cdots
               \sum_{j_d = 0}^{n_d - 1}
-                  X[j_1, j_2, \ldots, j_d]
+                  X[j_1, j_2, \ldots, j_d] 
                       \omega_1^{j_1 k_1}
                       \omega_2^{j_2 k_2}
                       \cdots
@@ -2452,7 +2438,7 @@ peculiar array format described in more detail by @ref{Real-data DFT
 Array Format}.
 
 The multi-dimensional c2r transform is simply the unnormalized inverse
-of the r2c transform, i.e. it is the same as FFTW's complex backward
+of the r2c transform.  i.e. it is the same as FFTW's complex backward
 multi-dimensional DFT, operating on a Hermitian input array in the
 peculiar format mentioned above and outputting a real array (since the
 DFT output is purely real).
@@ -2467,3 +2453,4 @@ Halfcomplex-format DFT}.  Likewise, FFTW's multidimensional
 @code{FFTW_DHT} r2r transform is not the same thing as the logical
 multi-dimensional discrete Hartley transform defined in the literature,
 as discussed in @ref{The Discrete Hartley Transform}.
+

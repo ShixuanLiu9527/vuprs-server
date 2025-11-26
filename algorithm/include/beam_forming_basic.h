@@ -18,6 +18,8 @@
 #include "nlohmann/json.hpp"
 #include "string_parse.h"
 #include "aligned_eigen_vector.h"
+#include "fpga_data_parse.h"
+#include "signal_data.h"
 
 #define PI 3.14159265358979323846
 
@@ -32,9 +34,12 @@ namespace vuprs
     {
         public:
             
-            Eigen::Matrix<double, 3, 1> positionVector;  /* Relative to the reference point, unit: m */
-            double timeDelay = 0.0;  /* unit: sec */
-            int adcChannel = 0;
+            Eigen::Matrix<double, 3, 1> positionVector;  /* [x; y; z], relative to the reference point, unit: m */
+            double timeDelay = 0.0;  /* time delay of signal, relative to the reference point, unit: sec */
+            std::string adcChannel = "";
+
+            std::vector<std::complex<double>> elementSignalTimeDomain, elementSignalFrequencyDomain;
+            Eigen::Matrix<Eigen::dcomplex, -1, 1> phasedElementSignalFrequencyDomain;
 
             /**
              * @brief Calculate time delay for this element.
@@ -57,14 +62,12 @@ namespace vuprs
      */
     class BeamFormingArray
     {
-        private:
-
-            Eigen::Matrix<double, -1, -1> timeDelayVector;
-            vuprs::AlignedEigenVector<vuprs::BeamFormingElement> array;
-
         public:
 
-            BeamFormingArray() = default;
+            Eigen::Matrix<double, -1, -1> timeDelayVector;
+            vuprs::AlignedEigenVector<vuprs::BeamFormingElement> elementArray;
+
+            BeamFormingArray();
 
             BeamFormingArray(const std::string &filename);
 
@@ -86,7 +89,14 @@ namespace vuprs
              * @param targetAz az of the target position (relative to array), unit: deg.
              * @param waveVelocity velocity of wave, unit: m/sec.
              */
-            void UpdataTimeDelay(const double &targetAlt, const double &targetAz, const double &waveVelocity); 
+            void UpdateTimeDelay(const double &targetAlt, const double &targetAz, const double &waveVelocity); 
+
+            /**
+             * @brief Input all signal to the beam forming array and bind the signal to certain element.
+             * 
+             * @param adcData adc data
+             */
+            void InputElementSignal(const vuprs::SignalData &adcData);
 
             /**
              * @brief Calculate Array response vector.
@@ -99,6 +109,8 @@ namespace vuprs
 
             double MaxAbsoluteTimeDelay() const;
 
+            bool empty() const;
+
             EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };
 
@@ -108,8 +120,9 @@ namespace vuprs
     inline Eigen::Matrix<double, 3, 1> AltAz2PointingVector(const double &alt, const double &az)
     {
         Eigen::Matrix<double, 3, 1> vec;
-        double calt = cos(vuprs::deg2rad(alt)), caz = cos(vuprs::deg2rad(az)), salt = sin(vuprs::deg2rad(alt)), saz = sin(vuprs::deg2rad(az));
-        vec << calt * saz, calt * caz, salt;
+        double c_alt = cos(vuprs::deg2rad(alt)), c_az = cos(vuprs::deg2rad(az)), \
+               s_alt = sin(vuprs::deg2rad(alt)), s_az = sin(vuprs::deg2rad(az));
+        vec << c_alt * s_az, c_alt * c_az, s_alt;
         return vec.normalized();
     }
 
