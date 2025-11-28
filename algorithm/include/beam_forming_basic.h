@@ -16,12 +16,15 @@
 #include <math.h>
 
 #include "nlohmann/json.hpp"
+
 #include "string_parse.h"
 #include "aligned_eigen_vector.h"
 #include "fpga_data_parse.h"
 #include "signal_data.h"
+#include "signal_processing.h"
 
 #define PI 3.14159265358979323846
+#define VUPRS_EPS_1 1e-5
 
 namespace vuprs
 {
@@ -36,10 +39,15 @@ namespace vuprs
             
             Eigen::Matrix<double, 3, 1> positionVector;  /* [x; y; z], relative to the reference point, unit: m */
             double timeDelay = 0.0;  /* time delay of signal, relative to the reference point, unit: sec */
-            std::string adcChannel = "";
+            std::string adcChannel = "";  /* "" = empty */
 
-            std::vector<std::complex<double>> elementSignalTimeDomain, elementSignalFrequencyDomain;
-            Eigen::Matrix<Eigen::dcomplex, -1, 1> phasedElementSignalFrequencyDomain;
+            double samplingFrequency = 0.0;  /* sampling frequency for this signal, unit: Hz */
+            double samplingTime = 0.0; /* sampling time for this signal, unit: sec */
+
+            std::vector<std::complex<double>> elementSignalTimeDomain;  /* raw data */
+            std::vector<std::complex<double>> elementSignalFrequencyDomain_std;  /* fft data */
+            Eigen::Matrix<Eigen::dcomplex, -1, 1> elementSignalFrequencyDomain_eigen;  /* First half in frequency domain */
+            Eigen::Matrix<Eigen::dcomplex, -1, 1> phasedElementSignalFrequencyDomain_eigen;  /* Total data in frequency domain */
 
             /**
              * @brief Calculate time delay for this element.
@@ -50,7 +58,18 @@ namespace vuprs
              * @param targetAz az of the target position (relative to array), unit: deg.
              * @param waveVelocity velocity of wave, unit: m/sec.
              */
-            void UpdataTimeDelay(const double &targetAlt, const double &targetAz, const double &waveVelocity); 
+            void UpdataTimeDelay(double targetAlt, double targetAz, double waveVelocity); 
+
+            /**
+             * @brief FFT for the signal: this->elementSignalTimeDomain
+             * 
+             * @note STEP 1: this->elementSignalTimeDomain ---> FFT ---> this->elementSignalFrequencyDomain_std;
+             * @note STEP 2: this->elementSignalFrequencyDomain_std ---> Cut First Half ---> this->elementSignalFrequencyDomain_std;
+             * @note STEP 3: this->elementSignalFrequencyDomain_eigen ---> Eigen::Map ---> this->elementSignalFrequencyDomain_eigen.
+             */
+            void DoFFT();
+
+            bool empty() const;
 
             EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };
@@ -64,7 +83,10 @@ namespace vuprs
     {
         public:
 
-            Eigen::Matrix<double, -1, -1> timeDelayVector;
+            double samplingFrequency = 0.0;  /* sampling frequency for this signal, unit: Hz */
+            double samplingTime = 0.0;  /* sampling time for this signal, unit: sec */
+            int signalPointCounts = 0;  /* sampling points for this signal */
+            Eigen::Matrix<Eigen::dcomplex, -1, 1> timeDelayVector;
             vuprs::AlignedEigenVector<vuprs::BeamFormingElement> elementArray;
 
             BeamFormingArray();
@@ -89,7 +111,7 @@ namespace vuprs
              * @param targetAz az of the target position (relative to array), unit: deg.
              * @param waveVelocity velocity of wave, unit: m/sec.
              */
-            void UpdateTimeDelay(const double &targetAlt, const double &targetAz, const double &waveVelocity); 
+            void UpdateTimeDelay(double targetAlt, double targetAz, double waveVelocity); 
 
             /**
              * @brief Input all signal to the beam forming array and bind the signal to certain element.
@@ -105,7 +127,21 @@ namespace vuprs
              * 
              * @retval Array response vector.
              */
-            Eigen::Matrix<Eigen::dcomplex, -1, -1> ArrayResponseVector(const double &frequency) const;
+            Eigen::Matrix<Eigen::dcomplex, -1, 1> ArrayResponseVector(double frequency) const;
+
+            /**
+             * @brief Get array signal matrix (M x N), each column is a snapshot.
+             * 
+             * @note If FFT is used, the resulting data will be halved (N / 2 + 1).
+             * 
+             * @param frequencyDomain true: do FFT for all data.
+             *                        false: do not FFT.
+             * @param samplingFrequency sampling frequency.
+             * 
+             * @retval frequencyDomain = true: Array signal matrix (frequency domain, size = (M) x (N / 2 + 1)).
+             * @retval frequencyDomain = false: Array signal matrix (time domain, size = (M)x(N))
+             */
+            Eigen::Matrix<Eigen::dcomplex, -1, -1> ArraySignalMatrix(bool frequencyDomain = true, double *samplingFrequency = nullptr);
 
             double MaxAbsoluteTimeDelay() const;
 
@@ -114,10 +150,40 @@ namespace vuprs
             EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };
 
-    inline double rad2deg(const double &rad) {return rad / PI * 180.0;}
-    inline double deg2rad(const double &deg) {return deg / 180.0 * PI;}
+    template <typename T>
+    void eigenVector2stdVector(const Eigen::Matrix<T, -1, 1> *eigenvector, std::vector<T> *stdvector)
+    {
+        if (eigenvector->rows() <= 0) return;
+        if (eigenvector->cols() != 1) throw std::runtime_error("Invalid shape of eigen (valid: Nx1)");
+        *stdvector = std::vector<T>(eigenvector->data(), eigenvector->data() + eigenvector->size());
+    }
 
-    inline Eigen::Matrix<double, 3, 1> AltAz2PointingVector(const double &alt, const double &az)
+    template <typename T>
+    void eigenRol2stdVector(const Eigen::Matrix<T, 1, -1> *eigenvector, std::vector<T> *stdvector)
+    {
+        if (eigenvector->cols() <= 0) return;
+        if (eigenvector->rows() != 1) throw std::runtime_error("Invalid shape of eigen (valid: 1xN)");
+        *stdvector = std::vector<T>(eigenvector->data(), eigenvector->data() + eigenvector->size());
+    }
+
+    template <typename T>
+    void stdVector2eigenVector(const std::vector<T> *stdvector, Eigen::Matrix<T, -1, 1> *eigenvector)
+    {
+        if (stdvector->empty()) return;
+        *eigenvector = Eigen::Map<Eigen::Matrix<T, -1, 1>>(stdvector->data(), stdvector->size());
+    }
+
+    template <typename T>
+    void stdVector2eigenRol(const std::vector<T> *stdvector, Eigen::Matrix<T, 1, -1> *eigenvector)
+    {
+        if (stdvector->empty()) return;
+        *eigenvector = Eigen::Map<Eigen::Matrix<T, 1, -1>>(stdvector->data(), stdvector->size());
+    }
+
+    inline double rad2deg(double rad) {return rad / PI * 180.0;}
+    inline double deg2rad(double deg) {return deg / 180.0 * PI;}
+
+    inline Eigen::Matrix<double, 3, 1> AltAz2PointingVector(double alt, double az)
     {
         Eigen::Matrix<double, 3, 1> vec;
         double c_alt = cos(vuprs::deg2rad(alt)), c_az = cos(vuprs::deg2rad(az)), \

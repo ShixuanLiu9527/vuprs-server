@@ -23,13 +23,9 @@ void vuprs::BeamFormerTemplate::InputElementSignal(const vuprs::SignalData &sign
     }
 
     this->array.InputElementSignal(signalData);
-
-    this->samplingFrequency = signalData.samplingFrequency;
-    this->samplingTime = signalData.samplingTime;
-    this->dataNumber = signalData._channelData[0].size();
 }
 
-void vuprs::BeamFormerTemplate::SetTargetDirection(const double &alt, const double az, const double waveVelocity)
+void vuprs::BeamFormerTemplate::SetTargetDirection(double alt, double az, double waveVelocity)
 {
     if (this->array.empty())
     {
@@ -39,15 +35,7 @@ void vuprs::BeamFormerTemplate::SetTargetDirection(const double &alt, const doub
     this->array.UpdateTimeDelay(alt, az, waveVelocity);
 }
 
-Eigen::Matrix<Eigen::dcomplex, -1, 1> vuprs::GenerateBeamFormingFrequencyList(const int &dataNumber, const double &samplingFrequency)
+Eigen::Matrix<Eigen::dcomplex, -1, 1> vuprs::GenerateBeamFormingFrequencyList(int dataNumber, double samplingFrequency)
 {
-    Eigen::Matrix<Eigen::dcomplex, -1, 1> retVector;
-    int frequencyNumber = dataNumber / 2;
-    retVector.resize(frequencyNumber, 1);
-    for (int i = 0; i < frequencyNumber; i++)
-    {
-        retVector(i, 0).real(0.0);
-        retVector(i, 0).imag(2.0 * PI * (double(i) * samplingFrequency / double(frequencyNumber)));  /* -2 * pi * f * j */
-    }
-    return retVector;
+    return 2.0 * PI * vuprs::GenerateFrequencyList(dataNumber, samplingFrequency);  /* 2 * pi * f * j */
 }

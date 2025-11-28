@@ -6,13 +6,15 @@
 
 namespace vuprs
 {
+    /**
+     * @brief Beam former template.
+     * @note aligned.
+     */
     class BeamFormerTemplate
     {
         protected:
 
             vuprs::BeamFormingArray array;
-            double samplingTime = 0.0, samplingFrequency = 0.0;
-            int dataNumber = 0;
 
         public:
 
@@ -43,15 +45,22 @@ namespace vuprs
              * @param az azimuth of target, relative to base array (unit: degrees).
              * @param waveVelocity velocity of wave (unit: m/sec).
              */
-            void SetTargetDirection(const double &alt, const double az, const double waveVelocity);
+            void SetTargetDirection(double alt, double az, double waveVelocity);
 
-            virtual void OutputSignal(std::vector<std::complex<double>> *outputSignal) = 0;
+            virtual void GetOutputSignal(std::vector<std::complex<double>> *outputSignal) = 0;
+
+            EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };
 
     /**
-     * @brief 2 * pi * f * j
+     * @brief Frequency vector.
+     * 
+     * @note [2pi * f_1 * j, 2pi * f_2 * j, ..., 2pi * f_F * j], F = dataNumber / 2 + 1
+     * 
+     * @param dataNumber total data number (input to FFT).
+     * @param samplingFrequency sampling frequency, unit: Hz.
      */
-    Eigen::Matrix<Eigen::dcomplex, -1, 1> GenerateBeamFormingFrequencyList(const int &dataNumber, const double &samplingFrequency);
+    Eigen::Matrix<Eigen::dcomplex, -1, 1> GenerateBeamFormingFrequencyList(int dataNumber, double samplingFrequency);
 }
 
 #endif

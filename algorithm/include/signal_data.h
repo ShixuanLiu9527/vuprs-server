@@ -21,6 +21,7 @@ namespace vuprs
             std::vector<std::string> _channelName;
 
             double samplingFrequency = 0.0, samplingTime = 0.0;
+            int signalPoints = 0;  /* signal data point number for one channel */
 
             bool contains(const std::string &channelName) const;
             void GetChannelData(const std::string &channelName, std::vector<std::complex<double>> *data) const;

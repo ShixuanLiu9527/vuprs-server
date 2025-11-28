@@ -30,13 +30,13 @@
  * 
  * then the storage order must be defined in the following way:
  * 
- *      ADC_CHANNEL__A_1                 2U
- *      ADC_CHANNEL__A_2                 0U
- *      ADC_CHANNEL__A_3                 1U
- *      ...                              ...
+ *      ADC_CHANNEL_POSITION__A_1                 2U
+ *      ADC_CHANNEL_POSITION__A_2                 0U
+ *      ADC_CHANNEL_POSITION__A_3                 1U
+ *      ...                                       ...
  * 
  * -----------------------------------------------------------------
- *      ADC Channel                      Storage position
+ *      ADC Channel                               Storage position
  * -----------------------------------------------------------------
  * 
  */
@@ -192,7 +192,7 @@ namespace vuprs
      */
     bool BufferData2ADCChannels(const vuprs::AlignedBufferServer *buffer, 
                                 const vuprs::FPGAhardwareConfigADC &adcFeatures, 
-                                const double &samplingFrequency,
+                                double samplingFrequency,
                                 vuprs::SignalData *adcData);
 
     class CRC8List
@@ -200,13 +200,13 @@ namespace vuprs
         private:
     
             std::vector<uint8_t> crcList;
-            uint8_t CalculateCRC(const uint8_t &source, const uint16_t &crcPolynomialCode);
+            uint8_t CalculateCRC(uint8_t source, uint16_t crcPolynomialCode);
 
         public:
 
-            CRC8List(const uint16_t &crcPolynomialCode);
+            CRC8List(uint16_t crcPolynomialCode);
             ~CRC8List();
-            uint8_t CRCValue(const uint8_t &source);
+            uint8_t CRCValue(uint8_t source);
     };
 
     class ADCFrame
@@ -221,10 +221,10 @@ namespace vuprs
             ADCFrame();
             ~ADCFrame();
 
-            void InputPositionData(const int &storagePosition, const uint32_t &data);
+            void InputPositionData(int storagePosition, uint32_t data);
 
-            bool CheckCRC(const int &storagePosition);
-            uint16_t GetPositionValue(const int &storagePosition);
+            bool CheckCRC(int storagePosition);
+            uint16_t GetPositionValue(int storagePosition);
 
     };
 }

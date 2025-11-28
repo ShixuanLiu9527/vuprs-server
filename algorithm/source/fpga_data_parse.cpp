@@ -46,7 +46,7 @@ const double LSB_VALUE = pow(2, ADC_DATAWIDTH) / 2.0;
 
 vuprs::CRC8List globalCRCList(CRC8_POLYNOMIAL_CDMA2000);
 
-bool vuprs::BufferData2ADCChannels(const vuprs::AlignedBufferServer *buffer, const vuprs::FPGAhardwareConfigADC &adcFeatures, const double &samplingFrequency, vuprs::SignalData *adcData)
+bool vuprs::BufferData2ADCChannels(const vuprs::AlignedBufferServer *buffer, const vuprs::FPGAhardwareConfigADC &adcFeatures, double samplingFrequency, vuprs::SignalData *adcData)
 {
     /* ------------------------ Security Check Start ------------------------- */
 
@@ -185,6 +185,7 @@ bool vuprs::BufferData2ADCChannels(const vuprs::AlignedBufferServer *buffer, con
     adcData->_UpdataHashMap();
     adcData->samplingFrequency = samplingFrequency;
     adcData->samplingTime = (adcFrameElements - 1.0) / samplingFrequency;
+    adcData->signalPoints = adcFrameElements;
 
     return true;
 }
@@ -193,7 +194,7 @@ bool vuprs::BufferData2ADCChannels(const vuprs::AlignedBufferServer *buffer, con
 /* ------------------------------------------------- CRC List ---------------------------------------------------- */
 /* --------------------------------------------------------------------------------------------------------------- */
 
-uint8_t vuprs::CRC8List::CalculateCRC(const uint8_t &source, const uint16_t &crcPolynomialCode)
+uint8_t vuprs::CRC8List::CalculateCRC(uint8_t source, uint16_t crcPolynomialCode)
 {
     uint8_t crc;
     uint8_t CRC8_CDMA2000 = crcPolynomialCode & (0xFF);
@@ -214,7 +215,7 @@ uint8_t vuprs::CRC8List::CalculateCRC(const uint8_t &source, const uint16_t &crc
     return crc;
 }
 
-vuprs::CRC8List::CRC8List(const uint16_t &crcPolynomialCode)
+vuprs::CRC8List::CRC8List(uint16_t crcPolynomialCode)
 {
     this->crcList.resize(256);
 
@@ -229,7 +230,7 @@ vuprs::CRC8List::~CRC8List()
     this->crcList.clear();
 }
 
-uint8_t vuprs::CRC8List::CRCValue(const uint8_t &source)
+uint8_t vuprs::CRC8List::CRCValue(uint8_t source)
 {
     return this->crcList[source];
 }
@@ -254,7 +255,7 @@ vuprs::ADCFrame::~ADCFrame()
     this->crcDataL.clear();
 }
 
-bool vuprs::ADCFrame::CheckCRC(const int &storagePosition)
+bool vuprs::ADCFrame::CheckCRC(int storagePosition)
 {
     if (IS_ADC_CHANNEL(storagePosition))
     {
@@ -277,7 +278,7 @@ bool vuprs::ADCFrame::CheckCRC(const int &storagePosition)
     }
 }
 
-void vuprs::ADCFrame::InputPositionData(const int &storagePosition, const uint32_t &data)
+void vuprs::ADCFrame::InputPositionData(int storagePosition, uint32_t data)
 {
     if (storagePosition < (ADC_FRAME_WORD_LENGTH - 2))
     {
@@ -291,7 +292,7 @@ void vuprs::ADCFrame::InputPositionData(const int &storagePosition, const uint32
     }
 }
 
-uint16_t vuprs::ADCFrame::GetPositionValue(const int &storagePosition)
+uint16_t vuprs::ADCFrame::GetPositionValue(int storagePosition)
 {
     if (IS_ADC_CHANNEL(storagePosition))
     {

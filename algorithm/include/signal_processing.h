@@ -23,9 +23,22 @@ namespace vuprs
      * 
      * @throw std::runtime_error when input data is empty.
      */
-    void FFT(std::vector<std::complex<double>> *inputRealData, std::vector<std::complex<double>> *outputData, bool inverse = false);
+    void FFT(const std::vector<std::complex<double>> *inputRealData, std::vector<std::complex<double>> *outputData, bool inverse = false);
 
-    void CutTheFirstHalf(std::vector<std::complex<double>> *inputRealData);
+    void CutTheFirstHalf(std::vector<std::complex<double>> *inputData);
+
+    void SignalMontage(std::vector<std::complex<double>> *inputData);
+    void SignalMontage(Eigen::Matrix<Eigen::dcomplex, -1, 1> *inputData);
+
+    /**
+     * @brief Frequency vector.
+     * 
+     * @note [f_1 * j, f_2 * j, ..., f_F * j], F = dataNumber / 2 + 1
+     * 
+     * @param dataNumber total data number (input to FFT).
+     * @param samplingFrequency sampling frequency, unit: Hz.
+     */
+    Eigen::Matrix<Eigen::dcomplex, -1, 1> GenerateFrequencyList(int dataNumber, double samplingFrequency);
 }
 
 #endif
