@@ -50,7 +50,7 @@ bool vuprs::BufferData2ADCChannels(const vuprs::AlignedBufferServer *buffer, con
 {
     /* ------------------------ Security Check Start ------------------------- */
 
-    if (buffer->is_allocated() || buffer->size() == 0)
+    if (!buffer->is_allocated() || buffer->size() == 0)
     {
         throw std::runtime_error("Buffer is empty, convert disabled");
     }
@@ -103,7 +103,7 @@ bool vuprs::BufferData2ADCChannels(const vuprs::AlignedBufferServer *buffer, con
 
                     for (uint64_t i = 0; i < (ADC_FRAME_WORD_LENGTH - 2); i++)
                     {
-                        oneADCFrame.InputPositionData(i, originData[dataHeaderPointer + i]);
+                        oneADCFrame.InputPositionData(i, originData[dataHeaderPointer + i + 1]);
                     }
                     adcFrames.push_back(oneADCFrame);
                 }
@@ -188,6 +188,158 @@ bool vuprs::BufferData2ADCChannels(const vuprs::AlignedBufferServer *buffer, con
     adcData->signalPoints = adcFrameElements;
 
     return true;
+}
+
+vuprs::SignalData vuprs::BufferData2ADCChannels(const vuprs::AlignedBufferServer *buffer, const vuprs::FPGAhardwareConfigADC &adcFeatures, double samplingFrequency, bool *status)
+{
+    /* ------------------------ Security Check Start ------------------------- */
+
+    if (!buffer->is_allocated() || buffer->size() == 0)
+    {
+        throw std::runtime_error("Buffer is empty, convert disabled.");
+    }
+
+    if (!adcFeatures.configdown)
+    {
+        throw std::runtime_error("Do not find ADC features, convert disabled");
+    }
+
+    /* ------------------------- Security Check End -------------------------- */
+
+    /* Convert to uint32_t vector */
+
+    std::vector<uint32_t> originData;
+    std::vector<vuprs::ADCFrame> adcFrames;
+    vuprs::ADCFrame oneADCFrame;
+    uint64_t wordsElements = 0, dataHeaderPointer = 0, dataTailerPointer = 0, adcFrameElements = 0;
+    int16_t signedValue = 0;
+
+    vuprs::SignalData outputSignalData;
+
+    if (status) *status = false;
+
+    outputSignalData._channelData.clear();
+    outputSignalData._channelData.resize(ADC_CHANNELS);
+
+    originData = buffer->to_vector<uint32_t>();
+
+    if (originData.size() == 0)
+    {
+        if (status) *status = false;
+        return outputSignalData;
+    }
+
+    wordsElements = originData.size();
+    adcFrames.reserve(wordsElements / (ADC_FRAME_WORD_LENGTH) + 1);
+
+    /* Check frame, find the process data */
+
+    dataHeaderPointer = 0;
+    dataTailerPointer = 0;
+
+    /* Get frame data */
+
+    while (dataHeaderPointer < wordsElements)
+    {
+        if (originData[dataHeaderPointer] == ADC_DATA_HEADER)  /* Find header */
+        {
+            dataTailerPointer = dataHeaderPointer + ADC_FRAME_WORD_LENGTH - 1;
+            if (dataTailerPointer < wordsElements)
+            {
+                if (originData[dataTailerPointer] == ADC_DATA_TAILER)
+                {
+                    /* Push data */
+
+                    for (uint64_t i = 0; i < (ADC_FRAME_WORD_LENGTH - 2); i++)
+                    {
+                        oneADCFrame.InputPositionData(i, originData[dataHeaderPointer + i + 1]);
+                    }
+                    adcFrames.push_back(oneADCFrame);
+                }
+                else  /* Stop */
+                {
+                    break;
+                }
+            }
+        
+            /* Update pointer */
+            
+            dataHeaderPointer = dataTailerPointer + 1;
+            if (dataHeaderPointer >= wordsElements) break;
+        }
+        else
+        {
+            dataHeaderPointer++;
+            if (dataHeaderPointer >= wordsElements) break;
+        }
+    }
+
+    if (adcFrames.size() <= 0)
+    {
+        if (status) *status = false;
+        return outputSignalData;
+    }
+
+    /* Channel name */
+
+    outputSignalData._channelName.resize(ADC_CHANNELS);
+
+    for (int position = 0; position < ADC_CHANNELS; position++)
+    {
+        auto it1 = STORAGE_POSITION__TO__ADC_CHANNEL.find(position);
+        if (it1 != STORAGE_POSITION__TO__ADC_CHANNEL.end())
+        {
+            uint8_t channel = it1->second;
+            auto it2 = ADC_CHANNEL__TO__ADC_CHANNEL_NAME.find(channel);
+            if (it2 != ADC_CHANNEL__TO__ADC_CHANNEL_NAME.end())
+            {
+                outputSignalData._channelName[position] = it2->second;
+            }
+            else
+            {
+                throw std::runtime_error("Invalid channel: " + std::to_string(channel));
+            }
+        }
+        else
+        {
+            throw std::runtime_error("Invalid storage position: " + std::to_string(position));
+        }
+    }
+
+    /* Calculate voltage */
+
+    adcFrameElements = adcFrames.size();
+    if (adcFrameElements % 2 != 0) adcFrameElements--;
+
+    for (int i = 0; i < ADC_CHANNELS; i++)
+    {
+        outputSignalData._channelData[i].resize(adcFrameElements);  /* Resize each channel */
+    }
+
+    for (uint64_t i = 0; i < adcFrameElements; i++)
+    {
+        for (uint64_t position = 0; position < ADC_CHANNELS; position++)  /* storage position */
+        {
+            if (adcFrames[i].CheckCRC(position))
+            {
+                signedValue = static_cast<int16_t>(adcFrames[i].GetPositionValue(position));
+                outputSignalData._channelData[position][i] = static_cast<double>(signedValue) * adcFeatures.adcVoltageRangeRadius / LSB_VALUE;
+            }
+            else
+            {
+                outputSignalData._channelData[position][i] = adcFeatures.adcVoltageRangeRadius;
+            }
+        }
+    }
+
+    outputSignalData._UpdataHashMap();
+    outputSignalData.samplingFrequency = samplingFrequency;
+    outputSignalData.samplingTime = (adcFrameElements - 1.0) / samplingFrequency;
+    outputSignalData.signalPoints = adcFrameElements;
+
+    if (status) *status = true;
+
+    return outputSignalData;
 }
 
 /* --------------------------------------------------------------------------------------------------------------- */

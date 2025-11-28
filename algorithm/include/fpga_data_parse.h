@@ -195,6 +195,22 @@ namespace vuprs
                                 double samplingFrequency,
                                 vuprs::SignalData *adcData);
 
+    /**
+     * @brief Convert buffer data to ADC Channels.
+     * 
+     * @param buffer data buffer, must be written in advance.
+     * @param adcFeatures adc features, must be load in advance (from JSON file).
+     * @param samplingFrequency sampling frequency.
+     * @param status calculate status.
+     * 
+     * @retval signal data object.
+     * 
+     * @throw 1. std::runtime_error("Buffer is empty, convert disabled"), when buffer is empty;
+     *        2. std::runtime_error("Do not find ADC features, convert disabled"), when adc features are empty.
+     */
+    vuprs::SignalData BufferData2ADCChannels(const vuprs::AlignedBufferServer *buffer, const vuprs::FPGAhardwareConfigADC &adcFeatures, 
+                                             double samplingFrequency = 1.0, bool *status = nullptr);
+
     class CRC8List
     {
         private:

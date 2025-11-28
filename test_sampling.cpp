@@ -1,21 +1,107 @@
 #include "fpga_control.h"
 #include "string_parse.h"
 
-int main()
+void TEST_SAMPLING__PrintHelp();
+void TEST_SAMPLING__ShowNeedHelp();
+
+void TEST_SAMPLING__PrintHelp()
+{
+printf("\n");
+printf(" |========================== [ TEST SAMPLING ] ==========================|\n");
+printf(" |                                                                       |\n");
+printf(" | ----- [ 1. For Help ] ----------------------------------------------- |\n");
+printf(" |                                                                       |\n");
+printf(" | [ \033[92mCOMMAND\033[0m ]                                                           |\n");
+printf(" |                                                                       |\n");
+printf(" | test_sampling -h                                                      |\n");
+printf(" | test_sampling --help                                                  |\n");
+printf(" |                                                                       |\n");
+printf(" | ----- [ 2. Sampling ] ----------------------------------------------- |\n");
+printf(" |                                                                       |\n");
+printf(" | [ \033[92mCOMMAND\033[0m ]                                                           |\n");
+printf(" |                                                                       |\n");
+printf(" | test_sampling --frame <frame> --points <points> -f <frequency>        |\n");
+printf(" |                                                                       |\n");
+printf(" |=======================================================================|\n");
+printf("\n");
+}
+
+void TEST_SAMPLING__ShowNeedHelp()
+{
+std::cout << " \033[31mcommand/value error\033[0m\n" << std::endl;
+printf(" see help: test_sampling --help\n");
+printf("           test_sampling -h\n\n");
+}
+
+int main(int argc, char *argv[])
 {
     vuprs::FPGAConfigManager config;
     vuprs::FPGAController controller;
     uint32_t readValue, writeValue = 0;
+    uint64_t sf = 0, sp = 0, clockIncrement, length;
+    double frequency = 0.0;
+    std::vector<std::string> args;
+    bool parseStatus = false;
 
-    uint64_t sf, sp, clockIncrement, length;
+    args.resize(argc);
+    for (int i = 0; i < argc; i++)
+    {
+        args[i] = std::string(argv[i]);
+    }
+
+    if (argc == 2)
+    {
+        if (args[1] == "-h" || args[1] == "--help")
+        {
+            TEST_SAMPLING__PrintHelp();
+            return 0;
+        }
+        else
+        {
+            TEST_SAMPLING__ShowNeedHelp();
+            return 0;
+        }
+    }
+    else if (argc == 7)
+    {
+        if (args[1] == "--frame" && args[3] == "--points" && args[5] == "-f")
+        {
+            sf = vuprs::ParseNumberFromString(args[2], &parseStatus);
+            if (!parseStatus)
+            {
+                TEST_SAMPLING__ShowNeedHelp();
+                return 0;
+            }
+            sp = vuprs::ParseNumberFromString(args[4], &parseStatus);
+            if (!parseStatus)
+            {
+                TEST_SAMPLING__ShowNeedHelp();
+                return 0;
+            }
+            frequency = vuprs::ParseDoubleFromString(args[6], &parseStatus);
+            if (!parseStatus)
+            {
+                TEST_SAMPLING__ShowNeedHelp();
+                return 0;
+            }
+            clockIncrement = vuprs::GetOptimalValueSCI(frequency);
+        }
+        else
+        {
+            TEST_SAMPLING__ShowNeedHelp();
+            return 0;
+        }
+    }
+    else
+    {
+        TEST_SAMPLING__ShowNeedHelp();
+        return 0;
+    }
 
     config.LoadFPGAConfigFromJson("./fpga_config.json");
     controller.LoadFPGAConfig(config);
 
-    sf = 32;
-    sp = 1024;
-    clockIncrement = 50 * 1000000 / (2 * (2000));  /* 2000 Hz */
-    length = (18 * 4) * sf * sp;  /* bytes */
+    length = (18 * 4) * sf * sp;  /* in bytes */
 
     if ((length & 0x3FFFFFF) != length)
     {

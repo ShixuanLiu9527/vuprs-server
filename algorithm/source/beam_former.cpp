@@ -91,7 +91,7 @@ void vuprs::BeamFormerMVDR::CalculateSignalCovarianceMatrixInCurrentFrame()
     this->CalculateAverageCovarianceMatrix();
 }
 
-void vuprs::BeamFormerMVDR::SetWindowSize(int newSize = -1)
+void vuprs::BeamFormerMVDR::SetWindowSize(int newSize)
 {
     if (newSize > 0)
     {

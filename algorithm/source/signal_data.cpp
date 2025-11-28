@@ -26,3 +26,45 @@ void vuprs::SignalData::DeleteChannelData(const std::string &channelName)
 {
     this->CHANNEL_NAME__TO__CHANNEL_INDEX.erase(channelName);
 }
+
+void vuprs::SignalData::ToCSV(const std::string &outputFile)
+{
+    this->_UpdataHashMap();
+    
+    if (this->_channelData.empty() || this->_channelName.empty()) 
+    {
+        throw std::runtime_error("No channel data to export.");
+    }
+    
+    std::ofstream file(outputFile);
+    if (!file.is_open())
+    {
+        throw std::runtime_error("Cannot open output file: " + outputFile);
+    }
+    
+    for (size_t i = 0; i < this->_channelName.size(); ++i) 
+    {
+        file << this->_channelName[i];
+        if (i != this->_channelName.size() - 1) 
+        {
+            file << ",";
+        }
+    }
+    file << "\n";
+    
+    for (int point = 0; point < this->signalPoints; ++point) 
+    {
+        for (size_t channel = 0; channel < this->_channelData.size(); ++channel) 
+        {
+            file << this->_channelData[channel][point].real();
+            
+            if (channel != this->_channelData.size() - 1) 
+            {
+                file << ",";
+            }
+        }
+        file << "\n";
+    }
+    
+    file.close();
+}

@@ -807,6 +807,8 @@ void vuprs::SetDMATransferConfigToDefault(DMATransferConfig *config)
     config->transferMemorySelection = DMA_TRANSFER_MEMORY_SELECTION__DDR;
 }
 
+#define FPGA_ADC_BASE_CLOCK_FREQUENCY_HZ 50000000.0
+
 uint32_t vuprs::GetOptimalValueSCI(const double &targetSamplingFreq)
 {
     uint32_t valueUpper, valueLower;
@@ -815,11 +817,11 @@ uint32_t vuprs::GetOptimalValueSCI(const double &targetSamplingFreq)
     if (fabs(targetSamplingFreq) > 1e-6)
     {
 
-        valueUpper = static_cast<uint32_t>(ceil(50. * 1000000. / (2. * targetSamplingFreq)));
-        valueLower = static_cast<uint32_t>(ceil(50. * 1000000. / (2. * targetSamplingFreq)));
+        valueUpper = static_cast<uint32_t>(ceil(FPGA_ADC_BASE_CLOCK_FREQUENCY_HZ / (2. * targetSamplingFreq)));
+        valueLower = static_cast<uint32_t>(ceil(FPGA_ADC_BASE_CLOCK_FREQUENCY_HZ / (2. * targetSamplingFreq)));
 
-        freqUpper = 50. * 1000000. / (2. * (double)valueUpper);
-        freqLower = 50. * 1000000. / (2. * (double)valueLower);
+        freqUpper = FPGA_ADC_BASE_CLOCK_FREQUENCY_HZ / (2. * (double)valueUpper);
+        freqLower = FPGA_ADC_BASE_CLOCK_FREQUENCY_HZ / (2. * (double)valueLower);
 
         if (fabs(valueLower - targetSamplingFreq) > fabs(valueUpper - targetSamplingFreq))
         {

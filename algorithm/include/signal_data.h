@@ -7,6 +7,8 @@
 #include <complex>
 #include <unordered_map>
 
+#include "aligned_buffer.h"
+
 namespace vuprs
 {
     class SignalData
@@ -26,6 +28,8 @@ namespace vuprs
             bool contains(const std::string &channelName) const;
             void GetChannelData(const std::string &channelName, std::vector<std::complex<double>> *data) const;
             void DeleteChannelData(const std::string &channelName);
+
+            void ToCSV(const std::string &outputFile);
 
             void _UpdataHashMap();
     };

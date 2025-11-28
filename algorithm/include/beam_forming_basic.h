@@ -167,14 +167,14 @@ namespace vuprs
     }
 
     template <typename T>
-    void stdVector2eigenVector(const std::vector<T> *stdvector, Eigen::Matrix<T, -1, 1> *eigenvector)
+    void stdVector2eigenVector(std::vector<T> *stdvector, Eigen::Matrix<T, -1, 1> *eigenvector)
     {
         if (stdvector->empty()) return;
         *eigenvector = Eigen::Map<Eigen::Matrix<T, -1, 1>>(stdvector->data(), stdvector->size());
     }
 
     template <typename T>
-    void stdVector2eigenRol(const std::vector<T> *stdvector, Eigen::Matrix<T, 1, -1> *eigenvector)
+    void stdVector2eigenRol(std::vector<T> *stdvector, Eigen::Matrix<T, 1, -1> *eigenvector)
     {
         if (stdvector->empty()) return;
         *eigenvector = Eigen::Map<Eigen::Matrix<T, 1, -1>>(stdvector->data(), stdvector->size());

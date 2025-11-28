@@ -270,7 +270,7 @@ bool vuprs::AlignedBufferDMA::malloc(uint64_t byteSize)
     /*
         To ensure address is aligned, size <- size + __XDMA_DMA_ALIGNMENT_BYTES__
     */
-    this->allocated = _aligned_malloc(byteSize + __XDMA_DMA_ALIGNMENT_BYTES__, __XDMA_DMA_ALIGNMENT_BYTES__);
+    _allocated = _aligned_malloc(byteSize + __XDMA_DMA_ALIGNMENT_BYTES__, __XDMA_DMA_ALIGNMENT_BYTES__);
 
 #else
 
@@ -317,7 +317,7 @@ bool vuprs::AlignedBufferServer::malloc(uint64_t byteSize)
     /*
         To ensure address is aligned, size <- size + __SERVER_ALIGNMENT_BYTES__
     */
-    this->allocated = _aligned_malloc(byteSize + __SERVER_ALIGNMENT_BYTES__, __SERVER_ALIGNMENT_BYTES__);
+    _allocated = _aligned_malloc(byteSize + __SERVER_ALIGNMENT_BYTES__, __SERVER_ALIGNMENT_BYTES__);
 
 #else
 

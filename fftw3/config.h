@@ -12,7 +12,7 @@
 /* #undef BENCHFFT_QUAD */
 
 /* Define to compile in single precision. */
-#define BENCHFFT_SINGLE 1
+/* #undef BENCHFFT_SINGLE in vuprs */
 
 /* Define to one of `_getb67', `GETB67', `getb67' for Cray-2 and Cray-YMP
    systems. This function is required for `alloca.c' support on those systems.
@@ -43,7 +43,8 @@
 /* #undef FC_DUMMY_MAIN_EQ_F77 */
 
 /* C compiler name and flags */
-#define FFTW_CC "gcc -O3 -fomit-frame-pointer -mtune=native -malign-double -fstrict-aliasing -fno-schedule-insns"
+/* #define FFTW_CC "gcc -O3 -fomit-frame-pointer -mtune=native -malign-double -fstrict-aliasing -fno-schedule-insns" */
+#define FFTW_CC "aarch64-linux-gnu-gcc -O3 -fomit-frame-pointer -mtune=cortex-a55"
 
 /* Define to enable extra FFTW debugging code. */
 /* #undef FFTW_DEBUG */
@@ -61,7 +62,7 @@
 /* #undef FFTW_RANDOM_ESTIMATOR */
 
 /* Define to compile in single precision. */
-#define FFTW_SINGLE 1
+/* #undef FFTW_SINGLE in vuprs */
 
 /* Define to 1 if you have the `abort' function. */
 #define HAVE_ABORT 1

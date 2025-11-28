@@ -28,6 +28,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/algorithm/include
     ${CMAKE_CURRENT_SOURCE_DIR}/system_tools/include
     ${CMAKE_CURRENT_SOURCE_DIR}/eigen
+    ${CMAKE_CURRENT_SOURCE_DIR}/fftw3
     ${CMAKE_CURRENT_SOURCE_DIR}/fftw3/api
 )
 
@@ -41,7 +42,9 @@ file(GLOB_RECURSE SERVER_SRC "server/source/*.cpp")
 add_executable(fpga_tool fpga_tool.cpp ${FPGA_SRC} ${SYS_TOOL_SRC} ${LOGGER_SRC})
 add_executable(vuprs_server test_server.cpp ${NETWORK_SRC} ${SYS_TOOL_SRC} ${LOGGER_SRC})
 add_executable(sampling_test test_sampling.cpp ${FPGA_SRC} ${SYS_TOOL_SRC} ${LOGGER_SRC})
+add_executable(adc_data_parser adc_data_parser.cpp ${FPGA_SRC} ${SYS_TOOL_SRC} ${LOGGER_SRC} ${ALGORITHM_SRC})
 
 target_link_libraries(fpga_tool PRIVATE m)
 target_link_libraries(vuprs_server PRIVATE Threads::Threads m)
-target_link_libraries(sampling_test PRIVATE m fftw3)
+target_link_libraries(sampling_test PRIVATE m)
+target_link_libraries(adc_data_parser PRIVATE m fftw3)

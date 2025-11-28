@@ -217,5 +217,5 @@ Eigen::Matrix<Eigen::dcomplex, -1, -1> vuprs::BeamFormingArray::ArraySignalMatri
 
 double vuprs::BeamFormingArray::MaxAbsoluteTimeDelay() const
 {
-    return this->timeDelayVector.maxCoeff().real();
+    return this->timeDelayVector.array().abs().matrix().maxCoeff();
 }

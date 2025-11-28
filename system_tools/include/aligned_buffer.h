@@ -37,8 +37,8 @@
 #endif
 
 #define __XDMA_DMA_ALIGNMENT_BYTES__              4096U        /* 4 kB alignment */
-#define __SERVER_ALIGNMENT_BYTES__                4U           /* 4 B alignment */
-#define __DEFAULT_ALIGNMENT_BYTES__               4U           /* 4 B alignment */
+#define __SERVER_ALIGNMENT_BYTES__                128U         /* 128 B alignment, must bigger than sizeof(void*) */
+#define __DEFAULT_ALIGNMENT_BYTES__               128U         /* 128 B alignment, must bigger than sizeof(void*) */
 
 namespace vuprs
 {
