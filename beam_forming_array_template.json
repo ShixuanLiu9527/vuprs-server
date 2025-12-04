@@ -1,33 +1,124 @@
 {
     "beam_forming_array": {
+        "format": {
+            "index": "0, 1, ..., N",
+            "position_x": "unit: m",
+            "position_y": "unit: m",
+            "position_z": "unit: m",
+            "adc_channel": "CH-A-1, ..., CH-A-8, CH-B-1, ..., CH-B-8"
+        },
         "array": [
             {
                 "index": "0",
-                "position_x": "0.0",
-                "position_y": "0.0",
-                "position_z": "0.0",
-                "adc_channel": "CH-A-1"
-            },
-            {
-                "index": "0",
-                "position_x": "0.0",
-                "position_y": "0.0",
-                "position_z": "0.0",
-                "adc_channel": "CH-A-2"
-            },
-            {
-                "index": "0",
-                "position_x": "0.0",
-                "position_y": "0.0",
+                "position_x": "-0.027",
+                "position_y": "0.060",
                 "position_z": "0.0",
                 "adc_channel": "CH-A-3"
             },
             {
-                "index": "0",
-                "position_x": "0.0",
-                "position_y": "0.0",
+                "index": "1",
+                "position_x": "0.032",
+                "position_y": "0.064",
+                "position_z": "0.0",
+                "adc_channel": "CH-A-7"
+            },
+            {
+                "index": "2",
+                "position_x": "-0.086",
+                "position_y": "0.050",
+                "position_z": "0.0",
+                "adc_channel": "CH-A-1"
+            },
+            {
+                "index": "3",
+                "position_x": "0.086",
+                "position_y": "0.050",
+                "position_z": "0.0",
+                "adc_channel": "CH-A-8"
+            },
+            {
+                "index": "4",
+                "position_x": "0.006",
+                "position_y": "0.032",
+                "position_z": "0.0",
+                "adc_channel": "CH-A-5"
+            },
+            {
+                "index": "5",
+                "position_x": "-0.024",
+                "position_y": "0.022",
+                "position_z": "0.0",
+                "adc_channel": "CH-A-2"
+            },
+            {
+                "index": "6",
+                "position_x": "0.020",
+                "position_y": "0.010",
+                "position_z": "0.0",
+                "adc_channel": "CH-A-6"
+            },
+            {
+                "index": "7",
+                "position_x": "-0.066",
+                "position_y": "0.006",
+                "position_z": "0.0",
+                "adc_channel": "CH-B-8"
+            },
+            {
+                "index": "8",
+                "position_x": "0.066",
+                "position_y": "-0.006",
                 "position_z": "0.0",
                 "adc_channel": "CH-A-4"
+            },
+            {
+                "index": "9",
+                "position_x": "-0.020",
+                "position_y": "-0.010",
+                "position_z": "0.0",
+                "adc_channel": "CH-B-6"
+            },
+            {
+                "index": "10",
+                "position_x": "0.024",
+                "position_y": "-0.022",
+                "position_z": "0.0",
+                "adc_channel": "CH-B-5"
+            },
+            {
+                "index": "11",
+                "position_x": "-0.006",
+                "position_y": "-0.032",
+                "position_z": "0.0",
+                "adc_channel": "CH-B-4"
+            },
+            {
+                "index": "12",
+                "position_x": "-0.086",
+                "position_y": "-0.050",
+                "position_z": "0.0",
+                "adc_channel": "CH-B-7"
+            },
+            {
+                "index": "13",
+                "position_x": "-0.032",
+                "position_y": "-0.064",
+                "position_z": "0.0",
+                "adc_channel": "CH-B-3"
+            },
+            {
+                "index": "14",
+                "position_x": "0.027",
+                "position_y": "-0.060",
+                "position_z": "0.0",
+                "adc_channel": "CH-B-1"
+            },
+            {
+                "index": "15",
+                "position_x": "0.086",
+                "position_y": "-0.050",
+                "position_z": "0.0",
+                "adc_channel": "CH-B-2"
             }
         ]
     }

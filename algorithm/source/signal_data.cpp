@@ -41,11 +41,16 @@ void vuprs::SignalData::ToCSV(const std::string &outputFile)
     {
         throw std::runtime_error("Cannot open output file: " + outputFile);
     }
+
+    uint64_t channelNumber = this->_channelData.size();
     
-    for (size_t i = 0; i < this->_channelName.size(); ++i) 
+    /* First line: time, ch1, ch2, ..., chN */
+
+    file << "time,";
+    for (size_t i = 0; i < channelNumber; ++i)
     {
         file << this->_channelName[i];
-        if (i != this->_channelName.size() - 1) 
+        if (i != channelNumber - 1)
         {
             file << ",";
         }
@@ -54,11 +59,13 @@ void vuprs::SignalData::ToCSV(const std::string &outputFile)
     
     for (int point = 0; point < this->signalPoints; ++point) 
     {
-        for (size_t channel = 0; channel < this->_channelData.size(); ++channel) 
+        double time = (double)point / this->samplingFrequency;
+        file << time; file << ",";
+        for (size_t channel = 0; channel < channelNumber; ++channel) 
         {
             file << this->_channelData[channel][point].real();
             
-            if (channel != this->_channelData.size() - 1) 
+            if (channel != channelNumber - 1) 
             {
                 file << ",";
             }

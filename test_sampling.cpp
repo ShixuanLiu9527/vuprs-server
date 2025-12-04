@@ -1,5 +1,9 @@
 #include "fpga_control.h"
 #include "string_parse.h"
+#include "fpga_data_parse.h"
+#include "signal_data.h"
+
+#define DMA_LENGTH_EXPAND_BYTES 4096U
 
 void TEST_SAMPLING__PrintHelp();
 void TEST_SAMPLING__ShowNeedHelp();
@@ -37,11 +41,17 @@ int main(int argc, char *argv[])
 {
     vuprs::FPGAConfigManager config;
     vuprs::FPGAController controller;
+    vuprs::AlignedBufferDMA buffer;
+    vuprs::DMATransferConfig dmaTransferConfig;
+    vuprs::SignalData signalData;
+
     uint32_t readValue, writeValue = 0;
-    uint64_t sf = 0, sp = 0, clockIncrement, length;
+    uint64_t sf = 0, sp = 0, clockIncrement, lengthInBytes;
     double frequency = 0.0;
     std::vector<std::string> args;
     bool parseStatus = false;
+
+    /* Parse command */
 
     args.resize(argc);
     for (int i = 0; i < argc; i++)
@@ -98,25 +108,31 @@ int main(int argc, char *argv[])
         return 0;
     }
 
+    /* FPGA Control */
+
     config.LoadFPGAConfigFromJson("./fpga_config.json");
     controller.LoadFPGAConfig(config);
 
-    length = (18 * 4) * sf * sp;  /* in bytes */
+    lengthInBytes = (ADC_FRAME_WORD_LENGTH * 4) * sf * sp;  /* in bytes */
 
-    if ((length & 0x3FFFFFF) != length)
+    if ((lengthInBytes & 0x3FFFFFF) != lengthInBytes)
     {
-        throw std::runtime_error("length to long.");
+        throw std::runtime_error("length too long.");
     }
 
     /* Reset DMA & ADC Controller */
 
-    std::cout << "--- Reset ADC ---" << std::endl;
+    printf("[ reset ADC controller, write \033[92m1\033[0m to \033[33mADC_RST\033[0m ]\n");
 
     controller.AXILite_WriteRegister(AXI_LITE_REGISTER__ADC__RST, 1);
-    do {controller.AXILite_ReadRegister(AXI_LITE_REGISTER__ADC__STR, &readValue);} 
+    do 
+    {
+        controller.AXILite_ReadRegister(AXI_LITE_REGISTER__ADC__STR, &readValue);
+        usleep(1000);
+    } 
     while (!(readValue & 0x00000001));
 
-    std::cout << "--- Reset DMA ---" << std::endl;
+    printf("[ reset DMA controller ]\n");
 
     controller.AXILite_ReadRegister(AXI_LITE_REGISTER__DMA__S2MM_DMACR, &readValue);
 
@@ -124,93 +140,148 @@ int main(int argc, char *argv[])
 
     controller.AXILite_WriteRegister(AXI_LITE_REGISTER__DMA__S2MM_DMACR, writeValue);
 
-    do {controller.AXILite_ReadRegister(AXI_LITE_REGISTER__DMA__S2MM_DMASR, &readValue);} 
+    do 
+    {
+        controller.AXILite_ReadRegister(AXI_LITE_REGISTER__DMA__S2MM_DMASR, &readValue);
+        usleep(1000);
+    } 
     while (!(readValue & 0x00000001));
 
     /* ADC configuration (not startup) */
 
-    std::cout << "--- write ADC_SF ---" << std::endl;
-
+    printf("[ write \033[92m%s\033[0m to ADC controller register: \033[33mADC_SF\033[0m ]\n", vuprs::Number2HexString(sf).c_str());
+    
     controller.AXILite_WriteRegister(AXI_LITE_REGISTER__ADC__SF, sf);
 
     controller.AXILite_ReadRegister(AXI_LITE_REGISTER__ADC__SF, &readValue);
-    std::cout << "readback: " << vuprs::Number2HexString(readValue) << std::endl;
+    printf("    readback back from \033[33mADC_SF\033[0m: \033[92m%s\033[0m\n", vuprs::Number2HexString(readValue).c_str());
 
-    std::cout << "--- write ADC_SP ---" << std::endl;
-
+    printf("[ write \033[92m%s\033[0m to ADC controller register: \033[33mADC_SP\033[0m ]\n", vuprs::Number2HexString(sp).c_str());
+    
     controller.AXILite_WriteRegister(AXI_LITE_REGISTER__ADC__SP, sp);
     
     controller.AXILite_ReadRegister(AXI_LITE_REGISTER__ADC__SP, &readValue);
-    std::cout << "readback: " << vuprs::Number2HexString(readValue) << std::endl;
+    printf("    readback back from \033[33mADC_SP\033[0m: \033[92m%s\033[0m\n", vuprs::Number2HexString(readValue).c_str());
 
-    std::cout << "--- write ADC_SCI ---" << std::endl;
-
+    printf("[ write \033[92m%s\033[0m to ADC controller register: \033[33mADC_SCI\033[0m ]\n", vuprs::Number2HexString(clockIncrement).c_str());
+    
     controller.AXILite_WriteRegister(AXI_LITE_REGISTER__ADC__SCI, clockIncrement);
 
     controller.AXILite_ReadRegister(AXI_LITE_REGISTER__ADC__SCI, &readValue);
-    std::cout << "readback: " << vuprs::Number2HexString(readValue) << std::endl;
+    printf("    readback back from \033[33mADC_SCI\033[0m: \033[92m%s\033[0m\n", vuprs::Number2HexString(readValue).c_str());
 
     /* DMA configuration */
     
     /* Read S2MM_DMACR */
 
-    std::cout << "--- read S2MM_DMACR ---" << std::endl;
+    printf("[ set \033[33mS2MM_DMACR.RS\033[0m to \033[92m1\033[0m ]\n");
     
     controller.AXILite_ReadRegister(AXI_LITE_REGISTER__DMA__S2MM_DMACR, &readValue);
+    printf("    read \033[33mS2MM_DMACR\033[0m: \033[92m%s\033[0m\n", vuprs::Number2HexString(readValue).c_str());
 
     /* set S2MM_DMACR.RS = 1 */
-
-    std::cout << "read S2MM_DMACR: " << vuprs::Number2HexString(readValue) << std::endl;
 
     writeValue = readValue;
     writeValue |= 0x00000001;
 
-    std::cout << "--- write S2MM_DMACR ---" << std::endl;
-
-    std::cout << "write S2MM_DMACR: " << vuprs::Number2HexString(writeValue) << std::endl;
-
+    printf("    write \033[92m%s\033[0m to \033[33mS2MM_DMACR\033[0m\n", vuprs::Number2HexString(writeValue).c_str());
+    
     controller.AXILite_WriteRegister(AXI_LITE_REGISTER__DMA__S2MM_DMACR, writeValue);
 
     controller.AXILite_ReadRegister(AXI_LITE_REGISTER__DMA__S2MM_DMACR, &readValue);
-    std::cout << "readback: " << vuprs::Number2HexString(readValue) << std::endl;
+    printf("    readback back from \033[33mS2MM_DMACR\033[0m: \033[92m%s\033[0m\n", vuprs::Number2HexString(readValue).c_str());
 
     /* Check DMA start */
 
-    std::cout << "waiting for DMA start ..." << std::endl;
-
-    do {controller.AXILite_ReadRegister(AXI_LITE_REGISTER__DMA__S2MM_DMASR, &readValue);} 
+    printf("[ waiting for DMA start ... ]\n");
+    
+    do 
+    {
+        controller.AXILite_ReadRegister(AXI_LITE_REGISTER__DMA__S2MM_DMASR, &readValue);
+        usleep(1000);
+    } 
     while (readValue & 0x00000001);  /* Check S2MM_DMASR.halted */
 
     /* Set destination address DDR (0x00000000) */
 
     uint32_t destination_addr = 0x00000000;
 
-    std::cout << "--- write S2MM_DA ---" << std::endl;
+    printf("[ write \033[92m%s\033[0m to DMA controller register: \033[33mS2MM_DA\033[0m ]\n", vuprs::Number2HexString(destination_addr).c_str());
 
     controller.AXILite_WriteRegister(AXI_LITE_REGISTER__DMA__S2MM_DA, destination_addr);
 
     controller.AXILite_ReadRegister(AXI_LITE_REGISTER__DMA__S2MM_DA, &readValue);
-    std::cout << "readback: " << vuprs::Number2HexString(readValue) << std::endl;
+    printf("    readback back from \033[33mS2MM_DA\033[0m: \033[92m%s\033[0m\n", vuprs::Number2HexString(readValue).c_str());
 
     /* Set DMA transfer size, and start DMA */
 
-    std::cout << "--- write S2MM_LENGTH ---" << std::endl;
-
-    controller.AXILite_WriteRegister(AXI_LITE_REGISTER__DMA__S2MM_LENGTH, length);
+    printf("[ write \033[92m%s\033[0m to DMA controller register: \033[33mS2MM_LENGTH\033[0m ]\n", vuprs::Number2HexString(lengthInBytes + DMA_LENGTH_EXPAND_BYTES).c_str());
+    
+    controller.AXILite_WriteRegister(AXI_LITE_REGISTER__DMA__S2MM_LENGTH, lengthInBytes + DMA_LENGTH_EXPAND_BYTES);
 
     controller.AXILite_ReadRegister(AXI_LITE_REGISTER__DMA__S2MM_LENGTH, &readValue);
-    std::cout << "readback: " << vuprs::Number2HexString(readValue) << std::endl;
+    printf("    readback back from \033[33mS2MM_LENGTH\033[0m: \033[92m%s\033[0m\n", vuprs::Number2HexString(readValue).c_str());
 
     usleep(1000);
 
     /* Start ADC */
 
-    std::cout << "--- write ADC_STR ---" << std::endl;
-
+    printf("[ write \033[92m1\033[0m to ADC controller register: \033[33mADC_STR\033[0m ]\n");
+    
     controller.AXILite_WriteRegister(AXI_LITE_REGISTER__ADC__STR, 1);
 
     controller.AXILite_ReadRegister(AXI_LITE_REGISTER__ADC__STR, &readValue);
-    std::cout << "readback: " << vuprs::Number2HexString(readValue) << std::endl;
+    printf("    readback back from \033[33mADC_STR\033[0m: \033[92m%s\033[0m\n", vuprs::Number2HexString(readValue).c_str());
+
+    /* Wait for sampling complete */
+
+    printf("[ waiting for sampling complete (about %f ms) ... ]\n", (double)sp * (double)sf * 1000.0 / frequency);
+
+    do 
+    {
+        controller.AXILite_ReadRegister(AXI_LITE_REGISTER__ADC__STR, &readValue);
+        usleep(1000);
+    } 
+    while ((readValue & 0x00000001) == 0);
+
+    printf("[ sampling complete! ]\n");
+
+    std::string outputFile = "./adc_output.bin", outputCSV = "./adc_output.csv";
+
+    std::cout << "Save raw sampling data to file: " << outputFile << std::endl;
+
+    vuprs::SetDMATransferConfigToDefault(&dmaTransferConfig);
+    dmaTransferConfig.dmaChannel = 0;
+    dmaTransferConfig.offset = 0;
+    dmaTransferConfig.transferByteSize = lengthInBytes + DMA_LENGTH_EXPAND_BYTES;
+    dmaTransferConfig.transferDirectionSelection = DMA_TRANSFER_DIRECTION__FPGA_TO_HOST;
+    dmaTransferConfig.transferMemorySelection = DMA_TRANSFER_MEMORY_SELECTION__DDR;
+
+    if (controller.AXIFull_BufferTransfer(dmaTransferConfig, &buffer))
+    {
+        buffer.to_file(outputFile);
+        printf("save success.\n");
+    }
+    else
+    {
+        printf("save failed.\n");
+    }
+
+    std::cout << "Save CSV data to file: " << outputCSV << std::endl;
+
+    bool status = false;
+
+    signalData = vuprs::BufferData2ADCChannels(&buffer, config.fpgaConfig.hardwareConfig.hardwareConfigADC, frequency, &status);
+
+    if (status)
+    {
+        signalData.ToCSV(outputCSV);
+        printf("save success.\n");
+    }
+    else
+    {
+        printf("save failed.\n");
+    }
 
     return 0;
 }

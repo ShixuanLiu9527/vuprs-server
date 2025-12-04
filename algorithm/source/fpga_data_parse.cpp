@@ -190,7 +190,7 @@ bool vuprs::BufferData2ADCChannels(const vuprs::AlignedBufferServer *buffer, con
     return true;
 }
 
-vuprs::SignalData vuprs::BufferData2ADCChannels(const vuprs::AlignedBufferServer *buffer, const vuprs::FPGAhardwareConfigADC &adcFeatures, double samplingFrequency, bool *status)
+vuprs::SignalData vuprs::BufferData2ADCChannels(const vuprs::AlignedBuffer *buffer, const vuprs::FPGAhardwareConfigADC &adcFeatures, double samplingFrequency, bool *status)
 {
     /* ------------------------ Security Check Start ------------------------- */
 

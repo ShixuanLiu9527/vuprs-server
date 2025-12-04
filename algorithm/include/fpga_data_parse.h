@@ -144,6 +144,24 @@
 #define ADC_CHANNEL_NAME__B_7            "CH-B-7"
 #define ADC_CHANNEL_NAME__B_8            "CH-B-8"
 
+#define IS_ADC_CHANNEL_NAME(VAL) \
+(VAL == ADC_CHANNEL_NAME__A_1             || \
+ VAL == ADC_CHANNEL_NAME__A_2             || \
+ VAL == ADC_CHANNEL_NAME__A_3             || \
+ VAL == ADC_CHANNEL_NAME__A_4             || \
+ VAL == ADC_CHANNEL_NAME__A_5             || \
+ VAL == ADC_CHANNEL_NAME__A_6             || \
+ VAL == ADC_CHANNEL_NAME__A_7             || \
+ VAL == ADC_CHANNEL_NAME__A_8             || \
+ VAL == ADC_CHANNEL_NAME__B_1             || \
+ VAL == ADC_CHANNEL_NAME__B_2             || \
+ VAL == ADC_CHANNEL_NAME__B_3             || \
+ VAL == ADC_CHANNEL_NAME__B_4             || \
+ VAL == ADC_CHANNEL_NAME__B_5             || \
+ VAL == ADC_CHANNEL_NAME__B_6             || \
+ VAL == ADC_CHANNEL_NAME__B_7             || \
+ VAL == ADC_CHANNEL_NAME__B_8)
+
 /**
  * Data header & Data Tailer
  */
@@ -208,7 +226,7 @@ namespace vuprs
      * @throw 1. std::runtime_error("Buffer is empty, convert disabled"), when buffer is empty;
      *        2. std::runtime_error("Do not find ADC features, convert disabled"), when adc features are empty.
      */
-    vuprs::SignalData BufferData2ADCChannels(const vuprs::AlignedBufferServer *buffer, const vuprs::FPGAhardwareConfigADC &adcFeatures, 
+    vuprs::SignalData BufferData2ADCChannels(const vuprs::AlignedBuffer *buffer, const vuprs::FPGAhardwareConfigADC &adcFeatures, 
                                              double samplingFrequency = 1.0, bool *status = nullptr);
 
     class CRC8List

@@ -78,32 +78,61 @@ bool vuprs::BeamFormingArray::LoadArrayFromJson(const std::string &filename)
             if (beamFormingArray.is_array())
             {
                 int arraySize = arrayData.size();
-                this->elementArray.resize(arraySize);
+                this->elementArray.clear();
+                this->elementArray.reserve(arraySize);
+
                 for (int i = 0; i < arraySize; i++)
                 {
-                    if (arrayData[i].contains("index") && arrayData[i].contains("position_x") && arrayData[i].contains("position_y") &&
-                        arrayData[i].contains("position_z") && arrayData[i].contains("adc_channel"))
+                    if (arrayData[i].contains("position_x") && arrayData[i].contains("position_y") && arrayData[i].contains("position_z") && 
+                        arrayData[i].contains("adc_channel"))
                     {
                         double x = 0, y = 0, z = 0;
                         int successCount = 0;
                         bool status = false;
                         std::string adcChannel;
 
+                        vuprs::BeamFormingElement oneBeamFormingElement;
+
                         x = vuprs::ParseDoubleFromString(arrayData[i]["position_x"].get<std::string>(), &status);
-                        if (status) {this->elementArray[i].positionVector(0, 0) = x; successCount++;}
+                        if (status) 
+                        {
+                            oneBeamFormingElement.positionVector(0, 0) = x; 
+                            successCount++;
+                        }
 
                         y = vuprs::ParseDoubleFromString(arrayData[i]["position_y"].get<std::string>(), &status);
-                        if (status) {this->elementArray[i].positionVector(1, 0) = y; successCount++;}
+                        if (status) 
+                        {
+                            oneBeamFormingElement.positionVector(1, 0) = y; 
+                            successCount++;
+                        }
 
                         z = vuprs::ParseDoubleFromString(arrayData[i]["position_z"].get<std::string>(), &status);
-                        if (status) {this->elementArray[i].positionVector(2, 0) = z; successCount++;}
+                        if (status) 
+                        {
+                            oneBeamFormingElement.positionVector(2, 0) = z; 
+                            successCount++;
+                        }
 
                         adcChannel = arrayData[i]["adc_channel"].get<std::string>();
-                        if (!adcChannel.empty()) {this->elementArray[i].adcChannel = adcChannel;}
-                        
+                        if (!adcChannel.empty()) 
+                        {
+                            oneBeamFormingElement.adcChannel = adcChannel;
+                            successCount++;
+                        }
+
                         if (successCount < 4)
                         {
                             throw std::runtime_error("Parse array data error.");
+                        }
+
+                        if (IS_ADC_CHANNEL_NAME(adcChannel))
+                        {
+                            this->elementArray.push_back(oneBeamFormingElement);
+                        }
+                        else
+                        {
+                            throw std::runtime_error("Invalid ADC channel name in file: " + filename);
                         }
                     }
                     else

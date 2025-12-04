@@ -379,7 +379,6 @@ bool vuprs::FPGAController::AXI_XDMA_WordIO(const vuprs::DMATransferConfig &tran
             else 
             {
                 *reg_addr = htoll(w_value);
-                std::cout << "write: " << vuprs::Number2HexString(w_value) << " to addr: " << vuprs::Number2HexString(registerTargetOffset) << std::endl;
             }
             
             munmap(map_base, mmapSize);
