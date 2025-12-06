@@ -125,14 +125,6 @@ void vuprs::TcpSession::receiveLoop()
             std::cout << "[session][" << this->getClientInfo() << "] disconnected."  << std::endl;
             break;
         }
-        // else
-        // {
-        //     if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)
-        //     {
-        //         std::cerr << "receive error. [" << strerror(errno) << "]"  << std::endl;
-        //         break;
-        //     }
-        // }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }

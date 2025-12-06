@@ -2,6 +2,10 @@
 
 <img src="./docs/server_structure.jpg" alt="Server" style="width:600px; height:auto;" /> 
 
+## 网络通信协议
+
+[网络通信协议V1.0](./PROTOCOL.md)
+
 ## Build
 
 在项目根目录输入以下指令:  

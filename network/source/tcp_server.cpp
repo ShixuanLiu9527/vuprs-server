@@ -318,7 +318,6 @@ void vuprs::TcpServer::acceptConnection()
                 this->SendToClient("[server] you have successfully connected.");
             }
         }
-        
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 }

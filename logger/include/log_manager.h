@@ -5,8 +5,8 @@
 #include "spdlog/sinks/rotating_file_sink.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
 
-#define __LOGGER_FILE_MAX_SIZE__        1024 * 1024 * 1   /* 1 MB */
-#define __LOGGER_FILE_MAX_FILES__       10  /* 10 files */
+#define __LOGGER_FILE_MAX_SIZE__        1024 * 1024 * 2   /* 2 MB */
+#define __LOGGER_FILE_MAX_FILES__       10                /* 10 files */
 
 namespace vuprs
 {
