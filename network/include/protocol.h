@@ -6,140 +6,185 @@
 #include <string>
 #include <vector>
 #include <arpa/inet.h>
+#include <netinet/in.h>
 
-/**
- * @brief Version.
- */
-
-#define VUPRS_NETWORK_PROTOCOL__VERSION__V1                               (uint8_t)0x00
-
-#define IS_VUPRS_NETWORK_PROTOCOL__VERSION(VAL) \
-(VAL == VUPRS_NETWORK_PROTOCOL__VERSION__V1)
-
-/**
- * @brief Type.
- */
-
-#define VUPRS_NETWORK_PROTOCOL__TYPE__OPERATING                           (uint8_t)0x00  /* card to host & host to card */
-#define VUPRS_NETWORK_PROTOCOL__TYPE__OPERATING_STATUS                    (uint8_t)0x01  /* card to host & host to card */
-#define VUPRS_NETWORK_PROTOCOL__TYPE__DATA                                (uint8_t)0x02  /* card to host */
-
-#define IS_VUPRS_NETWORK_PROTOCOL__TYPE(VAL) \
-(VAL == VUPRS_NETWORK_PROTOCOL__TYPE__OPERATING || \
- VAL == VUPRS_NETWORK_PROTOCOL__TYPE__OPERATING_STATUS || \
- VAL == VUPRS_NETWORK_PROTOCOL__TYPE__DATA)
-
-/**
- * @brief Information.
- */
-
-#define VUPRS_NETWORK_PROTOCOL__INFO__OPERATING_STATUS__OPERATING_SUCCESS (uint8_t)0x00
-#define VUPRS_NETWORK_PROTOCOL__INFO__OPERATING_STATUS__OPERATION_FAILED  (uint8_t)0x01
-
-#define VUPRS_NETWORK_PROTOCOL__INFO__OPERATING__SET_DATA_SIZE            (uint8_t)0x00  /* card to host */
-#define VUPRS_NETWORK_PROTOCOL__INFO__OPERATING__SET_SAMPLING_FREQUENCY   (uint8_t)0x00  /* host to card */
-#define VUPRS_NETWORK_PROTOCOL__INFO__OPERATING__SET_
-
-#define VUPRS_NETWORK_PROTOCOL__INFO__DATA__RAW_ALL_CHANNEL               (uint8_t)0x02
-#define VUPRS_NETWORK_PROTOCOL__INFO__DATA__FFT_ALL_CHANNEL               (uint8_t)0x03
-#define VUPRS_NETWORK_PROTOCOL__INFO__DATA__TARGET_SIGNAL                 (uint8_t)0x04
-#define VUPRS_NEWWORK_PROTOCOL__INFO__DATA__SCANNING_AMPLITUDE            (uint8_t)0x05
-#define VUPRS_NEWWORK_PROTOCOL__INFO__DATA__SCANNING_PROBABILITY          (uint8_t)0x05
-
-#define IS_VUPRS_NEWWORK_PROTOCOL__INFO(VAL) \
-(VAL == VUPRS_NETWORK_PROTOCOL__INFO__OPERATING_STATUS__OPERATING_SUCCESS || \
- VAL == VUPRS_NETWORK_PROTOCOL__INFO__OPERATING_STATUS__OPERATION_FAILED || \
- VAL == VUPRS_NETWORK_PROTOCOL__INFO__DATA__RAW_ALL_CHANNEL || \
- VAL == VUPRS_NETWORK_PROTOCOL__INFO__DATA__FFT_ALL_CHANNEL || \
- VAL == VUPRS_NETWORK_PROTOCOL__INFO__DATA__TARGET_SIGNAL || \
- VAL == VUPRS_NEWWORK_PROTOCOL__INFO__DATA__SCANNING_AMPLITUDE || \
- VAL == VUPRS_NEWWORK_PROTOCOL__INFO__DATA__SCANNING_PROBABILITY)
-
-/**
- * @brief Status.
- */
-
-#define VUPRS_NETWORK_PROTOCOL__STATUS__NORMAL                            (uint8_t)0x00
-#define VUPRS_NETWORK_PROTOCOL__STATUS__ABNORMAL                          (uint8_t)0x01
-
-#define IS_VUPRS_NETWORK_PROTOCOL__STATUS(VAL) \
-(VAL == VUPRS_NETWORK_PROTOCOL__STATUS__NORMAL || \
- VAL == VUPRS_NETWORK_PROTOCOL__STATUS__ABNORMAL)
-
-/**
- * @brief Position on header.
- */
-
-#define __VUPRS_NETWORK_PROTOCOL__BYTE_POSITION__VERSION                  (uint32_t)2
-#define __VUPRS_NETWORK_PROTOCOL__BYTE_POSITION__TYPE                     (uint32_t)3
-#define __VUPRS_NETWORK_PROTOCOL__BYTE_POSITION__INFO                     (uint32_t)4
-#define __VUPRS_NETWORK_PROTOCOL__BYTE_POSITION__STATUS                   (uint32_t)5
-
-#if __VUPRS_NETWORK_PROTOCOL__BYTE_POSITION__VERSION > 7 || \
-    __VUPRS_NETWORK_PROTOCOL__BYTE_POSITION__TYPE > 7 || \
-    __VUPRS_NETWORK_PROTOCOL__BYTE_POSITION__INFO > 7 || \
-    __VUPRS_NETWORK_PROTOCOL__BYTE_POSITION__STATUS > 7
-
-#error "Position must smaller than 8."
-
-#endif
-
-/**
- * @brief Magic.
- */
-
-#define __VUPRS_NETWORK_PROTOCOL__MAGIC__START_MAGIC                      (uint32_t)0xCAFEBABE
-#define __VUPRS_NETWORK_PROTOCOL__MAGIC__END_MAGIC                        (uint32_t)0xCAFEBABF
-
-#define __VUPRS_NETWORK_PROTOCOL__HEADER_SIZE                             (uint32_t)16  /* bytes (Magic and Data are not included) */
-
-#define __VUPRS_NETWORK_PROTOCOL__SENDING_MAX_TRIES                       (uint32_t)5
+#include "nlohmann/json.hpp"
+#include "string_parse.h"
 
 namespace vuprs
 {
-    class NetworkProtocolMessage
+    #define VUPRS_NETWORK_PROTOCOL_HEADER_BYTE_SIZE 36U
+
+    #pragma pack(push, 1)
+    struct NetworkProtocolHeader
     {
-        private:
+        uint32_t magic;
 
-            uint8_t version, type, info, status;
-            const void *data;
-            uint32_t dataSize;
+        uint8_t version;
+        uint8_t channel;
+        uint8_t msg_type;
+        uint8_t response_flag;
 
-            std::vector<uint8_t> serializeData;
+        uint32_t msg_id;
+        uint32_t msg_response_id;
 
-            bool versionSet = false, typeSet = false, infoSet = false, statusSet = false;
-            bool set = false;
+        uint32_t body_size;
 
-            void UpdateStatus();
+        uint32_t udp_stream_id;
+        uint32_t udp_packet_sequence;
+        uint32_t udp_total_packet_count;
+        uint32_t udp_total_packet_size;
+    };
+    #pragma pack(pop)
 
-            void Serialize();
+    /* ----------------------------------------------------------------------------------------------------- */
+    /* ----------------------------------------- Config Channel -------------------------------------------- */
+    /* ----------------------------------------------------------------------------------------------------- */
 
-        public:
+    struct ControlChannel_Message_Setting
+    {
+        uint8_t CONTROL__MSG__START_SAMPLING;
+        uint8_t CONTROL__MSG__STOP_SAMPLING;
+        uint8_t CONTROL__MSG__DISCONNECT;
+        uint8_t CONTROL__MSG__RESET;
+        uint8_t CONTROL__MSG__SET_SAMPLING_FREQUENCY;
+        uint8_t CONTROL__MSG__SET_DATA_PACKAGE_SIZE;
+        uint8_t CONTROL__MSG__SET_DATA_TYPE;
+    };
+    
+    struct ControlChannel_Message_Query
+    {
+        uint8_t CONTROL__MSG__QUERY_SAMPLING_FREQUENCY;
+        uint8_t CONTROL__MSG__QUERY_DATA_TYPE;
+        uint8_t CONTROL__MSG__QUERY_DEVICE_ID;
+    };
+    
+    struct ControlChannel_Message_Response
+    {
+        uint8_t CONTROL__MSG__SUCCESS;
+        uint8_t CONTROL__MSG__FAILED;
+        uint8_t CONTROL__MSG__DISCONNECT_READY;
+        uint8_t CONTROL__MSG__DEVICE_ID;
+        uint8_t CONTROL__MSG__SAMPLING_FREQUENCY;
+        uint8_t CONTROL__MSG__DATA_TYPE;
+    };
+    
+    struct ControlChannel_Config
+    {
+        uint8_t ChannelID;
 
-            NetworkProtocolMessage();
-
-            ~NetworkProtocolMessage();
-
-            void clear();
-
-            void SetVersion(uint8_t version);
-
-            void SetType(uint8_t type);
-
-            void SetInfo(uint8_t info);
-
-            void SetStatus(uint8_t status);
-
-            void SetData(const void *data, uint32_t size);
-
-            void GenerateHeader(uint32_t *firstWord, uint32_t *secondWord) const;
-
-            const uint8_t* GetData() const;
-            uint32_t GetDataSize() const;
-
-            bool SendToSocket(int client_fd, uint32_t timeout_ms = 5000);
+        vuprs::ControlChannel_Message_Setting settingMessage;
+        vuprs::ControlChannel_Message_Query queryMessage;
+        vuprs::ControlChannel_Message_Response responseMessage;
     };
 
+    /* ----------------------------------------------------------------------------------------------------- */
+    /* ----------------------------------------- Notify Channel -------------------------------------------- */
+    /* ----------------------------------------------------------------------------------------------------- */
+    
+    struct NotifyChannel_Message_Query
+    {
+        uint8_t NOTIFY__MSG__QUERY_CPU_TEMPERATURE;
+        uint8_t NOTIFY__MSG__QUERY_STORAGE;
+        uint8_t NOTIFY__MSG__QUERY_BATTERY_LEVEL;
+    };
+    
+    struct NotifyChannel_Message_Response
+    {
+        uint8_t NOTIFY__MSG__CPU_TEMPERATURE;
+        uint8_t NOTIFY__MSG__STORAGE;
+        uint8_t NOTIFY__MSG__BATTERY_LEVEL;
+    };
+    
+    struct NotifyChannel_Config
+    {
+        uint8_t ChannelID;
+
+        vuprs::NotifyChannel_Message_Query queryMessage;
+        vuprs::NotifyChannel_Message_Response responseMessage;
+    };
+
+    /* ----------------------------------------------------------------------------------------------------- */
+    /* ----------------------------------------- Heartbeat Channel ----------------------------------------- */
+    /* ----------------------------------------------------------------------------------------------------- */
+
+    struct HeartbeatChannel_Message_Emergency
+    {
+        uint8_t HEARTBEAT__MSG__EMERGENCY_ACK;
+    };
+    
+    struct HeartbeatChannel_Message_Response
+    {
+        uint8_t HEARTBEAT__MSG__IS_ONLINE;
+    };
+    
+    struct HeartbeatChannel_Config
+    {
+        uint8_t ChannelID;
+
+        vuprs::HeartbeatChannel_Message_Emergency emergencyMessage;
+        vuprs::HeartbeatChannel_Message_Response responseMessage;
+    };
+
+    /* ----------------------------------------------------------------------------------------------------- */
+    /* -------------------------------------------- Data Channel ------------------------------------------- */
+    /* ----------------------------------------------------------------------------------------------------- */
+
+    struct DataChannel_Message_Data
+    {
+        uint8_t DATA__MSG__RAW_SIGNAL;
+        uint8_t DATA__MSG__TARGET_SIGNAL;
+        uint8_t DATA__MSG__SCAN_POWER;
+        uint8_t DATA__MSG__SCAN_PROBABILITY__FAULT_1;
+    };
+    
+    struct DataChannel_Config
+    {
+        uint8_t ChannelID;
+
+        vuprs::DataChannel_Message_Data dataMessage;
+    };
+
+    /* ----------------------------------------------------------------------------------------------------- */
+    /* -------------------------------------------- Total config ------------------------------------------- */
+    /* ----------------------------------------------------------------------------------------------------- */
+
+    struct NetworkProtocol_ResponseType
+    {
+        uint8_t RSP__NONE;
+        uint8_t RSP__NORMAL;
+        uint8_t RSP__EMERGENCY;
+    };
+
+    struct NetworkProtocolConfig
+    {
+        uint32_t magic;
+
+        NetworkProtocol_ResponseType responseType;
+
+        ControlChannel_Config controlChannelConfig;
+        NotifyChannel_Config notifyChannelConfig;
+        HeartbeatChannel_Config heartbeatChannelConfig;
+        DataChannel_Config dataChannelConfig;
+    };
+
+    /**
+     * @brief Set network protocol header value to default.
+     * 
+     * @param header target header.
+     */
+    void SetDefaultHeaderValue(vuprs::NetworkProtocolHeader *header);
+
+    /**
+     * @brief Load network protocol config from JSON file.
+     * 
+     * @param filename JSON filename.
+     */
+    vuprs::NetworkProtocolConfig LoadNetworkProtocolConfigFromJson(const std::string &filename);
+
+    vuprs::NetworkProtocolHeader Buffer2NetworkHeader(const char *buffer, size_t bufferSize, uint32_t magic);
+
+    void ConvertHeaderToHostByteOrder(NetworkProtocolHeader* header);
 }
 
 #endif

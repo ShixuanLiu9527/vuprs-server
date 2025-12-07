@@ -83,7 +83,9 @@ bool vuprs::BeamFormingArray::LoadArrayFromJson(const std::string &filename)
 
                 for (int i = 0; i < arraySize; i++)
                 {
-                    if (arrayData[i].contains("position_x") && arrayData[i].contains("position_y") && arrayData[i].contains("position_z") && 
+                    if (arrayData[i].contains("position_x") && 
+                        arrayData[i].contains("position_y") && 
+                        arrayData[i].contains("position_z") && 
                         arrayData[i].contains("adc_channel"))
                     {
                         double x = 0, y = 0, z = 0;
@@ -94,7 +96,7 @@ bool vuprs::BeamFormingArray::LoadArrayFromJson(const std::string &filename)
                         vuprs::BeamFormingElement oneBeamFormingElement;
 
                         x = vuprs::ParseDoubleFromString(arrayData[i]["position_x"].get<std::string>(), &status);
-                        if (status) 
+                        if (status)
                         {
                             oneBeamFormingElement.positionVector(0, 0) = x; 
                             successCount++;

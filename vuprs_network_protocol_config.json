@@ -1,0 +1,81 @@
+{
+    "basic": {
+        "version": "1",
+        "magic": "0x8A8A8AAB",
+        "response_type": {
+            "RSP__NONE": "0x00",
+            "RSP__NORMAL": "0x01",
+            "RSP__EMERGENCY": "0x02"
+        }
+    },
+    "channels": {
+        "control": {
+            "protocol": "tcp",
+            "id": "0x00",
+            "message": {
+                "setting": {
+                    "CONTROL__MSG__START_SAMPLING": "0x00",
+                    "CONTROL__MSG__STOP_SAMPLING": "0x01",
+                    "CONTROL__MSG__DISCONNECT": "0x02",
+                    "CONTROL__MSG__RESET": "0x03",
+                    "CONTROL__MSG__SET_SAMPLING_FREQUENCY": "0x04",
+                    "CONTROL__MSG__SET_DATA_PACKAGE_SIZE": "0x05",
+                    "CONTROL__MSG__SET_DATA_TYPE": "0x06"
+                },
+                "query": {
+                    "CONTROL__MSG__QUERY_SAMPLING_FREQUENCY": "0x07",
+                    "CONTROL__MSG__QUERY_DATA_TYPE": "0x08",
+                    "CONTROL__MSG__QUERY_DEVICE_ID": "0x09"
+                },
+                "response": {
+                    "CONTROL__MSG__SUCCESS": "0x0A",
+                    "CONTROL__MSG__FAILED": "0x0B",
+                    "CONTROL__MSG__DISCONNECT_READY": "0x0C",
+                    "CONTROL__MSG__DEVICE_ID": "0x0D",
+                    "CONTROL__MSG__SAMPLING_FREQUENCY": "0x0E",
+                    "CONTROL__MSG__DATA_TYPE": "0x0F"
+                }
+            }
+        },
+        "notify": {
+            "protocol": "tcp",
+            "id": "0x01",
+            "message": {
+                "query": {
+                    "NOTIFY__MSG__QUERY_CPU_TEMPERATURE": "0x00",
+                    "NOTIFY__MSG__QUERY_STORAGE": "0x01",
+                    "NOTIFY__MSG__QUERY_BATTERY_LEVEL": "0x02"
+                },
+                "response": {
+                    "NOTIFY__MSG__CPU_TEMPERATURE": "0x03",
+                    "NOTIFY__MSG__STORAGE": "0x04",
+                    "NOTIFY__MSG__BATTERY_LEVEL": "0x05"
+                }
+            }
+        },
+        "heartbeat": {
+            "protocol": "tcp",
+            "id": "0x02",
+            "message": {
+                "emergency": {
+                    "HEARTBEAT__MSG__EMERGENCY_ACK": "0x00"
+                },
+                "response": {
+                    "HEARTBEAT__MSG__IS_ONLINE": "0x01"
+                }
+            }
+        },
+        "data": {
+            "protocol": "udp",
+            "id": "0x03",
+            "message": {
+                "data": {
+                    "DATA__MSG__RAW_SIGNAL": "0x00",
+                    "DATA__MSG__TARGET_SIGNAL": "0x01",
+                    "DATA__MSG__SCAN_POWER": "0x02",
+                    "DATA__MSG__SCAN_PROBABILITY__FAULT_1": "0x03"
+                }
+            }
+        }
+    }
+}

@@ -15,10 +15,44 @@ namespace vuprs
     uint64_t ParseHexFromString(const std::string &dataString, bool *status);
     int ParseIntegerFromString(const std::string &dataString, bool *status);
     double ParseDoubleFromString(const std::string &dataString, bool *status);
-
     uint64_t ParseNumberFromString(const std::string &dataString, bool *status);
-
     std::string Number2HexString(const uint64_t &num);
+
+    template<typename T>
+    void __JsonStringParseINT(T *target, const nlohmann::json &json, const std::string &item, bool required = true)
+    {
+        if (target == nullptr) throw std::runtime_error("Target cannot be NULL.");
+        bool status = false;
+        uint64_t value;
+        if (json.contains(item))
+        {
+            value = vuprs::ParseNumberFromString(json[item].get<std::string>(), &status);
+            if (status) *target = static_cast<T>(value);
+            else if (required) throw std::runtime_error("Cannot parse: " + item + " from json.");
+        }
+        else if (required)
+        {
+            throw std::runtime_error("Item: " + item + " not found.");
+        }
+    }
+
+    template<typename T>
+    void __JsonStringParseFLOAT(T *target, const nlohmann::json &json, const std::string &item, bool required = true)
+    {
+        if (target == nullptr) throw std::runtime_error("Target cannot be NULL.");
+        bool status = false;
+        uint64_t value;
+        if (json.contains(item))
+        {
+            value = vuprs::ParseDoubleFromString(json[item].get<std::string>(), &status);
+            if (status) *target = static_cast<T>(value);
+            else if (required) throw std::runtime_error("Cannot parse: " + item + " from json.");
+        }
+        else if (required)
+        {
+            throw std::runtime_error("Item: " + item + " not found.");
+        }
+    }
 } 
 
 #endif
