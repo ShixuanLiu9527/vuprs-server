@@ -184,6 +184,8 @@
 
 #define CRC8_POLYNOMIAL_CDMA2000         0x19B
 
+#define __MAX_DATA_HEADER_POINTER_FRAME_WAITING_COUNT 500
+
 namespace vuprs
 {
     /**

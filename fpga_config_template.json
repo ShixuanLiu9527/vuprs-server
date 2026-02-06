@@ -2,77 +2,160 @@
     "description": "VUPRS FPGA Configurations",
     "platform": "RK3568-XC7A100T",
     "author": "Shixuan Liu",
-    "address-map": 
+    "bus":
     {
         "axi-lite": 
         {
-            "bus-address-offset": "0x40000000",
-            "adc": 
-            {
-                "address-offset": "0x00010000",
-                "registers-address-offset": 
-                {
-                    "SCI-address-offset": "0x00",
-                    "SP-address-offset": "0x04",
-                    "SF-address-offset": "0x08",
-                    "STR-address-offset": "0x0c",
-                    "NGF-address-offset": "0x10",
-                    "ERR-address-offset": "0x14",
-                    "RST-address-offset": "0x18"
-                }
-            },
-            "dma": 
-            {
-                "address-offset": "0x00000000",
-                "registers-address-offset": 
-                {
-                    "S2MM_DMACR-address-offset": "0x30",
-                    "S2MM_DMASR-address-offset": "0x34",
-                    "SG_CTL-address-offset": "0x2c",
-                    "S2MM_CURDESC-address-offset": "0x38",
-                    "S2MM_CURDESC_MSB-address-offset": "0x3c",
-                    "S2MM_TAILDESC-address-offset": "0x40",
-                    "S2MM_TAILDESC_MSB-address-offset": "0x44",
-                    "S2MM_DA-address-offset": "0x48",
-                    "S2MM_DA_MSB-address-offset": "0x4c",
-                    "S2MM_LENGTH-address-offset": "0x58"
-                }
-            }
+            "fpga-base-address": "0x40000000",
+            "bar-offset": "0x40000000"
         },
-        "axi-full": 
+        "axi-full":
         {
-            "bus-address-offset": "0x00000000",
-            "ddr": 
-            {
-                "address-offset": "0x00000000"
-            },
-            "bram":
-            {
-                "address-offset": "0x60000000"
-            }
+            "fpga-base-address": "0x00000000"
+        },
+        "axi-stream":
+        {
+            "width": "32"
         }
     },
-    "hardware-features": 
+    "devices":
     {
-        "adc": 
+        "axi_dma": 
         {
+            "control-bus": "axi-lite",
+            "data-bus": "axi-stream",
+            "fpga-address": "0x40000000",
+            "bar-offset": "0x00000000",
+            "control-device-file": "/dev/xdma0_user",
+            "register-offset": 
+            {
+                "SG_CTL":             "0x2c",
+                "S2MM_DMACR":         "0x30",
+                "S2MM_DMASR":         "0x34",
+                "S2MM_CURDESC":       "0x38",
+                "S2MM_CURDESC_MSB":   "0x3c",
+                "S2MM_TAILDESC":      "0x40",
+                "S2MM_TAILDESC_MSB":  "0x44",
+                "S2MM_DA":            "0x48",
+                "S2MM_DA_MSB":        "0x4c",
+                "S2MM_LENGTH":        "0x58"
+            },
+            "s2mm-length-register-width": "26"
+        },
+        "adc_controller":
+        {
+            "control-bus": "axi-lite",
+            "data-bus": "axi-stream",
+            "fpga-address": "0x40010000",
+            "bar-offset": "0x00010000",
+            "control-device-file": "/dev/xdma0_user",
+            "register-offset": 
+            {
+                "ADC_SCI":  "0x00",
+                "ADC_SP":   "0x04",
+                "ADC_SF":   "0x08",
+                "ADC_STR":  "0x0c",
+                "ADC_NGF":  "0x10",
+                "ADC_ERR":  "0x14",
+                "ADC_RST":  "0x18",
+                "ADC_CS":   "0x1c"
+            },
             "max-sampling-frequency-hz": "120000",
             "voltage-range-radius-v": "10",
             "work-clock-frequency-hz": "50000000"
         },
+        "circular_buffer": 
+        {
+            "control-bus": "axi-lite",
+            "data-bus": "axi-stream",
+            "fpga-address": "0x40020000",
+            "bar-offset": "0x00020000",
+            "control-device-file": "/dev/xdma0_user",
+            "register-offset": 
+            {
+                "CBUF_FREEZE":  "0x00",
+                "CBUF_RST":     "0x04",
+                "CBUF_RS":      "0x08",
+                "CBUF_CBP":     "0x0c"
+            }
+        },
+        "fir_bank": 
+        {
+            "control-bus": "axi-lite",
+            "data-bus": "axi-stream",
+            "fpga-address": "0x40030000",
+            "bar-offset": "0x00030000",
+            "control-device-file": "/dev/xdma0_user",
+            "register-offset": 
+            {
+                "FIR_RST":         "0x00",
+                "FIR_U_FIR_LEN":   "0x04",
+                "FIR_U_FIR_COEF":  "0x08",
+                "FIR_LEN":         "0x0c",
+                "FIR_COEF_SCALE":  "0x10",
+                "FIR_RSC":         "0x14",
+                "FIR_RS":          "0x18",
+                "FIR_MAX_LEN":     "0x1c"
+            }
+        },
+        "pre_delay_unit": 
+        {
+            "control-bus": "axi-lite",
+            "data-bus": "axi-stream",
+            "fpga-address": "0x40040000",
+            "bar-offset": "0x00040000",
+            "control-device-file": "/dev/xdma0_user",
+            "register-offset":
+            {
+                "PREDLY_CH1_CH2":    "0x00",
+                "PREDLY_CH3_CH4":    "0x04",
+                "PREDLY_CH5_CH6":    "0x08",
+                "PREDLY_CH7_CH8":    "0x0c",
+                "PREDLY_CH9_CH10":   "0x10",
+                "PREDLY_CH11_CH12":  "0x14",
+                "PREDLY_CH13_CH14":  "0x18",
+                "PREDLY_CH15_CH16":  "0x1c",
+                "PREDLY_FREEZE":     "0x20",
+                "PREDLY_RST":        "0x24",
+                "PREDLY_RS":         "0x28",
+                "PREDLY_MAX_DLY":    "0x2c"
+            }
+        },
         "ddr": 
         {
-            "memory-capacity-megabytes": "512",
-            "data-width-bits": "32"
+            "control-bus": "none",
+            "data-bus": "axi-full",
+            "fpga-address": "0x00000000",
+            "h2c-device-file": "/dev/xdma0_h2c_0",
+            "c2h-device-file": "/dev/xdma0_c2h_0",
+            "memory-capacity-kilobytes": "524288"
         },
-        "axi-dma": 
+        "fir_bram":
         {
-            "s2mm-length-register-width": "26"
-            
+            "control-bus": "none",
+            "data-bus": "axi-full",
+            "fpga-address": "0x20010000",
+            "h2c-device-file": "/dev/xdma0_h2c_0",
+            "c2h-device-file": "/dev/xdma0_c2h_0",
+            "memory-capacity-kilobytes": "32"
         },
-        "bram":
+        "sg_bram":
         {
-            "memory-capacity-kilobytes": "8"
+            "control-bus": "none",
+            "data-bus": "axi-full",
+            "fpga-address": "0x20020000",
+            "h2c-device-file": "/dev/xdma0_h2c_0",
+            "c2h-device-file": "/dev/xdma0_c2h_0",
+            "memory-capacity-kilobytes": "16"
+        },
+        "cbuf_bram":
+        {
+            "control-bus": "none",
+            "data-bus": "axi-full",
+            "fpga-address": "0x20030000",
+            "h2c-device-file": "/dev/xdma0_h2c_0",
+            "c2h-device-file": "/dev/xdma0_c2h_0",
+            "memory-capacity-kilobytes": "32"
         }
     },
     "xdma-driver": 

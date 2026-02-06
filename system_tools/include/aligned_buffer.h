@@ -40,6 +40,18 @@
 #define __SERVER_ALIGNMENT_BYTES__                128U         /* 128 B alignment, must bigger than sizeof(void*) */
 #define __DEFAULT_ALIGNMENT_BYTES__               128U         /* 128 B alignment, must bigger than sizeof(void*) */
 
+#if __XDMA_DMA_ALIGNMENT_BYTES__ < 4U
+    #error __XDMA_DMA_ALIGNMENT_BYTES__ must bigger than 4U.
+#endif
+
+#if __SERVER_ALIGNMENT_BYTES__ < 4U
+    #error __SERVER_ALIGNMENT_BYTES__ must bigger than 4U.
+#endif
+
+#if __DEFAULT_ALIGNMENT_BYTES__ < 4U
+    #error __DEFAULT_ALIGNMENT_BYTES__ must bigger than 4U.
+#endif
+
 namespace vuprs
 {
 

@@ -212,6 +212,7 @@ vuprs::SignalData vuprs::BufferData2ADCChannels(const vuprs::AlignedBuffer *buff
     std::vector<vuprs::ADCFrame> adcFrames;
     vuprs::ADCFrame oneADCFrame;
     uint64_t wordsElements = 0, dataHeaderPointer = 0, dataTailerPointer = 0, adcFrameElements = 0;
+    uint64_t searchBoundary = 0;
     int16_t signedValue = 0;
 
     vuprs::SignalData outputSignalData;
@@ -237,6 +238,8 @@ vuprs::SignalData vuprs::BufferData2ADCChannels(const vuprs::AlignedBuffer *buff
     dataHeaderPointer = 0;
     dataTailerPointer = 0;
 
+    searchBoundary = std::min(wordsElements - 1, (uint64_t)__MAX_DATA_HEADER_POINTER_FRAME_WAITING_COUNT);
+
     /* Get frame data */
 
     while (dataHeaderPointer < wordsElements)
@@ -244,34 +247,24 @@ vuprs::SignalData vuprs::BufferData2ADCChannels(const vuprs::AlignedBuffer *buff
         if (originData[dataHeaderPointer] == ADC_DATA_HEADER)  /* Find header */
         {
             dataTailerPointer = dataHeaderPointer + ADC_FRAME_WORD_LENGTH - 1;
-            if (dataTailerPointer < wordsElements)
-            {
-                if (originData[dataTailerPointer] == ADC_DATA_TAILER)
-                {
-                    /* Push data */
-
-                    for (uint64_t i = 0; i < (ADC_FRAME_WORD_LENGTH - 2); i++)
-                    {
-                        oneADCFrame.InputPositionData(i, originData[dataHeaderPointer + i + 1]);
-                    }
-                    adcFrames.push_back(oneADCFrame);
-                }
-                else  /* Stop */
-                {
-                    break;
-                }
-            }
-        
-            /* Update pointer */
+            if (dataTailerPointer >= wordsElements) break;
             
-            dataHeaderPointer = dataTailerPointer + 1;
-            if (dataHeaderPointer >= wordsElements) break;
+            if (originData[dataTailerPointer] == ADC_DATA_TAILER)  /* Success */
+            {
+                /* Push data */
+
+                for (uint64_t i = 0; i < (ADC_FRAME_WORD_LENGTH - 2); i++) 
+                {
+                    oneADCFrame.InputPositionData(i, originData[dataHeaderPointer + i + 1]);
+                }
+                adcFrames.push_back(oneADCFrame);
+                dataHeaderPointer = dataTailerPointer + 1;  /* Update pointer */
+            }
+            else if (dataHeaderPointer <= searchBoundary) dataHeaderPointer++;
+            else break;
         }
-        else
-        {
-            dataHeaderPointer++;
-            if (dataHeaderPointer >= wordsElements) break;
-        }
+        else if (dataHeaderPointer <= searchBoundary) dataHeaderPointer++;
+        else break;
     }
 
     if (adcFrames.size() <= 0)
