@@ -27,7 +27,7 @@ void vuprs::FPGA_IOManager::Close() noexcept
     }
 }
 
-std::string vuprs::FPGA_IOManager::DeviceFilename() const
+std::string vuprs::FPGA_IOManager::GetDeviceFilename() const
 {
     return this->deviceFilename;
 }
@@ -136,19 +136,21 @@ bool vuprs::FPGA_IOManager::RegisterIO(uint32_t* ioValue, uint32_t absoluteAddre
     }
 }
 
-bool vuprs::FPGA_IOManager::RegisterListIO(std::vector<uint32_t*> ioValueList, std::vector<uint32_t> absoluteAddressList, bool isRead)
+bool vuprs::FPGA_IOManager::RegisterListIO(std::vector<uint32_t> *ioValueList, const std::vector<uint32_t> &absoluteAddressList, bool isRead)
 {
     if (!this->IsOpen())
     {
         throw std::runtime_error("FPGA device file is not opened.");
     }
-    if (ioValueList.size() != absoluteAddressList.size())
+    if (ioValueList->size() != absoluteAddressList.size() && !isRead)
     {
         throw std::runtime_error("ioValueList.size() != absoluteAddressList.size()");
     }
     void *map_base;
-    int registerNumer = ioValueList.size();
-    
+    int registerNumer = absoluteAddressList.size();
+
+    if (isRead) ioValueList->resize(registerNumer);
+
     map_base = ::mmap(0, __XDMA_AXI_LITE_MMAP_SIZE__, PROT_READ | PROT_WRITE, MAP_SHARED, this->fd, 0);
     
     if (map_base != MAP_FAILED)
@@ -159,18 +161,18 @@ bool vuprs::FPGA_IOManager::RegisterListIO(std::vector<uint32_t*> ioValueList, s
         {
             for (int i = 0; i < registerNumer; i++)
             {
-                if (ioValueList[i] == nullptr)
+                if (ioValueList == nullptr)
                 {
                     throw std::runtime_error("iovalue is NULL.");
                 }
                 volatile uint32_t *reg_addr = (volatile uint32_t *)((uint8_t *)map_base + absoluteAddressList[i]);
                 if (isRead) 
                 {
-                    *ioValueList[i] = ltohl(*reg_addr);
+                    (*ioValueList)[i] = ltohl(*reg_addr);
                 }
                 else
                 {
-                    *reg_addr = htoll(*ioValueList[i]);
+                    *reg_addr = htoll((*ioValueList)[i]);
                 }
             }
             ::munmap(map_base, __XDMA_AXI_LITE_MMAP_SIZE__);

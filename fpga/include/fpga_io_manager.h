@@ -75,7 +75,7 @@ namespace vuprs
              */
             bool IsOpen() const;
 
-            std::string DeviceFilename() const;
+            std::string GetDeviceFilename() const;
             
             /**
              * @brief Read/Write data from FPGA/buffer to buffer/FPGA.
@@ -124,7 +124,7 @@ namespace vuprs
              * 
              * @throw std::runtime_error
              */
-            bool RegisterListIO(std::vector<uint32_t*> ioValueList, std::vector<uint32_t> absoluteAddressList, bool isRead);
+            bool RegisterListIO(std::vector<uint32_t> *ioValueList, const std::vector<uint32_t> &absoluteAddressList, bool isRead);
     };
 }
 

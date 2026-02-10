@@ -19,8 +19,7 @@
 
 #include "string_parse.h"
 #include "aligned_eigen_vector.h"
-#include "fpga_data_parse.h"
-#include "signal_data.h"
+#include "fpga_data_conversion.h"
 #include "signal_processing.h"
 
 #define PI 3.14159265358979323846

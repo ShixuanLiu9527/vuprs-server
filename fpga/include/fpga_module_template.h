@@ -11,6 +11,8 @@
 
 #define __LINUX_DMA_MAX_TRANSFER_BYTES__          0x7ffff000  /* Maximum transfer size in Linux-32bit & Linux-64bit */
 
+#define _IS_CODING_MODE false  /* be false before compilering */
+
 namespace vuprs
 {
     enum class FPGABus
@@ -28,6 +30,14 @@ namespace vuprs
         REG_SEL_ENUM enumVal;
     };
 
+#if !_IS_CODING_MODE
+    enum class REG_SEL_ENUM
+    {
+        A,
+        B
+    };
+#endif
+
     /**
      * @brief FPGA Device Template (Abstract Base Class).
      * 
@@ -44,7 +54,9 @@ namespace vuprs
      * @note 3. Call method BindFPGAFileManager();
      * @note 4. Read/Write registers.
      */
+#if !_IS_CODING_MODE
     template<typename REG_SEL_ENUM>
+#endif
     class FPGADeviceTemplate
     {
         private:
@@ -53,7 +65,7 @@ namespace vuprs
             vuprs::FPGA_IOManager* bindIOManager;
             std::string controlDeviceFilename;
 
-            bool RegisterIO(REG_SEL_ENUM registerSelection, uint32_t* ioValue, bool isRead)
+            bool RegisterIO(uint32_t registerAddress, uint32_t* ioValue, bool isRead)
             {
                 /* Security Check */
 
@@ -61,34 +73,24 @@ namespace vuprs
                 {
                     throw std::runtime_error("FPGA file manager is NULL.");
                 }
-
-                /* Operation */
-
-                uint32_t registerAddressOffset = this->GetRegisterAbsoluteAddress(registerSelection);
-                
-                if (isRead) 
-                {
-                    return this->bindIOManager->RegisterIO(ioValue, registerAddressOffset, true);
-                }
-                else 
-                {
-                    return this->bindIOManager->RegisterIO(ioValue, registerAddressOffset, false);
-                }
+                return this->bindIOManager->RegisterIO(ioValue, registerAddress, isRead);
             }
 
-            bool RegisterIO(std::vector<REG_SEL_ENUM> mulRegisterSelection, std::vector<uint32_t*> ioValue, bool isRead)
+            bool RegisterIO(const std::vector<REG_SEL_ENUM> &mulRegisterSelection, std::vector<uint32_t> *ioValue, bool isRead)
             {
                 /* Security Check */
+
+                int registerNumber = mulRegisterSelection.size();
 
                 if (!this->isIOManagerBind) 
                 {
                     throw std::runtime_error("FPGA file manager is NULL."); 
                 }
-                if (registerNumber <= 0) 
+                if (registerNumber <= 0)
                 {
                     throw std::runtime_error("No registers read or written."); 
                 }
-                if (ioValue.size() != registerNumber) 
+                if (!isRead && ioValue->size() != registerNumber) 
                 {
                     throw std::runtime_error("mulReadValue.size() != register count to read.");
                 }
@@ -96,7 +98,6 @@ namespace vuprs
                 /* Operation */
 
                 std::vector<uint32_t> multiRegisterAddressOffset;
-                int registerNumber = mulRegisterSelection.size();
 
                 multiRegisterAddressOffset.resize(registerNumber);
 
@@ -105,14 +106,7 @@ namespace vuprs
                     multiRegisterAddressOffset[i] = this->GetRegisterAbsoluteAddress(mulRegisterSelection[i]);
                 }
 
-                if (isRead) 
-                {
-                    return this->bindIOManager->RegisterListIO(ioValue, multiRegisterAddressOffset, true);
-                }
-                else 
-                {
-                    return this->bindIOManager->RegisterListIO(ioValue, multiRegisterAddressOffset, false);
-                }
+                return this->bindIOManager->RegisterListIO(ioValue, multiRegisterAddressOffset, isRead);
             }
             
         protected:
@@ -251,7 +245,7 @@ namespace vuprs
             /* ------------------------------ Single Register IO ------------------------------ */
 
             /**
-             * @brief Read single register.
+             * @brief Read single register (use register selection).
              * 
              * @param registerSelection register to read.
              * @param readValue read value pointer.
@@ -260,11 +254,30 @@ namespace vuprs
              */
             bool ReadSingleRegister(REG_SEL_ENUM registerSelection, uint32_t *readValue)
             {
-                return this->RegisterIO(registerSelection, readValue, true);
+                uint32_t registerAddress = this->GetRegisterAbsoluteAddress(registerSelection);
+                return this->RegisterIO(registerAddress, readValue, true);
             }
 
             /**
-             * @brief Write single register.
+             * @brief Read single register (use offset).
+             * 
+             * @param offset register offset (must aligned to 4 bytes).
+             * @param readValue read value pointer.
+             * 
+             * @retval true: success, false: failed.
+             */
+            bool ReadSingleRegister(uint32_t offset, uint32_t *readValue)
+            {
+                if (offset % sizeof(uint32_t) != 0)
+                {
+                    throw std::runtime_error("Offset must aligned to 4 bytes.");
+                }
+                uint32_t registerAddress = offset + this->barOffset;
+                return this->RegisterIO(registerAddress, readValue, true);
+            }
+
+            /**
+             * @brief Write single register (use register selection).
              * 
              * @param registerSelection register to write.
              * @param writeValue write value.
@@ -273,7 +286,26 @@ namespace vuprs
              */
             bool WriteSingleRegister(REG_SEL_ENUM registerSelection, uint32_t writeValue)
             {
-                return this->RegisterIO(registerSelection, &writeValue, false);
+                uint32_t registerAddress = this->GetRegisterAbsoluteAddress(registerSelection);
+                return this->RegisterIO(registerAddress, &writeValue, false);
+            }
+
+            /**
+             * @brief Write single register (use offset).
+             * 
+             * @param offset register offset (must aligned to 4 bytes).
+             * @param writeValue write value.
+             * 
+             * @retval true: success, false: failed.
+             */
+            bool WriteSingleRegister(uint32_t offset, uint32_t writeValue)
+            {
+                if (offset % sizeof(uint32_t) != 0)
+                {
+                    throw std::runtime_error("Offset must aligned to 4 bytes.");
+                }
+                uint32_t registerAddress = offset + this->barOffset;
+                return this->RegisterIO(registerAddress, &writeValue, false);
             }
 
             /* ----------------------------- Multiple Register IO ----------------------------- */
@@ -286,7 +318,7 @@ namespace vuprs
              * 
              * @retval true: success, false: failed.
              */
-            bool ReadMultipleRegister(std::vector<REG_SEL_ENUM> mulRegisterSelection, std::vector<uint32_t*> mulReadValue)
+            bool ReadMultipleRegister(const std::vector<REG_SEL_ENUM> &mulRegisterSelection, std::vector<uint32_t> *mulReadValue)
             {
                 return this->RegisterIO(mulRegisterSelection, mulReadValue, true);
             }
@@ -299,18 +331,42 @@ namespace vuprs
              * 
              * @retval true: success, false: failed.
              */
-            bool WriteMultipleRegister(std::vector<REG_SEL_ENUM> mulRegisterSelection, std::vector<uint32_t> mulWriteValue)
+            bool WriteMultipleRegister(const std::vector<REG_SEL_ENUM> &mulRegisterSelection, const std::vector<uint32_t> &mulWriteValue)
             {
-                std::vector<uint32_t*> ioValueList;
-                int registerNumber = mulWriteValue.size()
-                ioValueList.resize(registerNumber);
+                std::vector<uint32_t> writeValueList = mulWriteValue;
+                return this->RegisterIO(mulRegisterSelection, &writeValueList, false);
+            }
 
-                for (int i = 0; i < registerNumber; i++) 
+            /**
+             * @brief Read all register info from device.
+             * 
+             * @param registerName output register name.
+             * @param registerOffset output register offset.
+             * @param readValue output register value.
+             * 
+             * @retval true: success.
+             * @retval false: failed.
+             */
+            bool ReadAllRegisters(std::vector<std::string> *registerName, std::vector<uint32_t> *registerOffset, std::vector<uint32_t> *readValue)
+            {
+                std::vector<REG_SEL_ENUM> mulRegisterSelection;
+                
+                int registerNumber = this->registerTable.size();
+                registerName->resize(registerNumber);
+                registerOffset->resize(registerNumber);
+
+                mulRegisterSelection.resize(registerNumber);
+                
+                for (int i = 0; i < registerNumber; i++)
                 {
-                    ioValueList[i] = &mulWriteValue[i];
+                    mulRegisterSelection[i] = this->registerTable[i].enumVal;
+                    (*registerName)[i] = this->registerTable[i].name;
+                    (*registerOffset)[i] = *this->registerTable[i].offsetVal;
                 }
 
-                return this->RegisterIO(mulRegisterSelection, ioValueList, false);
+                this->ReadMultipleRegister(mulRegisterSelection, readValue);
+
+                return true;
             }
     };
 

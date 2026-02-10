@@ -75,7 +75,7 @@ bool vuprs::FPGAController::ConfigFPGAFromJson(const std::string &configJsonFile
     return true;
 }
 
-bool vuprs::FPGAController::GenerateNewIOManager(const std::string &deviceFile, int *index)
+bool vuprs::FPGAController::GetIOManagerIndex(const std::string &deviceFile, int *index)
 {
     bool isNew = true;
     int len = this->ioManagerList.size();
@@ -86,7 +86,7 @@ bool vuprs::FPGAController::GenerateNewIOManager(const std::string &deviceFile, 
     *index = 0;
     for (int i = 0; i < len; i++)
     {
-        if (this->ioManagerList[i].DeviceFilename() == deviceFile)
+        if (this->ioManagerList[i].GetDeviceFilename() == deviceFile)
         {
             *index = i;
             isNew = false;
@@ -113,23 +113,23 @@ bool vuprs::FPGAController::BindIOManager()
 
     /* Generate */
 
-    this->GenerateNewIOManager(this->dev__AXI_DMA.ControlDeviceFilename(), &i_AXI_DMA);
-    this->GenerateNewIOManager(this->dev__ADC_Controller.ControlDeviceFilename(), &i_ADC_Controller);
-    this->GenerateNewIOManager(this->dev__Circular_Buffer.ControlDeviceFilename(), &i_Circular_Buffer);
-    this->GenerateNewIOManager(this->dev__FIR_Filter_Bank.ControlDeviceFilename(), &i_FIR_Filter_Bank);
-    this->GenerateNewIOManager(this->dev__PreDelay_Unit.ControlDeviceFilename(), &i_PreDelay_Unit);
+    this->GetIOManagerIndex(this->dev__AXI_DMA.ControlDeviceFilename(), &i_AXI_DMA);
+    this->GetIOManagerIndex(this->dev__ADC_Controller.ControlDeviceFilename(), &i_ADC_Controller);
+    this->GetIOManagerIndex(this->dev__Circular_Buffer.ControlDeviceFilename(), &i_Circular_Buffer);
+    this->GetIOManagerIndex(this->dev__FIR_Filter_Bank.ControlDeviceFilename(), &i_FIR_Filter_Bank);
+    this->GetIOManagerIndex(this->dev__PreDelay_Unit.ControlDeviceFilename(), &i_PreDelay_Unit);
 
-    this->GenerateNewIOManager(this->mem__DDR.H2C_ControlDeviceFilename(), &i_h2c_DDR);
-    this->GenerateNewIOManager(this->mem__DDR.C2H_ControlDeviceFilename(), &i_c2h_DDR);
+    this->GetIOManagerIndex(this->mem__DDR.H2C_ControlDeviceFilename(), &i_h2c_DDR);
+    this->GetIOManagerIndex(this->mem__DDR.C2H_ControlDeviceFilename(), &i_c2h_DDR);
 
-    this->GenerateNewIOManager(this->mem__FIR_BRAM.H2C_ControlDeviceFilename(), &i_h2c_FIR_BRAM);
-    this->GenerateNewIOManager(this->mem__FIR_BRAM.C2H_ControlDeviceFilename(), &i_c2h_FIR_BRAM);
+    this->GetIOManagerIndex(this->mem__FIR_BRAM.H2C_ControlDeviceFilename(), &i_h2c_FIR_BRAM);
+    this->GetIOManagerIndex(this->mem__FIR_BRAM.C2H_ControlDeviceFilename(), &i_c2h_FIR_BRAM);
 
-    this->GenerateNewIOManager(this->mem__SG_BRAM.H2C_ControlDeviceFilename(), &i_h2c_SG_BRAM);
-    this->GenerateNewIOManager(this->mem__SG_BRAM.C2H_ControlDeviceFilename(), &i_c2h_SG_BRAM);
+    this->GetIOManagerIndex(this->mem__SG_BRAM.H2C_ControlDeviceFilename(), &i_h2c_SG_BRAM);
+    this->GetIOManagerIndex(this->mem__SG_BRAM.C2H_ControlDeviceFilename(), &i_c2h_SG_BRAM);
 
-    this->GenerateNewIOManager(this->mem__Circular_Buffer_BRAM.H2C_ControlDeviceFilename(), &i_h2c_Circular_Buffer_BRAM);
-    this->GenerateNewIOManager(this->mem__Circular_Buffer_BRAM.C2H_ControlDeviceFilename(), &i_c2h_Circular_Buffer_BRAM);
+    this->GetIOManagerIndex(this->mem__Circular_Buffer_BRAM.H2C_ControlDeviceFilename(), &i_h2c_Circular_Buffer_BRAM);
+    this->GetIOManagerIndex(this->mem__Circular_Buffer_BRAM.C2H_ControlDeviceFilename(), &i_c2h_Circular_Buffer_BRAM);
 
     /* Bind */
 
