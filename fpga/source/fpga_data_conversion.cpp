@@ -16,10 +16,16 @@ void vuprs::SignalData::GetChannelData(const std::string &channelName, std::vect
 
 void vuprs::SignalData::_UpdataHashMap()
 {
-    if (this->_channelData.size() != this->_channelName.size()) {throw std::runtime_error("Unmatch channel & name size.");}
+    if (this->_channelData.size() != this->_channelName.size()) 
+    {
+        throw std::runtime_error("Unmatch channel & name size.");
+    }
     int dataChannels = this->_channelData.size();
     this->CHANNEL_NAME__TO__CHANNEL_INDEX.clear();
-    for (int i = 0; i < dataChannels; i++) {this->CHANNEL_NAME__TO__CHANNEL_INDEX.insert(std::make_pair(this->_channelName[i], i));}
+    for (int i = 0; i < dataChannels; i++)
+    {
+        this->CHANNEL_NAME__TO__CHANNEL_INDEX.insert(std::make_pair(this->_channelName[i], i));
+    }
 }
 
 void vuprs::SignalData::DeleteChannelData(const std::string &channelName)
@@ -137,6 +143,8 @@ bool vuprs::FPGACircularBuffer2Frames(vuprs::AlignedBufferDMA *buffer, vuprs::Si
     adcData->samplingTime = (1.0 / samplingFrequency) * ((double)frameParsedSize - 1.0);
     adcData->signalPoints = frameParsedSize;
 
+    adcData->_UpdataHashMap();
+
     return true;
 }
 
@@ -146,10 +154,13 @@ bool vuprs::FPGAMemoryBuffer2Frames(vuprs::AlignedBufferDMA *buffer, std::vector
     {
         throw std::runtime_error("Buffer is empty.");
     }
+
     std::vector<uint32_t> rawBufferDataVector = buffer->to_vector<uint32_t>();
     ssize_t vectorSize = rawBufferDataVector.size();
+
     beamformingResult->clear();
     beamformingResult->reserve(vectorSize);
+
     for (int i = 0; i < vectorSize; i++)
     {
         int32_t currentChannelData = static_cast<int32_t>(rawBufferDataVector[i]);
