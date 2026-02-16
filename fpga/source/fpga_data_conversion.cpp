@@ -10,8 +10,15 @@ bool vuprs::SignalData::contains(const std::string &channelName) const
 void vuprs::SignalData::GetChannelData(const std::string &channelName, std::vector<std::complex<double>> *data) const
 {
     auto it = this->CHANNEL_NAME__TO__CHANNEL_INDEX.find(channelName);
-    if (it != this->CHANNEL_NAME__TO__CHANNEL_INDEX.end()) {*data = this->_channelData[it->second];}
-    else {throw std::runtime_error("Invalid channel name: " + channelName);}
+
+    if (it != this->CHANNEL_NAME__TO__CHANNEL_INDEX.end()) 
+    {
+        data->assign(this->_channelData[it->second].begin(), this->_channelData[it->second].end());
+    }
+    else
+    {
+        throw std::runtime_error("Invalid channel name: " + channelName);
+    }
 }
 
 void vuprs::SignalData::_UpdataHashMap()

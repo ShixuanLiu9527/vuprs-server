@@ -1,41 +1,270 @@
 #include "beam_former_template.h"
 
-vuprs::BeamFormerTemplate::BeamFormerTemplate()
+vuprs::WidebandBeamformerTemplate::WidebandBeamformerTemplate()
 {
+    this->firLength = 0;
+    this->fs = 0.0;
 
+    this->is_arrayConfigDown = false;
+    this->is_beamfomerConfigDown = false;
+
+    this->is_signalEmpty = true;
+    this->is_covMatrixEmpty = true;
+
+    this->threadPool = std::make_unique<vuprs::ThreadPool>(std::thread::hardware_concurrency());
+    
+    this->firstSnapshot = true;
+    this->COVARIANCE_SNAP_WINDOW_SIZE = DEFAULT_COVARIANCE_SNAP_WINDOW_SIZE;
+    this->ADJACENT_FREQ_AVERAGE_INDEX = DEFAULT_ADJACENT_FREQ_AVERAGE_INDEX;
+    this->UpdateParameters();
 }
 
-vuprs::BeamFormerTemplate::BeamFormerTemplate(const std::string &arrayConfigFile)
+bool vuprs::WidebandBeamformerTemplate::ConfigArrayFromJson(const std::string &arrayConfigJsonFilename)
 {
-    this->ConfigBeamFormingArray(arrayConfigFile);
-}
-
-void vuprs::BeamFormerTemplate::ConfigBeamFormingArray(const std::string &arrayConfigFile)
-{
-    this->array.LoadArrayFromJson(arrayConfigFile);
-}
-
-void vuprs::BeamFormerTemplate::InputElementSignal(const vuprs::SignalData &signalData)
-{
-    if (this->array.empty())
+    if (this->array.LoadArrayFromJson(arrayConfigJsonFilename))
     {
-        throw std::runtime_error("Cannot input element signal to an empty array.");
+        int arraySize = this->array.elementArray.size();
+        this->elementChannelName.resize(arraySize);
+        this->elementPredelay.resize(arraySize);
+        this->elementPredelayCount.resize(arraySize);
+        for (int i = 0; i < arraySize; i++)
+        {
+            this->elementChannelName[i] = this->array.elementArray[i].adcChannel;
+        }
+        this->is_arrayConfigDown = true;
+        return true;
+    }
+    return false;
+}
+
+bool vuprs::WidebandBeamformerTemplate::ConfigBeamformerFromJson(const std::string &beamformerConfigJsonFilename)
+{
+    std::ifstream arrayConfigJsonFile;
+
+    arrayConfigJsonFile.open(beamformerConfigJsonFilename);
+    if (!arrayConfigJsonFile.is_open())
+    {
+        throw std::runtime_error("Cannot open file: " + beamformerConfigJsonFilename);
     }
 
-    this->array.InputElementSignal(signalData);
-}
+    nlohmann::json configJsonData;
 
-void vuprs::BeamFormerTemplate::SetTargetDirection(double alt, double az, double waveVelocity)
-{
-    if (this->array.empty())
+    try
     {
-        throw std::runtime_error("Cannot set target direction for an empty array.");
+        arrayConfigJsonFile >> configJsonData;
+    }
+    catch(const std::exception& e)
+    {
+        throw std::runtime_error("Failed to load array data from: " + beamformerConfigJsonFilename);
     }
 
-    this->array.UpdateTimeDelay(alt, az, waveVelocity);
+    vuprs::__JsonStringParseINT<uint32_t>(&this->firLength, configJsonData, "fir-length", true);
+
+    this->is_beamfomerConfigDown = true;
+
+    return true;
 }
 
-Eigen::Matrix<Eigen::dcomplex, -1, 1> vuprs::GenerateBeamFormingFrequencyList(int dataNumber, double samplingFrequency)
+bool vuprs::WidebandBeamformerTemplate::ConfigDown() const
 {
-    return 2.0 * PI * vuprs::GenerateFrequencyList(dataNumber, samplingFrequency);  /* 2 * pi * f * j */
+    return this->is_arrayConfigDown && this->is_beamfomerConfigDown;
+}
+
+bool vuprs::WidebandBeamformerTemplate::CalculateEnable() const
+{
+    return this->ConfigDown() && !this->is_signalEmpty && !this->is_covMatrixEmpty;
+}
+
+void vuprs::WidebandBeamformerTemplate::InputSignal(const vuprs::SignalData &signal)
+{
+    if (!this->ConfigDown())
+    {
+        throw std::runtime_error("Config not complete.");
+    }
+
+    this->array.InputElementSignal(signal);
+    this->fs = signal.samplingFrequency;
+    this->is_signalEmpty = false;
+}
+
+void vuprs::WidebandBeamformerTemplate::SetTargetDirection(double alt, double az, double waveVelocity)
+{
+    if (!this->ConfigDown())
+    {
+        throw std::runtime_error("Config not complete.");
+    }
+    if (this->is_signalEmpty)
+    {
+        throw std::runtime_error("Signal is empty.");
+    }
+
+    this->array.UpdateTimeDelay(alt, az, waveVelocity);  /* Update time delay */
+    this->array.GetSteeringVectorMatrix(&this->steeringVectors);  /* Get steering vectors */
+
+    /* Calculate predelay */
+
+    int arraySize = this->array.elementArray.size(), minPredelay = this->firLength;
+    double Ts = 0.0;
+
+    if (!this->is_signalEmpty) Ts = 1.0 / this->fs;
+
+    for (int i = 0; i < arraySize; i++)
+    {
+        if (this->is_signalEmpty)
+        {
+            this->elementPredelayCount[i] = 0;
+            continue;
+        }
+
+        this->elementPredelayCount[i] = -std::round(this->array.elementArray[i].timeDelay / Ts + ((double)this->firLength - 1.0) / 2.0);
+        
+        if (this->elementPredelayCount[i] < minPredelay)
+        {
+            minPredelay = this->elementPredelayCount[i];
+        }
+    }
+
+    for (int i = 0; i < arraySize; i++)
+    {
+        if (minPredelay < 0)
+        {
+            this->elementPredelayCount[i] = this->elementPredelayCount[i] - minPredelay;
+        }
+        this->elementPredelay[i] = this->elementPredelayCount[i] * Ts;
+    }
+}
+
+void vuprs::WidebandBeamformerTemplate::UpdateCovarianceMatrix()
+{
+    if (!this->ConfigDown())
+    {
+        throw std::runtime_error("Config not complete.");
+    }
+    if (this->is_signalEmpty)
+    {
+        throw std::runtime_error("Signal is empty.");
+    }
+
+    this->array.GetArraySignalMatrix(&this->snap_signalMatrix_freqDomain, nullptr, true);  /* Get array signal */
+
+    int dataPoints = this->snap_signalMatrix_freqDomain.cols();
+
+    if (this->estimate_covMatrix.size() <= 0)
+    {
+        this->estimate_covMatrix.resize(dataPoints);
+    }
+    else if (this->estimate_covMatrix.size() != dataPoints)
+    {
+        throw std::runtime_error("Data points in snapshot != latest");
+    }
+
+    if (this->mean_covMatrix.size() <= 0)
+    {
+        this->mean_covMatrix.resize(dataPoints);
+    }
+    else if (this->mean_covMatrix.size() != dataPoints)
+    {
+        throw std::runtime_error("Data points in snapshot != latest");
+    }
+
+    Eigen::Matrix<Eigen::dcomplex, -1, 1> snapshotFreqSignal;
+    Eigen::Matrix<Eigen::dcomplex, -1, -1> snapshotCovMatrix;
+
+    /* Update mean covariance matrix */
+
+    for (int i = 0; i < dataPoints; i++)
+    {
+        snapshotFreqSignal = this->snap_signalMatrix_freqDomain.col(i);
+        snapshotCovMatrix = snapshotFreqSignal * snapshotFreqSignal.adjoint();
+        if (this->firstSnapshot)
+        {
+            this->mean_covMatrix[i] = snapshotCovMatrix;
+        }
+        else
+        {
+            this->mean_covMatrix[i] = this->EXP_WEIGHTED_MOVING_AVERAGE_INDEX * snapshotCovMatrix + \
+                                      this->EXP_WEIGHTED_MOVING_AVERAGE_INDEX_1 * this->mean_covMatrix[i];
+        }
+    }
+
+    /* Update estimate covariance matrix */
+
+    this->estimate_covMatrix[0] = this->mean_covMatrix[0];
+
+    for (int i = 1; i < dataPoints - 1; i++)
+    {
+        this->estimate_covMatrix[i] = this->ADJACENT_FREQ_AVERAGE_INDEX_1 * this->mean_covMatrix[i - 1] + \
+                                      this->ADJACENT_FREQ_AVERAGE_INDEX * this->mean_covMatrix[i] + \
+                                      this->ADJACENT_FREQ_AVERAGE_INDEX_1 * this->mean_covMatrix[i + 1];
+    }
+
+    this->estimate_covMatrix[dataPoints - 1] = this->mean_covMatrix[dataPoints - 1];
+
+    this->is_covMatrixEmpty = false;
+    this->firstSnapshot = false;
+}
+
+void vuprs::WidebandBeamformerTemplate::SetCovarianceMatrixFittingParam(int snapsWindowSize, double adjacentFreqAverageIndex)
+{
+    this->COVARIANCE_SNAP_WINDOW_SIZE = snapsWindowSize;
+    this->ADJACENT_FREQ_AVERAGE_INDEX = adjacentFreqAverageIndex;
+    this->UpdateParameters();
+}
+
+void vuprs::WidebandBeamformerTemplate::UpdateParameters()
+{
+    this->EXP_WEIGHTED_MOVING_AVERAGE_INDEX = 2.0 / double(this->COVARIANCE_SNAP_WINDOW_SIZE + 1);  /* N = 2/a - 1 */
+    this->EXP_WEIGHTED_MOVING_AVERAGE_INDEX_1 = 1.0 - this->EXP_WEIGHTED_MOVING_AVERAGE_INDEX;  /* 1 - a */
+
+    this->ADJACENT_FREQ_AVERAGE_INDEX_1 = 0.5 * (1.0 - this->ADJACENT_FREQ_AVERAGE_INDEX);
+}
+
+void vuprs::WidebandBeamformerTemplate::ResetCovarianceMatrices()
+{
+    this->firstSnapshot = true;
+    this->is_signalEmpty = true;
+    this->is_covMatrixEmpty = true;
+    this->mean_covMatrix.clear();
+    this->estimate_covMatrix.clear();
+}
+
+void vuprs::WidebandBeamformerTemplate::GetWeightVectorValues(Eigen::Matrix<Eigen::dcomplex, -1, -1> *dst) const
+{
+    *dst = this->resultWeightVectors;
+}
+
+void vuprs::WidebandBeamformerTemplate::GetElementPredelay(std::vector<int> *elementPredelayCount, std::vector<double> *elementPredelay, std::vector<std::string> *channelName) const
+{
+    *elementPredelayCount = this->elementPredelayCount;
+    *elementPredelay = this->elementPredelay;
+    *channelName = this->elementChannelName;
+}
+
+void vuprs::WidebandBeamformerTemplate::CalculateBeamforming()
+{
+    if (!this->CalculateEnable())
+    {
+        throw std::runtime_error("Cannot calculate beam forming at that time.");
+    }
+
+    int numFreqs = this->estimate_covMatrix.size();
+    if (numFreqs == 0) return;
+    
+    int numElements = this->array.elementArray.size();
+    this->resultWeightVectors.resize(numElements, numFreqs);
+    
+    std::vector<std::future<void>> futures;
+    futures.reserve(numFreqs);
+    
+    for (int i = 0; i < numFreqs; i++)
+    {
+        futures.emplace_back(threadPool->enqueue(
+            [this, i]() {this->CalculateBeamformingForOneFreq(i);}
+        ));
+    }
+    
+    for (auto &f : futures) 
+    {
+        f.get();
+    }
 }

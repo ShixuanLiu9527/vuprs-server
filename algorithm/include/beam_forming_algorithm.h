@@ -1,0 +1,224 @@
+#ifndef BEAM_FORMING_ALGORITHM_H
+#define BEAM_FORMING_ALGORITHM_H
+
+#include <Eigen/Dense>
+#include <vector>
+#include <vector>
+#include <queue>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
+#include <functional>
+#include <future>
+
+#include "signal_processing.h"
+
+#define PI 3.14159265358979323846
+
+namespace vuprs
+{
+    struct IterationConfig
+    {
+        std::function<double(double)> func;  /* Original Function */
+        std::function<double(double)> diff;  /* First Derivative */
+        double lowerRegion;  /* lower boundary */
+        double upperRegion;  /* upper boundary */
+        double jumpout;  /* jumpout threshold */
+        int maxIteration;  /* max iteration counts */
+    };
+
+    class ThreadPool 
+    {
+        private:
+
+            std::vector<std::thread> workers;
+            std::queue<std::function<void()>> tasks;
+            std::mutex queue_mutex;
+            std::condition_variable condition;
+            bool stop;
+
+        public:
+            ThreadPool(size_t numThreads) : stop(false) 
+            {
+                for (size_t i = 0; i < numThreads; ++i) 
+                {
+                    /* Create one thread */
+
+                    workers.emplace_back([this] 
+                    {
+                        while (true)
+                        {
+                            std::function<void()> task;
+
+                            {
+                                std::unique_lock<std::mutex> lock(this->queue_mutex);
+
+                                this->condition.wait(lock, [this] {return this->stop || !this->tasks.empty();});
+
+                                if (this->stop && this->tasks.empty()) return;
+
+                                task = std::move(this->tasks.front());
+
+                                this->tasks.pop();
+                            }
+
+                            task();  /* Do task */
+                        }
+                    });
+                }
+            }
+    
+            template<class F, class... Args>
+            std::future<typename std::result_of<F(Args...)>::type> enqueue(F&& f, Args&&... args) 
+            {
+                using return_type = typename std::result_of<F(Args...)>::type;
+        
+                auto task = std::make_shared<std::packaged_task<return_type()>>(std::bind(std::forward<F>(f), std::forward<Args>(args)...));
+        
+                std::future<return_type> result = task->get_future();
+
+                {
+                    std::unique_lock<std::mutex> lock(queue_mutex);
+                    if (this->stop) throw std::runtime_error("Enqueue on stopped ThreadPool");
+                    tasks.emplace([task](){ (*task)(); });
+                }
+
+                condition.notify_one();
+                return result;
+            }
+    
+            ~ThreadPool() 
+            {
+                {
+                    std::unique_lock<std::mutex> lock(queue_mutex);
+                    stop = true;
+                }
+                condition.notify_all();
+                for (std::thread &worker : workers) 
+                {
+                    worker.join();
+                }
+            }
+    };
+
+    inline double rad2deg(double rad) {return rad / PI * 180.0;}
+    inline double deg2rad(double deg) {return deg / 180.0 * PI;}
+
+    /**
+     * @brief Alt, Az to pointing vector.
+     * 
+     * @param alt altitude in degrees.
+     * @param az azimuth in degrees.
+     */
+    inline Eigen::Matrix<double, 3, 1> AltAz2PointingVector(double alt, double az)
+    {
+        Eigen::Matrix<double, 3, 1> vec;
+        double c_alt = cos(vuprs::deg2rad(alt)), c_az = cos(vuprs::deg2rad(az)), \
+               s_alt = sin(vuprs::deg2rad(alt)), s_az = sin(vuprs::deg2rad(az));
+        vec << c_alt * s_az, c_alt * c_az, s_alt;
+        return vec.normalized();
+    }
+
+    /**
+     * @brief Pointing vector to Alt, Az.
+     * 
+     * @param vec pointing vector.
+     * @param alt output alt in degrees.
+     * @param az output az in degrees.
+     */
+    inline void PointingVector2AltAz(const Eigen::Matrix<double, 3, 1> &vec, double *alt, double *az)
+    {
+        double x = vec(0, 0), y = vec(1, 0), z = vec(2, 0);
+        if (z > 1.0) z = 1.0;
+        else if (z < -1.0) z = -1.0;
+        *alt = vuprs::rad2deg(asin(z));
+        *az = vuprs::rad2deg(atan2(x, y));
+    }
+
+    /**
+     * @brief Set IterationConfig obj to default value.
+     */
+    void SetIterationConfigDefault(IterationConfig *config);
+
+    /**
+     * @brief Secant iteration for 1D function.
+     * 
+     * @note result = Solve(func(val) == 0), val in [lowerRegion, upperRegion].
+     * 
+     * @param config iteration configuration.
+     * @param result output result.
+     * 
+     * @throw std::runtime_error
+     */
+    bool SecantIteration1D(const vuprs::IterationConfig &config, double *result);
+
+    /**
+     * @brief Robust secant iteration for 1D function.
+     * 
+     * @note result = Solve(func(val) == 0), val in [lowerRegion, upperRegion].
+     * 
+     * @param config iteration configuration.
+     * @param result output result.
+     * 
+     * @throw std::runtime_error
+     */
+    bool RobustSecantIteration1D(const vuprs::IterationConfig &config, double *result);
+
+    /**
+     * @brief Newton iteration for 1D function.
+     * 
+     * @note result = Solve(func(val) == 0), val in [lowerRegion, upperRegion].
+     * 
+     * @param config iteration configuration.
+     * @param result output result.
+     * 
+     * @throw std::runtime_error
+     */
+    bool NewtonIteration1D(const vuprs::IterationConfig &config, double *result);
+
+    /**
+     * @brief Robust newton iteration for 1D function.
+     * 
+     * @note result = Solve(func(val) == 0), val in [lowerRegion, upperRegion].
+     * 
+     * @param config iteration configuration.
+     * @param result output result.
+     * 
+     * @throw std::runtime_error
+     */
+    bool RobustNewtonIteration1D(const vuprs::IterationConfig &config, double *result);
+
+    /**
+     * @brief Bisection iteration for 1D function.
+     * 
+     * @note result = Solve(func(val) == 0), val in [lowerRegion, upperRegion].
+     * 
+     * @param config iteration configuration.
+     * @param result output result.
+     * 
+     * @throw std::runtime_error
+     */
+    bool BisectionIteration1D(const vuprs::IterationConfig &config, double *result);
+
+    /**
+     * @brief Eigenvalue decomposition for covariance matrix.
+     * 
+     * @param covMatrix input covariance matrix.
+     * @param eigenvalues output eigenvalues [eig1, eig2, ..., eigM].T
+     * @param eigenvectors output eigenvectors [eigenvector1, eigenvector2, ..., eigenvectorM] (size = M x M).
+     */
+    void EigenvalueDecomposition(const Eigen::Matrix<Eigen::dcomplex, -1, -1> &covMatrix, 
+                                 Eigen::Matrix<double, -1, 1> *eigenvalues,
+                                 Eigen::Matrix<Eigen::dcomplex, -1, -1> *eigenvectors);
+
+    /**
+     * @brief Calculate FIR coefficients from certain frequency response.
+     * 
+     * @param frequencyResponseHf frequency response H(f{k}), k = 1, 2, ..., L/2 + 1.
+     * @param fs sampling frequency (unit: Hz).
+     * @param h output coefficient.
+     */
+    void GetFrequencyResponseFIR_OneChannel(const Eigen::Matrix<Eigen::dcomplex, -1, 1> &frequencyResponseHf, double fs, Eigen::Matrix<double, -1, 1> *h);
+}
+
+#endif
