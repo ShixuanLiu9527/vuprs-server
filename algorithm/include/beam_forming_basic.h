@@ -86,7 +86,7 @@ namespace vuprs
 
         public:
 
-            double samplingFrequency = 0.0;  /* sampling frequency for this signal, unit: Hz */
+            double fs = 0.0;  /* sampling frequency for this signal, unit: Hz */
             double samplingTime = 0.0;  /* sampling time for this signal, unit: sec */
             int signalPointCounts = 0;  /* sampling points for this signal */
             Eigen::Matrix<Eigen::dcomplex, -1, 1> timeDelayVector;

@@ -327,15 +327,20 @@ void vuprs::EigenvalueDecomposition(
     *eigenvectors = solver.eigenvectors();
 }
 
-void vuprs::GetFrequencyResponseFIR_OneChannel(const Eigen::Matrix<Eigen::dcomplex, -1, 1> &frequencyResponseHf, double fs, Eigen::Matrix<double, -1, 1> *h)
+void vuprs::Get_FIR_EXPMatrix(int L_fir, int N_points, Eigen::Matrix<Eigen::dcomplex, -1, -1> *expMatrix, bool usePositiveFreq)
 {
-    int size = frequencyResponseHf.rows();
+    int outputSize;
 
-    Eigen::Matrix<Eigen::dcomplex, -1, 1> _frequencyResponseHf = frequencyResponseHf;
-    Eigen::Matrix<Eigen::dcomplex, -1, 1> _h;
-    
-    vuprs::SignalMontage(&_frequencyResponseHf);  /* signal montage */
-    vuprs::FFT(_frequencyResponseHf, &_h, true);
+    if (usePositiveFreq) outputSize = N_points / 2 + 1;
+    else outputSize = N_points;
 
-    *h = _h.real();
+    Eigen::Matrix<double, -1, 1> l_vec = Eigen::Matrix<double, -1, 1>::LinSpaced(L_fir, 0, L_fir-1);
+    Eigen::Matrix<double, -1, 1> k_vec = Eigen::Matrix<double, -1, 1>::LinSpaced(outputSize, 0, outputSize-1);
+
+    expMatrix->resize(outputSize, L_fir);
+
+    expMatrix->setOnes();  /* 1 */
+    *expMatrix *= -2.0 * PI * std::complex<double>(0, 1.0) / (double)N_points;  /* -j * 2 * pi / N */
+    *expMatrix = expMatrix->array() * (k_vec * l_vec.transpose()).array();  /* -j * 2 * pi * k * l / N */
+    *expMatrix = expMatrix->array().exp().matrix();  /* E(k,l) = exp(-j * 2 * pi * k * l / N) */
 }

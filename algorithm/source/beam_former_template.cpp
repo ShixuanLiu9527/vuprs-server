@@ -2,7 +2,6 @@
 
 vuprs::WidebandBeamformerTemplate::WidebandBeamformerTemplate()
 {
-    this->firLength = 0;
     this->fs = 0.0;
 
     this->is_arrayConfigDown = false;
@@ -37,34 +36,6 @@ bool vuprs::WidebandBeamformerTemplate::ConfigArrayFromJson(const std::string &a
     return false;
 }
 
-bool vuprs::WidebandBeamformerTemplate::ConfigBeamformerFromJson(const std::string &beamformerConfigJsonFilename)
-{
-    std::ifstream arrayConfigJsonFile;
-
-    arrayConfigJsonFile.open(beamformerConfigJsonFilename);
-    if (!arrayConfigJsonFile.is_open())
-    {
-        throw std::runtime_error("Cannot open file: " + beamformerConfigJsonFilename);
-    }
-
-    nlohmann::json configJsonData;
-
-    try
-    {
-        arrayConfigJsonFile >> configJsonData;
-    }
-    catch(const std::exception& e)
-    {
-        throw std::runtime_error("Failed to load array data from: " + beamformerConfigJsonFilename);
-    }
-
-    vuprs::__JsonStringParseINT<uint32_t>(&this->firLength, configJsonData, "fir-length", true);
-
-    this->is_beamfomerConfigDown = true;
-
-    return true;
-}
-
 bool vuprs::WidebandBeamformerTemplate::ConfigDown() const
 {
     return this->is_arrayConfigDown && this->is_beamfomerConfigDown;
@@ -73,6 +44,11 @@ bool vuprs::WidebandBeamformerTemplate::ConfigDown() const
 bool vuprs::WidebandBeamformerTemplate::CalculateEnable() const
 {
     return this->ConfigDown() && !this->is_signalEmpty && !this->is_covMatrixEmpty;
+}
+
+bool vuprs::WidebandBeamformerTemplate::PredelayEnable() const
+{
+    return this->ConfigDown() && !this->is_signalEmpty;
 }
 
 void vuprs::WidebandBeamformerTemplate::InputSignal(const vuprs::SignalData &signal)
@@ -100,38 +76,6 @@ void vuprs::WidebandBeamformerTemplate::SetTargetDirection(double alt, double az
 
     this->array.UpdateTimeDelay(alt, az, waveVelocity);  /* Update time delay */
     this->array.GetSteeringVectorMatrix(&this->steeringVectors);  /* Get steering vectors */
-
-    /* Calculate predelay */
-
-    int arraySize = this->array.elementArray.size(), minPredelay = this->firLength;
-    double Ts = 0.0;
-
-    if (!this->is_signalEmpty) Ts = 1.0 / this->fs;
-
-    for (int i = 0; i < arraySize; i++)
-    {
-        if (this->is_signalEmpty)
-        {
-            this->elementPredelayCount[i] = 0;
-            continue;
-        }
-
-        this->elementPredelayCount[i] = -std::round(this->array.elementArray[i].timeDelay / Ts + ((double)this->firLength - 1.0) / 2.0);
-        
-        if (this->elementPredelayCount[i] < minPredelay)
-        {
-            minPredelay = this->elementPredelayCount[i];
-        }
-    }
-
-    for (int i = 0; i < arraySize; i++)
-    {
-        if (minPredelay < 0)
-        {
-            this->elementPredelayCount[i] = this->elementPredelayCount[i] - minPredelay;
-        }
-        this->elementPredelay[i] = this->elementPredelayCount[i] * Ts;
-    }
 }
 
 void vuprs::WidebandBeamformerTemplate::UpdateCovarianceMatrix()
@@ -233,8 +177,50 @@ void vuprs::WidebandBeamformerTemplate::GetWeightVectorValues(Eigen::Matrix<Eige
     *dst = this->resultWeightVectors;
 }
 
-void vuprs::WidebandBeamformerTemplate::GetElementPredelay(std::vector<int> *elementPredelayCount, std::vector<double> *elementPredelay, std::vector<std::string> *channelName) const
+void vuprs::WidebandBeamformerTemplate::GetElementPredelay(
+    double firLength, bool includeFIRGroupDelay, 
+    std::vector<int> *elementPredelayCount, 
+    std::vector<double> *elementPredelay, 
+    std::vector<std::string> *channelName)
 {
+    if (this->is_signalEmpty)
+    {
+        throw std::runtime_error("No signal input.");
+    }
+
+    /* Calculate predelay */
+
+    int arraySize = this->array.elementArray.size(), minPredelay = 0;
+    double Ts = 1.0 / this->fs;
+
+    for (int i = 0; i < arraySize; i++)
+    {
+        if (includeFIRGroupDelay)
+        {
+            this->elementPredelayCount[i] = -std::round(
+                this->array.elementArray[i].timeDelay / Ts + (firLength - 1.0) / 2.0
+            );
+        }
+        else
+        {
+            this->elementPredelayCount[i] = -std::round(this->array.elementArray[i].timeDelay / Ts);
+        }
+        
+        if (this->elementPredelayCount[i] < minPredelay)
+        {
+            minPredelay = this->elementPredelayCount[i];
+        }
+    }
+
+    for (int i = 0; i < arraySize; i++)
+    {
+        if (minPredelay < 0)
+        {
+            this->elementPredelayCount[i] = this->elementPredelayCount[i] - minPredelay;
+        }
+        this->elementPredelay[i] = this->elementPredelayCount[i] * Ts;
+    }
+
     *elementPredelayCount = this->elementPredelayCount;
     *elementPredelay = this->elementPredelay;
     *channelName = this->elementChannelName;

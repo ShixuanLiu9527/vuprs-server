@@ -104,10 +104,46 @@ namespace vuprs
      */
     void FFT(const Eigen::Matrix<Eigen::dcomplex, -1, 1> &inputData, Eigen::Matrix<Eigen::dcomplex, -1, 1> *outputData, bool inverse = false);
 
+    /**
+     * @brief Cut half size (return size = N / 2 + 1).
+     * 
+     * @note input: [1, 2, 3, 4, 5, 6]
+     * @note output: [1, 2, 3, 4]
+     */
     void CutTheFirstHalf(std::vector<std::complex<double>> *inputData);
 
-    void SignalMontage(std::vector<std::complex<double>> *inputData);
-    void SignalMontage(Eigen::Matrix<Eigen::dcomplex, -1, 1> *inputData);
+    /**
+     * @brief In-place conjugate symmetric completion (for IDFT).
+     * 
+     * @note output.size = (input.size - 1) * 2
+     * @note input: [1j, 2j, 3j, 4j]
+     * @note output: [1j, 2j, 3j, 4j, -3j, -2j]
+     * 
+     * @param inputData input data.
+     */
+    void CompleteConjugateSymmetric(std::vector<std::complex<double>> *inputData);
+
+    /**
+     * @brief In-place conjugate symmetric completion (for IDFT).
+     * 
+     * @note output.size = (input.size - 1) * 2
+     * @note input: [1j, 2j, 3j, 4j]
+     * @note output: [1j, 2j, 3j, 4j, -3j, -2j]
+     * 
+     * @param inputData input data.
+     */
+    void CompleteConjugateSymmetric(Eigen::Matrix<Eigen::dcomplex, -1, 1> *inputData);
+
+    /**
+     * @brief In-place conjugate symmetric completion.
+     * 
+     * @note output.size = (input.size - 1) * 2
+     * @note input: [1, 2, 3, 4]
+     * @note output: [1, 2, 3, 4, 3, 2]
+     * 
+     * @param inputData input data.
+     */
+    void CompleteSymmetric(Eigen::Matrix<double, -1, 1> *inputData);
 
     /**
      * @brief Frequency vector.

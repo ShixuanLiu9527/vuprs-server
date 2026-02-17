@@ -36,7 +36,7 @@ bool vuprs::BeamFormingElement::empty() const
 
 vuprs::BeamFormingArray::BeamFormingArray()
 {
-    this->samplingFrequency = 0.0;
+    this->fs = 0.0;
     this->samplingTime = 0.0;
     this->signalPointCounts = 0;
 
@@ -181,7 +181,7 @@ void vuprs::BeamFormingArray::InputElementSignal(const vuprs::SignalData &adcDat
 
     int arraySize = this->elementArray.size();
     
-    this->samplingFrequency = adcData.samplingFrequency;
+    this->fs = adcData.samplingFrequency;
     this->samplingTime = adcData.samplingTime;
     this->signalPointCounts = adcData.signalPoints;
     
@@ -208,7 +208,7 @@ Eigen::Matrix<Eigen::dcomplex, -1, 1> vuprs::BeamFormingArray::GetSteeringVector
 
 void vuprs::BeamFormingArray::GetSteeringVectorMatrix(Eigen::Matrix<Eigen::dcomplex, -1, -1> *matrix) const
 {
-    Eigen::Matrix<Eigen::dcomplex, -1, 1> _j_omega = -2.0 * PI * vuprs::GenerateComplexFrequencyList(this->signalPointCounts, this->samplingFrequency);  /* -j * omega */
+    Eigen::Matrix<Eigen::dcomplex, -1, 1> _j_omega = -2.0 * PI * vuprs::GenerateComplexFrequencyList(this->signalPointCounts, this->fs);  /* -j * omega */
     *matrix = (this->timeDelayVector * _j_omega.transpose()).array().exp().matrix();  /* exp(-jwT{i}) */
 }
 
@@ -259,7 +259,7 @@ void vuprs::BeamFormingArray::GetArraySignalMatrix(Eigen::Matrix<Eigen::dcomplex
             );
         }
     }
-    if (samplingFrequency != nullptr) *samplingFrequency = this->samplingFrequency;
+    if (samplingFrequency != nullptr) *samplingFrequency = this->fs;
 }
 
 double vuprs::BeamFormingArray::GetMaxAbsoluteTimeDelay() const

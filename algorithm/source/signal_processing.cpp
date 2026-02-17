@@ -147,7 +147,7 @@ void vuprs::CutTheFirstHalf(std::vector<std::complex<double>> *inputData)
     inputData->resize(size / 2 + 1);
 }
 
-void vuprs::SignalMontage(std::vector<std::complex<double>> *inputData)
+void vuprs::CompleteConjugateSymmetric(std::vector<std::complex<double>> *inputData)
 {
     uint64_t originSize = inputData->size();
 
@@ -176,22 +176,44 @@ void vuprs::SignalMontage(std::vector<std::complex<double>> *inputData)
     inputData->insert(inputData->end(), backHalf.begin(), backHalf.end());
 }
 
-void vuprs::SignalMontage(Eigen::Matrix<Eigen::dcomplex, -1, 1> *inputData)
+void vuprs::CompleteConjugateSymmetric(Eigen::Matrix<Eigen::dcomplex, -1, 1> *inputData)
 {
-    int originSize = inputData->size();
+    int halfSize = inputData->rows();
+    
+    if (halfSize <= 2) return;
+    
+    int fullSize = 2 * (halfSize - 1);
+    int backHalfSize = halfSize - 2;
+    
+    Eigen::Matrix<Eigen::dcomplex, -1, 1> negativeFreq(backHalfSize);
 
-    if (originSize <= 2)
+    for (int i = 0; i < backHalfSize; i++)
     {
-        return;
+        negativeFreq(i) = std::conj((*inputData)(halfSize - 2 - i));
     }
+    
+    inputData->conservativeResize(fullSize);
+    inputData->tail(backHalfSize) = negativeFreq;
+}
 
-    int backHalfSize = originSize - 2;
-    Eigen::VectorXcd backHalf = inputData->segment(1, backHalfSize).reverse();
+void vuprs::CompleteSymmetric(Eigen::Matrix<double, -1, 1> *inputData)
+{
+    int halfSize = inputData->rows();
     
-    backHalf = backHalf.conjugate();
+    if (halfSize <= 2) return;
     
-    inputData->conservativeResize(originSize + backHalfSize);
-    inputData->tail(backHalfSize) = backHalf;
+    int fullSize = 2 * (halfSize - 1);
+    int backHalfSize = halfSize - 2;
+    
+    Eigen::Matrix<double, -1, 1> negativeFreq(backHalfSize);
+
+    for (int i = 0; i < backHalfSize; i++)
+    {
+        negativeFreq(i) = (*inputData)(halfSize - 2 - i);
+    }
+    
+    inputData->conservativeResize(fullSize);
+    inputData->tail(backHalfSize) = negativeFreq;
 }
 
 Eigen::Matrix<Eigen::dcomplex, -1, 1> vuprs::GenerateComplexFrequencyList(int dataNumber, double samplingFrequency)

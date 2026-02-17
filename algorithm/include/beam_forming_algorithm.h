@@ -212,13 +212,17 @@ namespace vuprs
                                  Eigen::Matrix<Eigen::dcomplex, -1, -1> *eigenvectors);
 
     /**
-     * @brief Calculate FIR coefficients from certain frequency response.
+     * @brief Get FIR exp matrix (E).
      * 
-     * @param frequencyResponseHf frequency response H(f{k}), k = 1, 2, ..., L/2 + 1.
-     * @param fs sampling frequency (unit: Hz).
-     * @param h output coefficient.
+     * @note N: Signal points, L: FIR Filter Length.
+     * @note E(k,l) = exp(-j * 2 * pi * k * l / N).
+     * 
+     * @param L_fir FIR Filter length.
+     * @param N_points signal points.
+     * @param expMatrix output matrix E.
+     * @param usePositiveFreq true: E.size = (N/2+1) x L, false: E.size = N x L.
      */
-    void GetFrequencyResponseFIR_OneChannel(const Eigen::Matrix<Eigen::dcomplex, -1, 1> &frequencyResponseHf, double fs, Eigen::Matrix<double, -1, 1> *h);
+    void Get_FIR_EXPMatrix(int L_fir, int N_points, Eigen::Matrix<Eigen::dcomplex, -1, -1> *expMatrix, bool usePositiveFreq);
 }
 
 #endif

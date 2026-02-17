@@ -13,11 +13,6 @@ namespace vuprs
     {
         private:
 
-            bool firstSnapshot;
-
-            bool is_arrayConfigDown, is_beamfomerConfigDown;
-            bool is_signalEmpty, is_covMatrixEmpty;
-
             std::unique_ptr<ThreadPool> threadPool;
 
             int COVARIANCE_SNAP_WINDOW_SIZE;
@@ -32,21 +27,25 @@ namespace vuprs
 
         protected:
 
+            bool firstSnapshot;
+
+            bool is_arrayConfigDown, is_beamfomerConfigDown;
+            bool is_signalEmpty, is_covMatrixEmpty;
+
             vuprs::BeamFormingArray array;
 
             Eigen::Matrix<Eigen::dcomplex, -1, -1> snap_signalMatrix_freqDomain;  /* Size: (M) x (N / 2 + 1) */
-            Eigen::Matrix<Eigen::dcomplex, -1, -1> steeringVectors;
-            Eigen::Matrix<Eigen::dcomplex, -1, -1> resultWeightVectors;
+            Eigen::Matrix<Eigen::dcomplex, -1, -1> steeringVectors;  /* Size: (M) x (N / 2 + 1) */
+            Eigen::Matrix<Eigen::dcomplex, -1, -1> resultWeightVectors;  /* Size: (M) x (N / 2 + 1) */
 
-            uint32_t firLength;  /* FIR filter length */
             double fs;  /* Sampling frequency */
 
             std::vector<int> elementPredelayCount;  /* Predelay count */
             std::vector<double> elementPredelay;  /* Predelay time = count * Ts */
             std::vector<std::string> elementChannelName;  /* element channel name list */
 
-            std::vector<Eigen::Matrix<Eigen::dcomplex, -1, -1>> mean_covMatrix;  /* covMatrix[i] is the mean cov matrix in band [i] */
-            std::vector<Eigen::Matrix<Eigen::dcomplex, -1, -1>> estimate_covMatrix;  /* covMatrix[i] is the mean cov matrix in band [i] */
+            vuprs::AlignedEigenVector<Eigen::Matrix<Eigen::dcomplex, -1, -1>> mean_covMatrix;  /* Size: N / 2 + 1, covMatrix[i] is the mean cov matrix in band [i] */
+            vuprs::AlignedEigenVector<Eigen::Matrix<Eigen::dcomplex, -1, -1>> estimate_covMatrix;  /* Size: N / 2 + 1, covMatrix[i] is the mean cov matrix in band [i] */
 
             /**
              * @brief Calculate beamforming for one frequency.
@@ -70,16 +69,11 @@ namespace vuprs
             /**
              * @brief Config beam forming array from JSON file.
              * 
+             * @note Check ConfigDown() in advance.
+             * 
              * @param arrayConfigJsonFilename JSON file name.
              */
             bool ConfigArrayFromJson(const std::string &arrayConfigJsonFilename);
-
-            /**
-             * @brief Config beam former from JSON file.
-             * 
-             * @param beamformerConfigJsonFilename JSON file name.
-             */
-            bool ConfigBeamformerFromJson(const std::string &beamformerConfigJsonFilename);
 
             /* STEP 2: INPUT SIGNAL */
 
@@ -111,6 +105,8 @@ namespace vuprs
 
             /**
              * @brief Do beam forming calculation.
+             * 
+             * @note Check CalculateEnable() in advance.
              */
             void CalculateBeamforming();
 
@@ -136,14 +132,23 @@ namespace vuprs
             /**
              * @brief Get element predelay parameters.
              * 
+             * @note Check PredelayEnable() in advance.
+             * 
+             * @param firLength FIR filter bank length.
+             * @param includeFIRGroupDelay true: include FIR group delay, false: exclude FIR group delay.
              * @param elementPredelayCount integer delay. (count = -round[delay{m}/Ts + (L-1)/2])
              * @param elementPredelay integer delay time. (Tm = -round[delay{m}/Ts + (L-1)/2] * Ts)
              * @param channelName corresponding channel name.
              */
-            void GetElementPredelay(std::vector<int> *elementPredelayCount, std::vector<double> *elementPredelay, std::vector<std::string> *channelName) const;
+            void GetElementPredelay(
+                double firLength, bool includeFIRGroupDelay, 
+                std::vector<int> *elementPredelayCount,
+                std::vector<double> *elementPredelay,
+                std::vector<std::string> *channelName);
 
             bool ConfigDown() const;
             bool CalculateEnable() const;
+            bool PredelayEnable() const;
     };
 }
 
