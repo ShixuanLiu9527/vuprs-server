@@ -6,6 +6,9 @@
 
 namespace vuprs
 {
+    /**
+     * @brief VUPRS aligned Eigen vector.
+     */
     template<typename T>
     using AlignedEigenVector = std::vector<T, Eigen::aligned_allocator<T>>;
 }

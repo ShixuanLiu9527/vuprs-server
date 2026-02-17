@@ -3,41 +3,38 @@
 
 #include "beam_former_template.h"
 
-#define DEFAULT_MVDR_FRAME_WINDOW_LENGTH 50
-
 namespace vuprs
 {
-    class BeamFormerCBF: public BeamFormerTemplate
-    {
-        public:
-
-            void GetOutputSignal(std::vector<std::complex<double>> *outputSignal) override;
-    };
-
-    class BeamFormerMVDR: public BeamFormerTemplate
+    class Beamformer_DCRCB: public vuprs::WidebandBeamformerTemplate
     {
         private:
 
-            int currentSignalPoints = -1;  /* signal points */
-            int windowSize = DEFAULT_MVDR_FRAME_WINDOW_LENGTH;  /* window size */
+            double steeringErrorRadius;
+        
+        protected:
 
-            Eigen::Matrix<Eigen::dcomplex, -1, -1> currentSignalMatrix;
-            std::vector<Eigen::Matrix<Eigen::dcomplex, -1, -1>> averageCovarianceMatrixList;
-            std::vector<std::vector<Eigen::Matrix<Eigen::dcomplex, -1, -1>>> frameCovarianceMatrixListWindow;
-
-            void CalculateSignalCovarianceMatrixInCurrentFrame();
-
-            void CalculateAverageCovarianceMatrix();
-
-            void ResetCovarianceMatrixParam();
+            void CalculateBeamformingForOneFreq(int freqIndex) override;
 
         public:
 
-            BeamFormerMVDR();
+            Beamformer_DCRCB();
 
-            void GetOutputSignal(std::vector<std::complex<double>> *outputSignal) override;
+            ~Beamformer_DCRCB();
 
-            void SetWindowSize(int newSize = -1);
+            void SetSteeringErrorRadius(double r);
+    };
+
+    class Beamformer_CBF: public vuprs::WidebandBeamformerTemplate
+    {
+        protected:
+
+            void CalculateBeamformingForOneFreq(int freqIndex) override;
+
+        public:
+
+            Beamformer_CBF();
+
+            ~Beamformer_CBF();
     };
 }
 

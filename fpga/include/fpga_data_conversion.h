@@ -69,6 +69,24 @@ constexpr uint16_t ADC_FRAME_TAILER__L = (uint16_t)(ADC_FRAME_TAILER & 0xFFFF);
 #define ADC_CHANNEL_NAME__B_7                     "CH-B-7"
 #define ADC_CHANNEL_NAME__B_8                     "CH-B-8"
 
+#define IS_ADC_CHANNEL_NAME(VAL) \
+(VAL == ADC_CHANNEL_NAME__A_1 || \
+ VAL == ADC_CHANNEL_NAME__A_2 || \
+ VAL == ADC_CHANNEL_NAME__A_3 || \
+ VAL == ADC_CHANNEL_NAME__A_4 || \
+ VAL == ADC_CHANNEL_NAME__A_5 || \
+ VAL == ADC_CHANNEL_NAME__A_6 || \
+ VAL == ADC_CHANNEL_NAME__A_7 || \
+ VAL == ADC_CHANNEL_NAME__A_8 || \
+ VAL == ADC_CHANNEL_NAME__B_1 || \
+ VAL == ADC_CHANNEL_NAME__B_2 || \
+ VAL == ADC_CHANNEL_NAME__B_3 || \
+ VAL == ADC_CHANNEL_NAME__B_4 || \
+ VAL == ADC_CHANNEL_NAME__B_5 || \
+ VAL == ADC_CHANNEL_NAME__B_6 || \
+ VAL == ADC_CHANNEL_NAME__B_7 || \
+ VAL == ADC_CHANNEL_NAME__B_8)
+
 namespace vuprs
 {
     const std::vector<std::string> ADC_CHANNEL_ADDR_MAP = {
@@ -148,7 +166,7 @@ namespace vuprs
     };
 
     /**
-     * @brief Convert circular buffer data to adcData.
+     * @brief Parse circular buffer data to adcData.
      * 
      * @param buffer Input aligned DMA buffer.
      * @param adcData Output ADC data (ch1: adcData[0], ch2: adcData[1], ...).
