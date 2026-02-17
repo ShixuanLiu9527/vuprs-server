@@ -8,6 +8,7 @@
 #include <unordered_map>
 
 #include "aligned_buffer.h"
+#include "fpga_data_conv.h"
 
 #define ADC_CHANNEL_NUMBER               16U
 #define ADC_FRAME_HALF_WORD_SIZE         20U  /* 10 words */
@@ -45,52 +46,6 @@ constexpr uint16_t ADC_FRAME_TAILER__L = (uint16_t)(ADC_FRAME_TAILER & 0xFFFF);
 #define ADC_CHANNEL__B_6                         13U
 #define ADC_CHANNEL__B_7                         14U
 #define ADC_CHANNEL__B_8                         15U
-
-/* -------------------------------------------------------------------- */
-/* ------------ Circular Buffer - Channel Position Define ------------- */
-/* -------------------------------------------------------------------- */
-
-/**
- * 
- * Define the storage order of ADC channels here.
- * 
- * e.g. If the data is stored in the following order (word is 32 bit):
- * 
- *      half word 0:  ADC-CH-A2
- *      half word 1:  ADC-CH-A3
- *      half word 2:  ADC-CH-A1
- *      ...      ...
- * 
- * then the storage order must be defined in the following way:
- * 
- *      ADC_CHANNEL_POSITION__A_1                 2U
- *      ADC_CHANNEL_POSITION__A_2                 0U
- *      ADC_CHANNEL_POSITION__A_3                 1U
- *      ...                                       ...
- * 
- * -----------------------------------------------------------------
- *      ADC Channel                               Storage position
- * -----------------------------------------------------------------
- * 
- */
-
-#define ADC_CHANNEL_POSITION__A_1                 0U
-#define ADC_CHANNEL_POSITION__A_2                 1U
-#define ADC_CHANNEL_POSITION__A_3                 2U
-#define ADC_CHANNEL_POSITION__A_4                 3U
-#define ADC_CHANNEL_POSITION__A_5                 4U
-#define ADC_CHANNEL_POSITION__A_6                 5U
-#define ADC_CHANNEL_POSITION__A_7                 6U
-#define ADC_CHANNEL_POSITION__A_8                 7U
-
-#define ADC_CHANNEL_POSITION__B_1                 8U
-#define ADC_CHANNEL_POSITION__B_2                 9U
-#define ADC_CHANNEL_POSITION__B_3                 10U
-#define ADC_CHANNEL_POSITION__B_4                 11U
-#define ADC_CHANNEL_POSITION__B_5                 12U
-#define ADC_CHANNEL_POSITION__B_6                 13U
-#define ADC_CHANNEL_POSITION__B_7                 14U
-#define ADC_CHANNEL_POSITION__B_8                 15U
 
 /* -------------------------------------------------------------------- */
 /* -------------- Circular Buffer - Channel Name Define --------------- */
@@ -134,6 +89,13 @@ constexpr uint16_t ADC_FRAME_TAILER__L = (uint16_t)(ADC_FRAME_TAILER & 0xFFFF);
 
 namespace vuprs
 {
+    const std::vector<std::string> ADC_CHANNEL_ADDR_MAP = {
+        ADC_CHANNEL_NAME__A_1, ADC_CHANNEL_NAME__A_2, ADC_CHANNEL_NAME__A_3, ADC_CHANNEL_NAME__A_4,
+        ADC_CHANNEL_NAME__A_5, ADC_CHANNEL_NAME__A_6, ADC_CHANNEL_NAME__A_7, ADC_CHANNEL_NAME__A_8,
+        ADC_CHANNEL_NAME__B_1, ADC_CHANNEL_NAME__B_2, ADC_CHANNEL_NAME__B_3, ADC_CHANNEL_NAME__B_4,
+        ADC_CHANNEL_NAME__B_5, ADC_CHANNEL_NAME__B_6, ADC_CHANNEL_NAME__B_7, ADC_CHANNEL_NAME__B_8
+    };  /* addr in one frame: [0, 1, 2, ...], corresponding channel: [A1, A2, ...] */
+
     class SignalData
     {
         private:
@@ -208,11 +170,13 @@ namespace vuprs
      * 
      * @param buffer Input aligned DMA buffer.
      * @param adcData Output ADC data (ch1: adcData[0], ch2: adcData[1], ...).
+     * @param fs sampling frequency.
+     * @param v_scale ADC voltage scale (5.0 or 10.0 for AD7606)
      * 
      * @retval true: success.
      * @retval false: failed.
      */
-    bool FPGACircularBuffer2Frames(vuprs::AlignedBufferDMA *buffer, vuprs::SignalData *adcData, double samplingFrequency = 1.0);
+    bool FPGACircularBuffer2Frames(vuprs::AlignedBufferDMA *buffer, vuprs::SignalData *adcData, double fs = 1.0, double v_scale = 1.0);
 
     /**
      * @brief Convert memory data to signed float.
