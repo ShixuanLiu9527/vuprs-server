@@ -1,176 +1,113 @@
 #include "beam_former.h"
 
-/* --------------------------------------------------------------------------------------------------------------- */
-/* -------------------------------------------------- CBF -------------------------------------------------------- */
-/* --------------------------------------------------------------------------------------------------------------- */
+/* ------------------------------------------------------------------------------ */
+/* ---------------------------------- DCRCB ------------------------------------- */
+/* ------------------------------------------------------------------------------ */
 
-void vuprs::BeamFormerCBF::GetOutputSignal(std::vector<std::complex<double>> *outputSignal)
+vuprs::Beamformer_DCRCB::Beamformer_DCRCB()
 {
-    if (this->array.empty())
-    {
-        throw std::runtime_error("Cannot beam forming use empty array.");
-    }
-
-    int elementCount = this->array.elementArray.size();
-    Eigen::Matrix<Eigen::dcomplex, -1, 1> totalSignalFrequencyDomain;  /* beam forming output */
-    Eigen::Matrix<Eigen::dcomplex, -1, 1> beamFormingFrequencyVector;  /* beam forming frequency vector */
-    Eigen::Matrix<Eigen::dcomplex, -1, 1> weightVector;  /* beam forming weight vector */
-
-    totalSignalFrequencyDomain.resize(this->array.signalPointCounts / 2 + 1, 1);
-    totalSignalFrequencyDomain.setZero();
-
-    beamFormingFrequencyVector = vuprs::GenerateBeamFormingFrequencyList(this->array.signalPointCounts, this->array.samplingFrequency);  /* 2 * pi * f * j */
-
-    for (int i = 0; i < elementCount; i++)
-    {
-        this->array.elementArray[i].DoFFT();
-        weightVector = (beamFormingFrequencyVector * this->array.timeDelayVector(i, 0)).array().exp().matrix();
-        this->array.elementArray[i].phasedElementSignalFrequencyDomain_eigen = (this->array.elementArray[i].elementSignalFrequencyDomain_eigen.array() * weightVector.array()).matrix();
-        totalSignalFrequencyDomain += this->array.elementArray[i].phasedElementSignalFrequencyDomain_eigen;
-    }
-
-    totalSignalFrequencyDomain /= (double)elementCount;
-    vuprs::SignalMontage(&totalSignalFrequencyDomain);
-
-    /* IFFT */
-
-    std::vector<std::complex<double>> ifftInput;
-    vuprs::eigenVector2stdVector(&totalSignalFrequencyDomain, &ifftInput);
-    vuprs::FFT(&ifftInput, outputSignal, true);
+    this->steeringErrorRadius = 0.0;
 }
 
-/* --------------------------------------------------------------------------------------------------------------- */
-/* ------------------------------------------------- MVDR -------------------------------------------------------- */
-/* --------------------------------------------------------------------------------------------------------------- */
-
-vuprs::BeamFormerMVDR::BeamFormerMVDR()
+vuprs::Beamformer_DCRCB::~Beamformer_DCRCB()
 {
-    this->windowSize = DEFAULT_MVDR_FRAME_WINDOW_LENGTH;
-    this->frameCovarianceMatrixListWindow.reserve(this->windowSize + 1);
+
 }
 
-void vuprs::BeamFormerMVDR::CalculateSignalCovarianceMatrixInCurrentFrame()
+void vuprs::Beamformer_DCRCB::SetSteeringErrorRadius(double r)
 {
-    Eigen::Matrix<Eigen::dcomplex, -1, -1> identity;
-    double samplingFrequency;
-
-    this->currentSignalMatrix = this->array.ArraySignalMatrix(true, &samplingFrequency);
-
-    int elementCount = this->currentSignalMatrix.rows(), frequencySignalPoints = this->currentSignalMatrix.cols();
-
-    if (elementCount == 0 || frequencySignalPoints == 0)
-    {
-        throw std::runtime_error("Empty array or empty signal");
-    }
-    if (this->currentSignalPoints == -1)
-    {
-        this->currentSignalPoints = frequencySignalPoints;
-    }
-    else
-    {
-        if (this->currentSignalPoints != frequencySignalPoints)
-        {
-            throw std::runtime_error("Different points: " + std::to_string(this->currentSignalPoints) + ", " + std::to_string(frequencySignalPoints));
-        }
-    }
-
-    std::vector<Eigen::Matrix<Eigen::dcomplex, -1, -1>> currentMatrixList(frequencySignalPoints);
-    identity = Eigen::Matrix<Eigen::dcomplex, -1, -1>::Identity(elementCount, elementCount) * VUPRS_EPS_1;
-
-    for (int i = 0; i < frequencySignalPoints; i++)
-    {
-        currentMatrixList[i] = this->currentSignalMatrix.col(i) * this->currentSignalMatrix.col(i).adjoint() + identity;
-    }
-
-    this->frameCovarianceMatrixListWindow.push_back(currentMatrixList);
-    if (this->frameCovarianceMatrixListWindow.size() > this->windowSize)
-    {
-        this->frameCovarianceMatrixListWindow.erase(this->frameCovarianceMatrixListWindow.begin());
-    }
-
-    this->CalculateAverageCovarianceMatrix();
+    this->steeringErrorRadius = r;
 }
 
-void vuprs::BeamFormerMVDR::SetWindowSize(int newSize)
+void vuprs::Beamformer_DCRCB::CalculateBeamformingForOneFreq(int freqIndex)
 {
-    if (newSize > 0)
-    {
-        this->windowSize = newSize;
-    }
-    else
-    {
-        this->windowSize = DEFAULT_MVDR_FRAME_WINDOW_LENGTH;
-    }
+    Eigen::Matrix<double, -1, 1> gamma_eigenvalues;  /* matrix gamma (pre diag) */
+    Eigen::Matrix<double, -1, 1> inv_gamma_eigenvalues;  /* matrix gamma.(-1) (pre diag) */
+    Eigen::Matrix<double, -1, 1> zs2;  /* zs .* zs */
+    Eigen::Matrix<Eigen::dcomplex, -1, -1> u_eigenvectors;  /* matrix U, R = U * GAMMA * U.H */
+    Eigen::Matrix<Eigen::dcomplex, -1, 1> zs;  /* zs = U.H @ ps */
+    Eigen::Matrix<Eigen::dcomplex, -1, 1> ps = this->steeringVectors.col(freqIndex);  /* ps */
 
-    this->ResetCovarianceMatrixParam();
+    vuprs::IterationConfig iter;
+
+    double max_eigenvalues, min_eigenvalues, M = this->array.elementArray.size();
+    double _max_eigenvalues;  /* 1 / max(eig) */
+    double _min_eigenvalues;  /* 1 / min(eig) */
+    double rho = M / pow(M - this->steeringErrorRadius / 2.0, 2.0);
+    double sqrt_M_rho = sqrt(M * rho);
+    double result_val;  /* result lambda */
+    
+    vuprs::SetIterationConfigDefault(&iter);
+
+    /* Eigenvalue decomposition */
+
+    vuprs::EigenvalueDecomposition(this->estimate_covMatrix[freqIndex], &gamma_eigenvalues, &u_eigenvectors);
+
+    inv_gamma_eigenvalues = gamma_eigenvalues.array().pow(-1.0).matrix();
+
+    min_eigenvalues = gamma_eigenvalues.minCoeff();
+    max_eigenvalues = gamma_eigenvalues.maxCoeff();
+
+    _min_eigenvalues = 1.0 / min_eigenvalues;
+    _max_eigenvalues = 1.0 / max_eigenvalues;
+
+    zs = u_eigenvectors.adjoint() * ps;
+    zs2 = zs.array().abs2().matrix();
+
+    /* Generate range */
+
+    iter.lowerRegion = -_min_eigenvalues;
+    iter.upperRegion = (_max_eigenvalues - sqrt_M_rho * _min_eigenvalues) / (sqrt_M_rho - 1.0);
+    
+    /* Generate function: f(val) = h(val) - rho */
+
+    auto func_lambda = [&zs2, &inv_gamma_eigenvalues, &rho](double val) -> double
+    {
+        Eigen::Matrix<double, -1, 1> part0 = (inv_gamma_eigenvalues.array() + val).matrix();
+        Eigen::Matrix<double, -1, 1> part1 = part0.array().pow(-1.0).matrix();
+        Eigen::Matrix<double, -1, 1> part2 = part0.array().pow(-2.0).matrix();
+
+        return zs2.dot(part2) / pow(zs2.dot(part1), 2.0) - rho;
+    };
+
+    iter.func = func_lambda;
+
+    /* Iteration */
+
+    BisectionIteration1D(iter, &result_val);
+
+    /* Get weight vector for this frequency band */
+
+    Eigen::Matrix<Eigen::dcomplex, -1, -1> invR_plus_lambdaI_inv = \
+        u_eigenvectors * ((inv_gamma_eigenvalues.array() + result_val).array().pow(-1.0).matrix().asDiagonal()) * u_eigenvectors.adjoint();  /* (R.-1 + lambda * I).-1 */
+    Eigen::Matrix<Eigen::dcomplex, -1, 1> invR_plus_lambdaI_inv__mul__ps = invR_plus_lambdaI_inv * ps;
+
+    Eigen::Matrix<Eigen::dcomplex, -1, 1> ps_estimate = \
+        (M - this->steeringErrorRadius / 2.0) * invR_plus_lambdaI_inv__mul__ps / (ps.adjoint() * invR_plus_lambdaI_inv__mul__ps)(0, 0);
+
+    Eigen::Matrix<Eigen::dcomplex, -1, -1> invR = u_eigenvectors * inv_gamma_eigenvalues.asDiagonal() * u_eigenvectors.adjoint();  /* R.-1 = U * GAMMA.-1 * U.H */
+    Eigen::Matrix<Eigen::dcomplex, -1, -1> invR__mul__ps_estimate = invR * ps_estimate;
+
+    this->resultWeightVectors.col(freqIndex) = invR__mul__ps_estimate / (ps_estimate.adjoint() * invR__mul__ps_estimate)(0, 0);
 }
 
-void vuprs::BeamFormerMVDR::CalculateAverageCovarianceMatrix()
+/* ------------------------------------------------------------------------------ */
+/* ------------------------------------ CBF ------------------------------------- */
+/* ------------------------------------------------------------------------------ */
+
+vuprs::Beamformer_CBF::Beamformer_CBF()
 {
-    if (this->currentSignalPoints == -1)
-    {
-        return;
-    }
-
-    /* Linear weight factor */
-
-    int frameSize = this->frameCovarianceMatrixListWindow.size();
-
-    if (frameSize <= 0)
-    {
-        return;
-    }
-
-    this->averageCovarianceMatrixList.resize(this->currentSignalPoints);
-    double totalWeight = (1.0 + (double)frameSize) * (double)frameSize / 2.0;
-
-    for (int i = 0; i < this->currentSignalPoints; i++)
-    {
-        this->averageCovarianceMatrixList[i].setZero();
-        for (int j = 0; j < frameSize; j++)
-        {
-            double weight = double(j + 1);
-            this->averageCovarianceMatrixList[i] += weight * this->frameCovarianceMatrixListWindow[j][i];
-        }
-        this->averageCovarianceMatrixList[i] /= totalWeight;
-    }
+    
 }
 
-void vuprs::BeamFormerMVDR::ResetCovarianceMatrixParam()
+vuprs::Beamformer_CBF::~Beamformer_CBF()
 {
-    this->currentSignalPoints = -1;
-    std::vector<std::vector<Eigen::Matrix<Eigen::dcomplex, -1, -1>>>().swap(this->frameCovarianceMatrixListWindow);  /* release */
-    this->frameCovarianceMatrixListWindow.reserve(this->windowSize);
+
 }
 
-void vuprs::BeamFormerMVDR::GetOutputSignal(std::vector<std::complex<double>> *outputSignal)
+void vuprs::Beamformer_CBF::CalculateBeamformingForOneFreq(int freqIndex)
 {
-    this->CalculateSignalCovarianceMatrixInCurrentFrame();
-
-    int frequencySignalPoints = this->currentSignalMatrix.cols(), elements = this->currentSignalMatrix.rows();
-    Eigen::Matrix<Eigen::dcomplex, -1, 1> result(frequencySignalPoints), fullResult;
-    Eigen::Matrix<Eigen::dcomplex, -1, 1> frequencyList = vuprs::GenerateFrequencyList(this->array.signalPointCounts, this->array.samplingFrequency);
-    Eigen::Matrix<Eigen::dcomplex, -1, -1> invCovarianceMatrix;
-    Eigen::Matrix<Eigen::dcomplex, -1, 1> arrayResponseVector;
-    Eigen::Matrix<Eigen::dcomplex, -1, 1> weightedVector;
-
-    /* Weighted and calculate */
-
-    for (int i = 0; i < frequencySignalPoints; i++)
-    {
-        invCovarianceMatrix = this->averageCovarianceMatrixList[i].inverse();
-        arrayResponseVector = this->array.ArrayResponseVector(frequencyList(i, 0).imag());
-        weightedVector = invCovarianceMatrix * arrayResponseVector / (arrayResponseVector.adjoint() * invCovarianceMatrix * arrayResponseVector)(0, 0);
-        result(i, 0) = (weightedVector.adjoint() * this->currentSignalMatrix.col(i));
-    }
-
-    /* Montage */
-
-    vuprs::SignalMontage(&result);
-
-    /* IFFT */
-
-    std::vector<std::complex<double>> ifftInput;
-    vuprs::eigenVector2stdVector(&result, &ifftInput);
-    vuprs::FFT(&ifftInput, outputSignal, true);
+    Eigen::Matrix<Eigen::dcomplex, -1, 1> ps = this->steeringVectors.col(freqIndex);  /* ps */
+    double M = this->array.elementArray.size();  /* M */
+    this->resultWeightVectors.col(freqIndex) = ps / M;
 }

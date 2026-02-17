@@ -15,10 +15,14 @@ void vuprs::BeamFormingElement::DoFFT()
     {
         throw std::runtime_error("Cannot do FFT in an empty element.");
     }
+    if (this->elementSignalTimeDomain.size() <= 0)
+    {
+        throw std::runtime_error("Signal is empty.");
+    }
     
-    vuprs::FFT(&this->elementSignalTimeDomain, &this->elementSignalFrequencyDomain_std);
+    vuprs::FFT(this->elementSignalTimeDomain, &this->elementSignalFrequencyDomain_std);
     vuprs::CutTheFirstHalf(&this->elementSignalFrequencyDomain_std);
-    vuprs::stdVector2eigenVector<std::complex<double>>(&this->elementSignalFrequencyDomain_std, &this->elementSignalFrequencyDomain_eigen);
+    vuprs::stdVector2eigenVector<std::complex<double>>(this->elementSignalFrequencyDomain_std, &this->elementSignalFrequencyDomain_eigen);
 }
 
 bool vuprs::BeamFormingElement::empty() const
@@ -32,15 +36,11 @@ bool vuprs::BeamFormingElement::empty() const
 
 vuprs::BeamFormingArray::BeamFormingArray()
 {
+    this->fs = 0.0;
+    this->samplingTime = 0.0;
+    this->signalPointCounts = 0;
 
-}
-
-vuprs::BeamFormingArray::BeamFormingArray(const std::string &filename)
-{
-    if (!this->LoadArrayFromJson(filename))
-    {
-        throw std::runtime_error("Failed to load array from: " + filename);
-    }
+    this->threadPool = std::make_unique<vuprs::ThreadPool>(std::thread::hardware_concurrency());
 }
 
 vuprs::BeamFormingArray::~BeamFormingArray()
@@ -181,7 +181,7 @@ void vuprs::BeamFormingArray::InputElementSignal(const vuprs::SignalData &adcDat
 
     int arraySize = this->elementArray.size();
     
-    this->samplingFrequency = adcData.samplingFrequency;
+    this->fs = adcData.samplingFrequency;
     this->samplingTime = adcData.samplingTime;
     this->signalPointCounts = adcData.signalPoints;
     
@@ -201,14 +201,20 @@ bool vuprs::BeamFormingArray::empty() const
     return this->elementArray.size() <= 0;
 }
 
-Eigen::Matrix<Eigen::dcomplex, -1, 1> vuprs::BeamFormingArray::ArrayResponseVector(double frequency) const
+Eigen::Matrix<Eigen::dcomplex, -1, 1> vuprs::BeamFormingArray::GetSteeringVector(double frequency) const
 {
     return (-this->timeDelayVector * std::complex<double>(0, 1) * 2.0 * PI * frequency).array().exp().matrix();
 }
 
-Eigen::Matrix<Eigen::dcomplex, -1, -1> vuprs::BeamFormingArray::ArraySignalMatrix(bool frequencyDomain, double *samplingFrequency)
+void vuprs::BeamFormingArray::GetSteeringVectorMatrix(Eigen::Matrix<Eigen::dcomplex, -1, -1> *matrix) const
 {
-    uint64_t dataSize = this->elementArray[0].elementSignalTimeDomain.size();
+    Eigen::Matrix<Eigen::dcomplex, -1, 1> _j_omega = -2.0 * PI * vuprs::GenerateComplexFrequencyList(this->signalPointCounts, this->fs);  /* -j * omega */
+    *matrix = (this->timeDelayVector * _j_omega.transpose()).array().exp().matrix();  /* exp(-jwT{i}) */
+}
+
+void vuprs::BeamFormingArray::GetArraySignalMatrix(Eigen::Matrix<Eigen::dcomplex, -1, -1> *signalMatrix, double *samplingFrequency, bool frequencyDomain)
+{
+    uint64_t dataSize = this->signalPointCounts;
     uint64_t elementSize = this->elementArray.size();
 
     if (dataSize <= 0)
@@ -220,33 +226,43 @@ Eigen::Matrix<Eigen::dcomplex, -1, -1> vuprs::BeamFormingArray::ArraySignalMatri
         throw std::runtime_error("Cannot get array signal matrix from an empty array.");
     }
 
-    Eigen::Matrix<Eigen::dcomplex, -1, -1> arraySignalMatrix;
+    if (frequencyDomain) signalMatrix->resize(this->elementArray.size(), dataSize / 2 + 1);  /* M x (N/2 + 1) */
+    else signalMatrix->resize(elementSize, dataSize);  /* M x N */
 
-    if (frequencyDomain) arraySignalMatrix.resize(this->elementArray.size(), dataSize / 2 + 1);
-    else arraySignalMatrix.resize(this->elementArray.size(), dataSize);
+    std::vector<std::future<void>> futures;
+    futures.reserve(elementSize);
 
-    for (int i = 0; i < elementSize; i++)
+    if (frequencyDomain)
     {
-        if (this->elementArray.empty())
+        for (uint64_t i = 0; i < elementSize; i++)
         {
-            throw std::runtime_error("Cannot get array signal matrix from an empty array.");
+            futures.emplace_back(
+                [this, i](){this->elementArray[i].DoFFT();}
+            );
         }
-        if (frequencyDomain)
+        for (auto &f : futures)  /* wait complete */
         {
-            this->elementArray[i].DoFFT();
-            arraySignalMatrix.row(i) = this->elementArray[i].elementSignalFrequencyDomain_eigen.transpose();
+            f.get();
         }
-        else
+        for (uint64_t i = 0; i < elementSize; i++)
         {
-            arraySignalMatrix.row(i) = Eigen::Map<Eigen::Matrix<Eigen::dcomplex, 1, -1>>(this->elementArray[i].elementSignalTimeDomain.data(), this->elementArray[i].elementSignalTimeDomain.size());
+            signalMatrix->row(i) = this->elementArray[i].elementSignalFrequencyDomain_eigen.transpose();
         }
     }
-
-    if (samplingFrequency != nullptr) *samplingFrequency = this->samplingFrequency;
-    return arraySignalMatrix;
+    else
+    {
+        for (uint64_t i = 0; i < elementSize; i++)
+        {
+            signalMatrix->row(i) = Eigen::Map<Eigen::Matrix<Eigen::dcomplex, 1, -1>>(
+                this->elementArray[i].elementSignalTimeDomain.data(), 
+                this->elementArray[i].elementSignalTimeDomain.size()
+            );
+        }
+    }
+    if (samplingFrequency != nullptr) *samplingFrequency = this->fs;
 }
 
-double vuprs::BeamFormingArray::MaxAbsoluteTimeDelay() const
+double vuprs::BeamFormingArray::GetMaxAbsoluteTimeDelay() const
 {
     return this->timeDelayVector.array().abs().matrix().maxCoeff();
 }

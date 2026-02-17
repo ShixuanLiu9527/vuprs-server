@@ -1,0 +1,137 @@
+#include "fir.h"
+
+vuprs::FIRCalculator::FIRCalculator()
+{
+    this->firLength = 0;
+    this->freqRange_l = 0.0;
+    this->freqRange_u = 1000000.0;
+    this->lastSignalPoints = 0;
+    this->configdown = false;
+}
+
+vuprs::FIRCalculator::~FIRCalculator()
+{
+
+}
+
+bool vuprs::FIRCalculator::ConfigFIRFromJsonFile(const std::string &jsonFilename)
+{
+    std::ifstream arrayConfigJsonFile;
+
+    arrayConfigJsonFile.open(jsonFilename);
+    if (!arrayConfigJsonFile.is_open())
+    {
+        throw std::runtime_error("Cannot open file: " + jsonFilename);
+    }
+
+    nlohmann::json configJsonData;
+
+    try
+    {
+        arrayConfigJsonFile >> configJsonData;
+    }
+    catch(const std::exception& e)
+    {
+        throw std::runtime_error("Failed to load array data from: " + jsonFilename);
+    }
+
+    vuprs::__JsonStringParseINT<uint32_t>(&this->firLength, configJsonData, "length", true);
+
+    this->configdown = true;
+    return true;
+}
+
+void vuprs::FIRCalculator::SetFrequencyRange(double lower, double upper)
+{
+    if (lower >= upper)
+    {
+        throw std::runtime_error("Lower >= Upper.");
+    }
+    this->freqRange_l = lower;
+    this->freqRange_u = upper;
+}
+
+bool vuprs::FIRCalculator::SolveCoeffUseExpectedFrequencyResponse(const Eigen::Matrix<Eigen::dcomplex, -1, -1> &response, double fs)
+{
+    if (!this->configdown)
+    {
+        std::runtime_error("Config not complete.");
+    }
+
+    int M = response.rows();  /* M */
+    int N_2_plus_1 = response.cols();  /* N/2+1 */
+    int N = (N_2_plus_1 - 1) * 2;  /* N */
+    
+    if (N_2_plus_1 < this->firLength)
+    {
+        throw std::runtime_error("Too little response for solving.");
+    }
+
+    if (this->lastSignalPoints != N)
+    {
+        vuprs::Get_FIR_EXPMatrix(this->firLength, N, &this->matrixE, false);
+        this->lastSignalPoints = N;
+    }
+
+    Eigen::Matrix<Eigen::dcomplex, -1, 1> h;
+    Eigen::Matrix<double, -1, 1> W_vec;
+
+    Eigen::Matrix<double, -1, 1> h_real;
+
+    W_vec.resize(N_2_plus_1, 1);   /* length = N / 2 + 1 */
+    W_vec.setOnes();
+
+    W_vec *= 0.01;
+    
+    for (int i = 0; i < N_2_plus_1; i++)  /* for positive frequency */
+    {
+        double fk = fs * i / N;
+        if (fk >= this->freqRange_l && fk <= this->freqRange_u)
+        {
+            W_vec(i, 0) = 1.0;
+        }
+    }
+
+    vuprs::CompleteSymmetric(&W_vec);  /* Montage */
+
+    if (W_vec.rows() != N)
+    {
+        throw std::runtime_error("Internal error.");
+    }
+
+    Eigen::Matrix<Eigen::dcomplex, -1, -1> EH = this->matrixE.adjoint();
+    Eigen::Matrix<Eigen::dcomplex, -1, -1> W_E = this->matrixE.array().colwise() * W_vec.array();
+    Eigen::Matrix<Eigen::dcomplex, -1, -1> EH_W_E = EH * W_E;  /* E.H * W * E */
+    Eigen::Matrix<Eigen::dcomplex, -1, -1> EH_W = EH.array().rowwise() * W_vec.array();  /* E.H * W */
+    Eigen::Matrix<Eigen::dcomplex, -1, 1> EH_W_Hd;  /* E.H * W * Hd */
+    Eigen::Matrix<Eigen::dcomplex, -1, 1> Hd;
+
+    this->firCoefficient.resize(M);
+
+    for (int i = 0; i < M; i++)
+    {
+        this->firCoefficient[i].resize(this->firLength);
+
+        Hd = response.row(i).transpose();
+        
+        vuprs::CompleteConjugateSymmetric(&Hd);
+
+        EH_W_Hd = EH_W * Hd;
+
+        h = EH_W_E.ldlt().solve(EH_W_Hd);
+        if (h.imag().norm() > 1e-5)
+        {
+            return false;
+        }
+        h_real = h.real();
+
+        vuprs::eigenVector2stdVector<double>(h_real, &this->firCoefficient[i]);
+    }
+
+    return true;
+}
+
+void vuprs::FIRCalculator::GetFIRBankCoefficient(std::vector<std::vector<double>> *dst) const
+{
+    *dst = this->firCoefficient;
+}
