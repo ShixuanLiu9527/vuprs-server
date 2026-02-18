@@ -29,6 +29,7 @@ void vuprs::FPGA_Device__AXIDirectMemoryAccess::GenerateRegisterTable()
 bool vuprs::FPGA_Device__AXIDirectMemoryAccess::LoadFromJsonObj(const nlohmann::json &obj)
 {
     this->LoadMainInfoFromJsonObj(obj);
+    this->configdone = true;
     return true;
 }
 
@@ -41,6 +42,9 @@ vuprs::FPGA_Device__ADCController::FPGA_Device__ADCController()
     this->maxSamplingFrequencyHz = 10000.0;
     this->voltageRangeRadiusV = 10.0;
     this->workClockFrequencyHz = 50000000.0;
+
+    this->currentSamplingFrequency = 0.0;
+    this->currentSCI = 0xFFFFFFFF;
 
     this->GenerateRegisterTable();
     this->SetRegisterOffsetDefault();
@@ -66,8 +70,63 @@ bool vuprs::FPGA_Device__ADCController::LoadFromJsonObj(const nlohmann::json &ob
    vuprs::__JsonStringParseFLOAT<double>(&this->maxSamplingFrequencyHz, obj, "max-sampling-frequency-hz", true);
    vuprs::__JsonStringParseFLOAT<double>(&this->voltageRangeRadiusV, obj, "voltage-range-radius-v", true);
    vuprs::__JsonStringParseFLOAT<double>(&this->workClockFrequencyHz, obj, "work-clock-frequency-hz", true);
+   this->configdone = true;
    return true;
 }
+
+uint32_t vuprs::FPGA_Device__ADCController::GetSCIValueForSamplingFrequency(double fs) const
+{
+    if (!this->configdone)
+    {
+        throw std::runtime_error("Config not complete.");
+    }
+    if (fs > this->maxSamplingFrequencyHz || fs <= 1e-2)
+    {
+        return 0xFFFFFFFF;
+    }
+
+    uint32_t SCI = std::round(this->workClockFrequencyHz / (2.0 * fs));
+    uint32_t SCI_u = SCI + 1;
+    uint32_t SCI_l = SCI - 1;
+
+    double f_SCI = this->SCI2FS(SCI);
+    double f_SCI_u = this->SCI2FS(SCI_u);
+    double f_SCI_l = this->SCI2FS(SCI_l);
+
+    if (abs(f_SCI - fs) <= abs(f_SCI_u - fs) && 
+        abs(f_SCI - fs) <= abs(f_SCI_l - fs))
+    {
+        return SCI;
+    }
+    else if (abs(f_SCI_u - fs) <= abs(f_SCI - fs) && 
+             abs(f_SCI_u - fs) <= abs(f_SCI_l - fs))
+    {
+        return SCI_u;
+    }
+    else if (abs(f_SCI_l - fs) <= abs(f_SCI - fs) && 
+             abs(f_SCI_l - fs) <= abs(f_SCI_u - fs))
+    {
+        return SCI_l;
+    }
+    
+    return SCI;
+}
+
+double vuprs::FPGA_Device__ADCController::SCI2FS(uint32_t SCI) const
+{
+    return this->workClockFrequencyHz / (2.0 * static_cast<double>(SCI));
+}
+
+void vuprs::FPGA_Device__ADCController::SetSCI(uint32_t SCI) 
+{
+    this->currentSCI = SCI;
+    this->currentSamplingFrequency = this->SCI2FS(SCI);
+}
+
+double vuprs::FPGA_Device__ADCController::MaxSamplingFrequency() const {return this->maxSamplingFrequencyHz;}
+double vuprs::FPGA_Device__ADCController::VoltageRangeRadius() const {return this->voltageRangeRadiusV;}
+double vuprs::FPGA_Device__ADCController::WorkFrequency() const {return this->workClockFrequencyHz;}
+double vuprs::FPGA_Device__ADCController::CurrentSamplingFrequency() const {return this->currentSamplingFrequency;}
 
 /* ---------------------------------------------------------------------- */
 /* --------------------------- Circular Buffer -------------------------- */
@@ -92,7 +151,14 @@ void vuprs::FPGA_Device__CircularBuffer::GenerateRegisterTable()
 bool vuprs::FPGA_Device__CircularBuffer::LoadFromJsonObj(const nlohmann::json &obj)
 {
     this->LoadMainInfoFromJsonObj(obj);
+    vuprs::__JsonStringParseINT<uint32_t>(&this->signalPoints, obj, "signal-points", true);
+    this->configdone = true;
     return true;
+}
+
+uint32_t vuprs::FPGA_Device__CircularBuffer::SignalPoints() const
+{
+    return this->signalPoints;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -122,6 +188,7 @@ void vuprs::FPGA_Device__FIRFilterBank::GenerateRegisterTable()
 bool vuprs::FPGA_Device__FIRFilterBank::LoadFromJsonObj(const nlohmann::json &obj)
 {
     this->LoadMainInfoFromJsonObj(obj);
+    this->configdone = true;
     return true;
 }
 
@@ -156,5 +223,6 @@ void vuprs::FPGA_Device__PreDelayUnit::GenerateRegisterTable()
 bool vuprs::FPGA_Device__PreDelayUnit::LoadFromJsonObj(const nlohmann::json &obj)
 {
     this->LoadMainInfoFromJsonObj(obj);
+    this->configdone = true;
     return true;
 }

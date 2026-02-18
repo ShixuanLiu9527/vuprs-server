@@ -77,7 +77,8 @@
                 "CBUF_RST":     "0x04",
                 "CBUF_RS":      "0x08",
                 "CBUF_CBP":     "0x0c"
-            }
+            },
+            "signal-points": "512"
         },
         "fir_bank": 
         {
