@@ -1,5 +1,9 @@
 #include "fpga_api.h"
 
+/* ----------------------------------------------------------------------------- */
+/* ----------------------------- ADC Controller -------------------------------- */
+/* ----------------------------------------------------------------------------- */
+
 bool vuprs::FPGA_API__ADC__StartADC(vuprs::FPGAController *controller, double fs)
 {
     if (!controller->ConfigDown())
@@ -76,6 +80,10 @@ bool vuprs::FPGA_API__ADC__ResetADC(vuprs::FPGAController *controller)
     return operateStatus;
 }
 
+/* ----------------------------------------------------------------------------- */
+/* ----------------------------- Circular Buffer ------------------------------- */
+/* ----------------------------------------------------------------------------- */
+
 bool vuprs::FPGA_API__CBUF__ReadCircularBuffer(vuprs::FPGAController *controller, 
     vuprs::SignalData *signal)
 {
@@ -144,6 +152,10 @@ bool vuprs::FPGA_API__CBUF__ReadCircularBuffer(vuprs::FPGAController *controller
     return operateStatus;
 }
 
+/* ----------------------------------------------------------------------------- */
+/* ------------------------------ Predelay Unit -------------------------------- */
+/* ----------------------------------------------------------------------------- */
+
 bool vuprs::FPGA_API__PDLY__SetPredelay(vuprs::FPGAController *controller, 
     const std::vector<uint16_t> &channelPredelay, const std::vector<std::string> &channelName)
 {
@@ -195,6 +207,10 @@ bool vuprs::FPGA_API__PDLY__SetPredelay(vuprs::FPGAController *controller,
 
     return controller->dev__PreDelay_Unit.WriteMultipleRegister(registersToWrite, predelayToWrite);
 }
+
+/* ----------------------------------------------------------------------------- */
+/* ---------------------------- FIR Filter Bank -------------------------------- */
+/* ----------------------------------------------------------------------------- */
 
 bool vuprs::FPGA_API__FIR__SetCoefficients(vuprs::FPGAController *controller, 
     std::vector<std::vector<double>> *coefficients, double maxAbsoluteCoefficient)
@@ -373,7 +389,11 @@ bool vuprs::FPGA_API__FIR__SetLengthAndCoefficients(vuprs::FPGAController *contr
     return operateStatus;
 }
 
-bool vuprs::FPGA_API__FIR__ReadDDR(vuprs::FPGAController *controller, 
+/* ----------------------------------------------------------------------------- */
+/* ------------------------------------ DDR ------------------------------------ */
+/* ----------------------------------------------------------------------------- */
+
+bool vuprs::FPGA_API__DDR__ReadDDR(vuprs::FPGAController *controller, 
     vuprs::AlignedBufferDMA *buffer, uint32_t ddrOffset, uint32_t transferSize)
 {
     if (!controller->ConfigDown())
@@ -382,4 +402,98 @@ bool vuprs::FPGA_API__FIR__ReadDDR(vuprs::FPGAController *controller,
     }
 
     return controller->mem__DDR.ReadMemory(buffer, ddrOffset, transferSize);
+}
+
+/* ----------------------------------------------------------------------------- */
+/* ---------------------------------- AXI DMA ---------------------------------- */
+/* ----------------------------------------------------------------------------- */
+
+bool vuprs::FPGA_API__DMA__StartScatterGatherDMA_S2MM(vuprs::FPGAController *controller,
+        const std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> &descriptors, bool isCyclicMode)
+{
+    if (!controller->ConfigDown())
+    {
+        throw std::runtime_error("FPGA Controller not configured in advance.");
+    }
+
+    uint32_t descriptorSize = descriptors.size();
+
+    if (descriptorSize == 0)
+    {
+        throw std::runtime_error("Descriptor is empty.");
+    }
+    if (isCyclicMode && descriptors[descriptorSize - 1].NXTDESC != 0)
+    {
+        throw std::runtime_error("Invalid cyclic DMA descriptor.");
+    }
+
+    uint32_t r_val, w_val;
+    bool operateStatus = true;
+    int timeout = 0;
+
+    /* Clear buffer */
+
+    controller->buffer.release();
+
+    /* STEP 1: Stop DMA */
+
+    operateStatus &= controller->dev__AXI_DMA.ReadSingleRegister(vuprs::AXI_DMA__Registers::S2MM_DMACR, &r_val);
+    w_val = FPGA_CLEAR_REG_BIT(r_val, 0);  /* clear S2MM_DMACR.RS */
+    operateStatus &= controller->dev__AXI_DMA.WriteSingleRegister(vuprs::AXI_DMA__Registers::S2MM_DMACR, w_val);
+
+    /* Wait for S2MM_DMASR.Halted = 1 */
+
+    do
+    {
+       operateStatus &= controller->dev__AXI_DMA.ReadSingleRegister(vuprs::AXI_DMA__Registers::S2MM_DMASR, &r_val);
+       if (FPGA_REG_BIT(r_val, 0)) break;
+       if (timeout > 1000) break;
+       timeout++;
+       usleep(1000); 
+    } 
+    while (!FPGA_REG_BIT(r_val, 0));
+    timeout = 0;
+
+    /* STEP 2: Write descriptor address to current descriptor pointer */
+
+    operateStatus &= controller->dev__AXI_DMA.WriteSingleRegister(vuprs::AXI_DMA__Registers::S2MM_CURDESC, 0x00);  /* write with 0x00 */
+
+    /* STEP 3: Start DMA */
+
+    operateStatus &= controller->dev__AXI_DMA.ReadSingleRegister(vuprs::AXI_DMA__Registers::S2MM_DMACR, &r_val);
+    w_val = FPGA_SET_REG_BIT(r_val, 0);  /* set S2MM_DMACR.RS */
+    operateStatus &= controller->dev__AXI_DMA.WriteSingleRegister(vuprs::AXI_DMA__Registers::S2MM_DMACR, w_val);
+    
+    /* Wait for S2MM_DMASR.Halted = 0 */
+
+    do
+    {
+       operateStatus &= controller->dev__AXI_DMA.ReadSingleRegister(vuprs::AXI_DMA__Registers::S2MM_DMASR, &r_val);
+       if (!FPGA_REG_BIT(r_val, 0)) break;
+       if (timeout > 1000) break;
+       timeout++;
+       usleep(1000); 
+    } 
+    while (FPGA_REG_BIT(r_val, 0));
+    timeout = 0;
+
+    /* STEP 4: Write descriptors to SG_BRAM */
+
+    controller->buffer.from_vector<vuprs::AXI_DMA_ScatterGatherDescriptor>(descriptors);
+    operateStatus &= controller->mem__SG_BRAM.WriteMemory(&controller->buffer, 0x00, controller->buffer.size());
+
+    /* STEP 5: Write tail descriptor register to trigger. */
+
+    if (isCyclicMode)
+    {
+        w_val = (uint32_t)((uint32_t)0x50 << 6);
+    }
+    else
+    {
+        w_val = (uint32_t)((uint32_t)(descriptors[descriptorSize - 1].ALIGNMENT_0_CURRENT_ADDR) << 6);  /* Write to [31:6] */
+    }
+
+    operateStatus &= controller->dev__AXI_DMA.WriteSingleRegister(vuprs::AXI_DMA__Registers::S2MM_TAILDESC, w_val);
+
+    return operateStatus;
 }

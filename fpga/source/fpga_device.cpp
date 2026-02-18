@@ -33,6 +33,69 @@ bool vuprs::FPGA_Device__AXIDirectMemoryAccess::LoadFromJsonObj(const nlohmann::
     return true;
 }
 
+void vuprs::AXI_DMA_ScatterGatherDescriptor_ToDefault(vuprs::AXI_DMA_ScatterGatherDescriptor *descriptor)
+{
+    descriptor->NXTDESC = 0;
+    descriptor->NXTDESC_MSB = 0;
+    descriptor->BUFFER_ADDRESS = 0;
+    descriptor->BUFFER_ADDRESS_MSB = 0;
+    descriptor->RESERVED_0 = 0;
+    descriptor->RESERVED_1 = 0;
+    descriptor->CONTROL = 0;
+    descriptor->STATUS = 0;
+
+    descriptor->APP0 = 0;
+    descriptor->APP1 = 0;
+    descriptor->APP2 = 0;
+    descriptor->APP3 = 0;
+    descriptor->APP4 = 0;
+
+    descriptor->ALIGNMENT_0_CURRENT_ADDR = 0;
+    descriptor->ALIGNMENT_1 = 0;
+    descriptor->ALIGNMENT_2 = 0;
+}
+
+void vuprs::CreateDMAScatterGatherDescriptorChain(std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> *descriptorList, 
+        uint32_t bufferSize, uint32_t bufferCount, uint32_t ddrBaseAddr, bool isCyclicMode)
+{
+    if (bufferSize == 0 || bufferCount == 0)
+    {
+        throw std::runtime_error("Buffer size or buffer count should not be 0.");
+    }
+    if (bufferSize % vuprs::DMA_BUFFER_ALIGNMENT_1_WORD != 0)
+    {
+        throw std::runtime_error("Buffer size must aligned to 1 word");
+    }
+    if (bufferSize > vuprs::DMA_MAX_BUFFER_LENGTH)
+    {
+        throw std::runtime_error("Buffer size must be smaller than " + std::to_string(vuprs::DMA_MAX_BUFFER_LENGTH) + " bytes.");
+    }
+
+    descriptorList->resize(bufferCount);
+
+    for (uint32_t i = 0; i < bufferCount; i++)
+    {
+        vuprs::AXI_DMA_ScatterGatherDescriptor_ToDefault(&(*descriptorList)[i]);
+
+        /* Next descriptor address (in bytes) = (i + 1) * 64U. */
+
+        (*descriptorList)[i].NXTDESC = (i + 1) * sizeof(vuprs::AXI_DMA_ScatterGatherDescriptor);
+        (*descriptorList)[i].ALIGNMENT_0_CURRENT_ADDR = i * sizeof(vuprs::AXI_DMA_ScatterGatherDescriptor);
+
+        /* Current buffer address (in bytes) = i * buffer size */
+
+        (*descriptorList)[i].BUFFER_ADDRESS = i * bufferSize + ddrBaseAddr;
+
+        /* Current buffer length CONTROL[25:0] = buffer size */
+
+        (*descriptorList)[i].CONTROL |= (bufferSize & vuprs::DMA_BUFFER_LENGTH_MASK);
+    }
+    if (isCyclicMode)
+    {
+        (*descriptorList)[bufferCount - 1].NXTDESC = 0;  /* point to begining */
+    }
+}
+
 /* ---------------------------------------------------------------------- */
 /* ---------------------------- ADC Controller -------------------------- */
 /* ---------------------------------------------------------------------- */
