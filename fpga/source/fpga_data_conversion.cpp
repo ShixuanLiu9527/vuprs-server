@@ -89,7 +89,7 @@ void vuprs::SignalData::ToCSV(const std::string &outputFile)
     file.close();
 }
 
-bool vuprs::FPGACircularBuffer2Frames(vuprs::AlignedBufferDMA *buffer, vuprs::SignalData *adcData, double fs, double v_scale)
+bool vuprs::FPGACircularBuffer2Frames(vuprs::AlignedBufferDMA *buffer, vuprs::SignalData *adcData, double fs, double v_scale, uint32_t currentBramPointer)
 {
     if (!buffer->is_allocated())
     {
@@ -125,9 +125,9 @@ bool vuprs::FPGACircularBuffer2Frames(vuprs::AlignedBufferDMA *buffer, vuprs::Si
                 for (int ch = 0; ch < ADC_CHANNEL_NUMBER; ch++)
                 {
                     adcData->_channelData[ch].emplace_back(
-                        std::complex<double>(
-                            vuprs::Q15__ADC_UINT16_TO_DOUBLE(rawBufferDataVector[headerPointer + ch + 2], v_scale), 
-                            0.0)
+                        std::complex<double>(vuprs::Q15__ADC_UINT16_TO_DOUBLE(
+                            rawBufferDataVector[headerPointer + ch + 2], v_scale
+                        ), 0.0)
                     );
                 }
                 frameParsedSize++;
@@ -139,6 +139,11 @@ bool vuprs::FPGACircularBuffer2Frames(vuprs::AlignedBufferDMA *buffer, vuprs::Si
         }
         headerPointer += ADC_FRAME_HALF_WORD_SIZE;
         tailerPointer += ADC_FRAME_HALF_WORD_SIZE;
+    }
+
+    for (int ch = 0; ch < ADC_CHANNEL_NUMBER; ch++)
+    {
+        vuprs::RotateCircularBuffer<std::complex<double>>(&adcData->_channelData[ch], currentBramPointer);
     }
 
     adcData->samplingFrequency = fs;

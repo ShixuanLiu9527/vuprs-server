@@ -69,6 +69,13 @@ namespace vuprs
     {
         private:
 
+            double maxSamplingFrequencyHz;
+            double voltageRangeRadiusV;
+            double workClockFrequencyHz;
+
+            double currentSamplingFrequency;
+            uint32_t currentSCI;
+
             uint32_t offset_ADC_SCI;
             uint32_t offset_ADC_SP;
             uint32_t offset_ADC_SF;
@@ -78,10 +85,6 @@ namespace vuprs
             uint32_t offset_ADC_RST;
             uint32_t offset_ADC_CS;
 
-            double maxSamplingFrequencyHz;
-            double voltageRangeRadiusV;
-            double workClockFrequencyHz;
-
         protected:
 
             void GenerateRegisterTable() override;
@@ -90,6 +93,41 @@ namespace vuprs
 
             FPGA_Device__ADCController();
             bool LoadFromJsonObj(const nlohmann::json &obj) override;
+
+            /**
+             * @brief Get SCI value for certain sampling frequency.
+             */
+            uint32_t GetSCIValueForSamplingFrequency(double fs) const;
+
+            /**
+             * @brief Maximum sampling frequency.
+             */
+            double MaxSamplingFrequency() const;
+
+            /**
+             * @brief ADC work voltage (5.0 V or 10.0 V for AD7606)
+             */
+            double VoltageRangeRadius() const;
+
+            /**
+             * @brief Work frequency (e.g. 50000000 Hz)
+             */
+            double WorkFrequency() const;
+
+            /**
+             * @brief Current sampling frequency.
+             */
+            double CurrentSamplingFrequency() const;
+
+            /**
+             * @brief Convert SCI value to sampling frequency.
+             */
+            double SCI2FS(uint32_t SCI) const;
+
+            /**
+             * @brief Set SCI value.
+             */
+            void SetSCI(uint32_t SCI);
     };
 
     /* ---------------------------------------------------------------------- */
@@ -108,6 +146,8 @@ namespace vuprs
     {
         private:
 
+            uint32_t signalPoints;
+
             uint32_t offset_CBUF_FREEZE;
             uint32_t offset_CBUF_RST;
             uint32_t offset_CBUF_RS;
@@ -121,6 +161,8 @@ namespace vuprs
 
             FPGA_Device__CircularBuffer();
             bool LoadFromJsonObj(const nlohmann::json &obj) override;
+
+            uint32_t SignalPoints() const;
     };
 
     /* ---------------------------------------------------------------------- */
