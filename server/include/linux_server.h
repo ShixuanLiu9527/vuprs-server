@@ -10,9 +10,7 @@
 #define VUPRS_LINUX_SERVER_H
 
 #include "tcp_server.h"
-#include "fpga_config.h"
 #include "log_manager.h"
-#include "session_callback.h"
 
 namespace vuprs
 {
@@ -39,12 +37,6 @@ namespace vuprs
         private:
 
             vuprs::TcpServer server;
-            vuprs::FPGAConfigManager fpgaConfigManager;  /* FPGA configuration */
-            bool fileConfigDown;
-
-            bool SystemSelfTest();
-
-            bool StartUpCondition();
 
         public:
 
