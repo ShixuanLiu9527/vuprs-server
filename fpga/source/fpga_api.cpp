@@ -155,6 +155,16 @@ bool vuprs::FPGA_API__CBUF__ReadCircularBuffer(vuprs::FPGAController *controller
     return operateStatus;
 }
 
+bool vuprs::FPGA_API__CBUF__ResetCircularBuffer(vuprs::FPGAController *controller)
+{
+    if (!controller->ConfigDown())
+    {
+        throw std::runtime_error("FPGA Controller not configured in advance.");
+    }
+
+    return controller->dev__Circular_Buffer.WriteSingleRegister(vuprs::Circular_Buffer__Registers::CBUF_RST, 0);
+}
+
 /* ----------------------------------------------------------------------------- */
 /* ------------------------------ Predelay Unit -------------------------------- */
 /* ----------------------------------------------------------------------------- */
@@ -209,6 +219,16 @@ bool vuprs::FPGA_API__PDLY__SetPredelay(vuprs::FPGAController *controller,
     }
 
     return controller->dev__PreDelay_Unit.WriteMultipleRegister(registersToWrite, predelayToWrite);
+}
+
+bool vuprs::FPGA_API__PDLY__ResetPredelay(vuprs::FPGAController *controller)
+{
+    if (!controller->ConfigDown())
+    {
+        throw std::runtime_error("FPGA Controller not configured in advance.");
+    }
+
+    return controller->dev__PreDelay_Unit.WriteSingleRegister(vuprs::PreDelay_Unit__Registers::PREDLY_RST, 0);
 }
 
 /* ----------------------------------------------------------------------------- */
