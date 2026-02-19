@@ -90,7 +90,7 @@ bool vuprs::FPGA_API__CBUF__ReadCircularBuffer(vuprs::FPGAController *controller
         throw std::runtime_error("FPGA Controller not configured in advance.");
     }
 
-    uint32_t r_val, w_val;
+    uint32_t r_val, w_val, CBF;
     int timeout = 0;
     bool operateStatus = true;
 
@@ -128,29 +128,26 @@ bool vuprs::FPGA_API__CBUF__ReadCircularBuffer(vuprs::FPGAController *controller
     } 
     while (!FPGA_REG_BIT(r_val, 0));
 
-    /* STEP 3: Read circular buffer */
-    uint32_t signalPoints = controller->dev__Circular_Buffer.SignalPoints();
-    operateStatus &= controller->mem__Circular_Buffer_BRAM.ReadMemory(&controller->buffer, 0, signalPoints * ADC_FRAME_WORD_SIZE * sizeof(uint32_t));
-
-    /* STEP 4: Read current BRAM pointer */
-
-    operateStatus &= controller->dev__Circular_Buffer.ReadSingleRegister(vuprs::Circular_Buffer__Registers::CBUF_CBP, &r_val);
-
-    /* STEP 5: Reset */
-
-    operateStatus &= controller->dev__Circular_Buffer.WriteSingleRegister(vuprs::Circular_Buffer__Registers::CBUF_RST, 0);
-
-    /* Data convert */
-
-    double voltageScale = controller->dev__ADC_Controller.VoltageRangeRadius();
-
-    /* Read SCI */
+    /* Read SCI, get fs & voltage */
 
     operateStatus &= controller->dev__ADC_Controller.ReadSingleRegister(vuprs::ADC_Controller__Registers::ADC_SCI, &r_val);
 
     double fs = controller->dev__ADC_Controller.SCI2FS(r_val);
+    double voltageScale = controller->dev__ADC_Controller.VoltageRangeRadius();
 
-    operateStatus &= vuprs::FPGACircularBuffer2Frames(&controller->buffer, signal, fs, voltageScale, r_val);
+    /* STEP 3: Read circular buffer */
+
+    uint32_t signalPoints = controller->dev__Circular_Buffer.SignalPoints();
+    operateStatus &= controller->mem__Circular_Buffer_BRAM.ReadMemory(&controller->buffer, 0, signalPoints * ADC_FRAME_WORD_SIZE * sizeof(uint32_t));
+
+    /* STEP 4: Read current BRAM pointer & convert */
+
+    operateStatus &= controller->dev__Circular_Buffer.ReadSingleRegister(vuprs::Circular_Buffer__Registers::CBUF_CBP, &CBF);
+    operateStatus &= vuprs::FPGACircularBuffer2Frames(&controller->buffer, signal, fs, voltageScale, CBF);
+
+    /* STEP 5: Reset */
+
+    operateStatus &= controller->dev__Circular_Buffer.WriteSingleRegister(vuprs::Circular_Buffer__Registers::CBUF_RST, 0);
 
     return operateStatus;
 }
@@ -170,7 +167,7 @@ bool vuprs::FPGA_API__CBUF__ResetCircularBuffer(vuprs::FPGAController *controlle
 /* ----------------------------------------------------------------------------- */
 
 bool vuprs::FPGA_API__PDLY__SetPredelay(vuprs::FPGAController *controller, 
-    const std::vector<uint16_t> &channelPredelay, const std::vector<std::string> &channelName)
+    const std::vector<int> &channelPredelay, const std::vector<std::string> &channelName)
 {
     if (!controller->ConfigDown())
     {
@@ -206,7 +203,7 @@ bool vuprs::FPGA_API__PDLY__SetPredelay(vuprs::FPGAController *controller,
         int pos = vuprs::FindValueInVec<std::string>(channelName, ADC_CHANNEL_ADDR_MAP[i]);
         if (pos >= 0)
         {
-            predelayOrdered[i] = channelPredelay[pos];
+            predelayOrdered[i] = static_cast<uint16_t>(channelPredelay[pos]);
         }
         else
         {

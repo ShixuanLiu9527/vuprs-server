@@ -688,6 +688,11 @@ namespace vuprs
             {
                 return this->configdone;
             }
+
+            uint32_t FPGAAddress() const
+            {
+                return this->fpgaAddress;
+            }
     };
 }
 

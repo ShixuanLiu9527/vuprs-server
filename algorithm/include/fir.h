@@ -10,13 +10,14 @@ namespace vuprs
     {
         private:
 
-            bool configdown;
+            bool configdone;
 
             uint32_t firLength;
             uint32_t lastSignalPoints;  /* last N */
             double freqRange_l, freqRange_u;
 
             std::vector<std::vector<double>> firCoefficient;
+            double maxAbsCoefficient;
 
             Eigen::Matrix<Eigen::dcomplex, -1, -1> matrixE;
 
@@ -34,7 +35,7 @@ namespace vuprs
             /**
              * @brief Set interest region for frequency.
              * 
-             * @note lower < upper < 0.5 * fs.
+             * @note 0 < lower < upper < 0.5 * fs.
              * 
              * @param lower lower boundary.
              * @param upper upper boundary.
@@ -60,6 +61,21 @@ namespace vuprs
              * @brief Get FIR Filter Bank coefficients.
              */
             void GetFIRBankCoefficient(std::vector<std::vector<double>> *dst) const;
+
+            /**
+             * @brief Get FIR filter bank coefficients that are all zero.
+             */
+            void GetZeroFIRBankCoefficient(std::vector<std::vector<double>> *dst, uint32_t channelNumber) const;
+
+            /**
+             * @brief Get FIR filter length.
+             */
+            uint32_t FIRLength() const;
+
+            /**
+             * @brief Get maximum absolute coefficient of FIR filter bank.
+             */
+            double MaxAbsoluteFIRCoefficient() const;
     };
 }
 

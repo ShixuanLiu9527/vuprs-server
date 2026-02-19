@@ -6,17 +6,12 @@
 
 vuprs::Beamformer_DCRCB::Beamformer_DCRCB()
 {
-    this->steeringErrorRadius = 0.0;
+    
 }
 
 vuprs::Beamformer_DCRCB::~Beamformer_DCRCB()
 {
 
-}
-
-void vuprs::Beamformer_DCRCB::SetSteeringErrorRadius(double r)
-{
-    this->steeringErrorRadius = r;
 }
 
 void vuprs::Beamformer_DCRCB::CalculateBeamformingForOneFreq(int freqIndex)
@@ -27,13 +22,15 @@ void vuprs::Beamformer_DCRCB::CalculateBeamformingForOneFreq(int freqIndex)
     Eigen::Matrix<Eigen::dcomplex, -1, -1> u_eigenvectors;  /* matrix U, R = U * GAMMA * U.H */
     Eigen::Matrix<Eigen::dcomplex, -1, 1> zs;  /* zs = U.H @ ps */
     Eigen::Matrix<Eigen::dcomplex, -1, 1> ps = this->steeringVectors.col(freqIndex);  /* ps */
+    double signalFreq = this->signalFrequencyList(freqIndex);
+    double steeringErrorRadius = this->array.CalculateSteeringVectorErrorRadius(signalFreq);
 
     vuprs::IterationConfig iter;
 
     double max_eigenvalues, min_eigenvalues, M = this->array.elementArray.size();
     double _max_eigenvalues;  /* 1 / max(eig) */
     double _min_eigenvalues;  /* 1 / min(eig) */
-    double rho = M / pow(M - this->steeringErrorRadius / 2.0, 2.0);
+    double rho = M / pow(M - steeringErrorRadius / 2.0, 2.0);
     double sqrt_M_rho = sqrt(M * rho);
     double result_val;  /* result lambda */
     
@@ -83,7 +80,7 @@ void vuprs::Beamformer_DCRCB::CalculateBeamformingForOneFreq(int freqIndex)
     Eigen::Matrix<Eigen::dcomplex, -1, 1> invR_plus_lambdaI_inv__mul__ps = invR_plus_lambdaI_inv * ps;
 
     Eigen::Matrix<Eigen::dcomplex, -1, 1> ps_estimate = \
-        (M - this->steeringErrorRadius / 2.0) * invR_plus_lambdaI_inv__mul__ps / (ps.adjoint() * invR_plus_lambdaI_inv__mul__ps)(0, 0);
+        (M - steeringErrorRadius / 2.0) * invR_plus_lambdaI_inv__mul__ps / (ps.adjoint() * invR_plus_lambdaI_inv__mul__ps)(0, 0);
 
     Eigen::Matrix<Eigen::dcomplex, -1, -1> invR = u_eigenvectors * inv_gamma_eigenvalues.asDiagonal() * u_eigenvectors.adjoint();  /* R.-1 = U * GAMMA.-1 * U.H */
     Eigen::Matrix<Eigen::dcomplex, -1, -1> invR__mul__ps_estimate = invR * ps_estimate;

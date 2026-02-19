@@ -39,13 +39,36 @@ vuprs::BeamFormingArray::BeamFormingArray()
     this->fs = 0.0;
     this->samplingTime = 0.0;
     this->signalPointCounts = 0;
-
+    this->maxElementPositionError = 0.0;
+    
     this->threadPool = std::make_unique<vuprs::ThreadPool>(std::thread::hardware_concurrency());
 }
 
 vuprs::BeamFormingArray::~BeamFormingArray()
 {
     vuprs::AlignedEigenVector<vuprs::BeamFormingElement>().swap(this->elementArray);
+}
+
+double vuprs::BeamFormingArray::CalculateSteeringVectorErrorRadius(double signalFrequency) const
+{
+    if (this->empty())
+    {
+        throw std::runtime_error("Array is empty.");
+    }
+
+    /* Calculate time delay error */
+
+    double timedelay_err = this->maxElementPositionError / DEFAULT_SOUND_VELOCITY_MPS;
+
+    /* Get error */
+
+    Eigen::Matrix<double, -1, 1> vec;
+    vec.resize(this->elementArray.size(), 1);
+    vec.setOnes();
+    vec *= PI * signalFrequency * timedelay_err;
+    vec = vec.array().sin().pow(2.0).matrix();
+
+    return 4.0 * vec.sum();
 }
 
 bool vuprs::BeamFormingArray::LoadArrayFromJson(const std::string &filename)
@@ -89,44 +112,20 @@ bool vuprs::BeamFormingArray::LoadArrayFromJson(const std::string &filename)
                         arrayData[i].contains("adc_channel"))
                     {
                         double x = 0, y = 0, z = 0;
-                        int successCount = 0;
-                        bool status = false;
                         std::string adcChannel;
-
                         vuprs::BeamFormingElement oneBeamFormingElement;
 
-                        x = vuprs::ParseDoubleFromString(arrayData[i]["position_x"].get<std::string>(), &status);
-                        if (status)
-                        {
-                            oneBeamFormingElement.positionVector(0, 0) = x; 
-                            successCount++;
-                        }
+                        vuprs::__JsonStringParseFLOAT<double>(&x, arrayData[i], "position_x", true);
+                        vuprs::__JsonStringParseFLOAT<double>(&y, arrayData[i], "position_y", true);
+                        vuprs::__JsonStringParseFLOAT<double>(&z, arrayData[i], "position_z", true);
 
-                        y = vuprs::ParseDoubleFromString(arrayData[i]["position_y"].get<std::string>(), &status);
-                        if (status) 
-                        {
-                            oneBeamFormingElement.positionVector(1, 0) = y; 
-                            successCount++;
-                        }
+                        oneBeamFormingElement.positionVector(0, 0) = x;
+                        oneBeamFormingElement.positionVector(1, 0) = y;
+                        oneBeamFormingElement.positionVector(2, 0) = z;
 
-                        z = vuprs::ParseDoubleFromString(arrayData[i]["position_z"].get<std::string>(), &status);
-                        if (status) 
-                        {
-                            oneBeamFormingElement.positionVector(2, 0) = z; 
-                            successCount++;
-                        }
-
-                        adcChannel = arrayData[i]["adc_channel"].get<std::string>();
-                        if (!adcChannel.empty()) 
-                        {
-                            oneBeamFormingElement.adcChannel = adcChannel;
-                            successCount++;
-                        }
-
-                        if (successCount < 4)
-                        {
-                            throw std::runtime_error("Parse array data error.");
-                        }
+                        vuprs::__JsonParseString(&adcChannel, arrayData[i], "adc_channel", true);
+                        
+                        oneBeamFormingElement.adcChannel = adcChannel;
 
                         if (IS_ADC_CHANNEL_NAME(adcChannel))
                         {
@@ -151,6 +150,15 @@ bool vuprs::BeamFormingArray::LoadArrayFromJson(const std::string &filename)
         else
         {
             throw std::runtime_error("Missing element [array]");
+        }
+        if (beamFormingArray.contains("info"))
+        {
+            auto info = beamFormingArray["info"];
+            vuprs::__JsonStringParseFLOAT<double>(&this->maxElementPositionError, info, "max-element-position-error-radius", true);
+        }
+        else
+        {
+            throw std::runtime_error("Missing element [info]");
         }
     }
     else

@@ -78,7 +78,7 @@ namespace vuprs
      * @throw std::runtime_error
      */
     bool FPGA_API__PDLY__SetPredelay(vuprs::FPGAController *controller, 
-        const std::vector<uint16_t> &channelPredelay, const std::vector<std::string> &channelName);
+        const std::vector<int> &channelPredelay, const std::vector<std::string> &channelName);
 
     /**
      * @brief Reset Predelay Unit.

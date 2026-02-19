@@ -51,48 +51,68 @@ void vuprs::AXI_DMA_ScatterGatherDescriptor_ToDefault(vuprs::AXI_DMA_ScatterGath
     descriptor->APP4 = 0;
 
     descriptor->ALIGNMENT_0_CURRENT_ADDR = 0;
-    descriptor->ALIGNMENT_1 = 0;
+    descriptor->ALIGNMENT_1_PREVIOUS_ADDR = 0;
     descriptor->ALIGNMENT_2 = 0;
 }
 
 void vuprs::CreateDMAScatterGatherDescriptorChain(std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> *descriptorList, 
-        uint32_t bufferSize, uint32_t bufferCount, uint32_t ddrBaseAddr, bool isCyclicMode)
+        const vuprs::AXI_DMA_SGDescriptor_Config &config)
 {
-    if (bufferSize == 0 || bufferCount == 0)
+    if (config.bufferSize == 0 || config.bufferCount == 0)
     {
         throw std::runtime_error("Buffer size or buffer count should not be 0.");
     }
-    if (bufferSize % vuprs::DMA_BUFFER_ALIGNMENT_1_WORD != 0)
+    if (config.bufferSize % vuprs::DMA_BUFFER_ALIGNMENT_1_WORD != 0)
     {
         throw std::runtime_error("Buffer size must aligned to 1 word");
     }
-    if (bufferSize > vuprs::DMA_MAX_BUFFER_LENGTH)
+    if (config.bufferSize > vuprs::DMA_MAX_BUFFER_LENGTH)
     {
         throw std::runtime_error("Buffer size must be smaller than " + std::to_string(vuprs::DMA_MAX_BUFFER_LENGTH) + " bytes.");
     }
 
-    descriptorList->resize(bufferCount);
+    descriptorList->resize(config.bufferCount);
 
-    for (uint32_t i = 0; i < bufferCount; i++)
+    /* Operate as normal link list */
+
+    for (uint32_t i = 0; i < config.bufferCount; i++)
     {
         vuprs::AXI_DMA_ScatterGatherDescriptor_ToDefault(&(*descriptorList)[i]);
 
         /* Next descriptor address (in bytes) = (i + 1) * 64U. */
 
-        (*descriptorList)[i].NXTDESC = (i + 1) * sizeof(vuprs::AXI_DMA_ScatterGatherDescriptor);
-        (*descriptorList)[i].ALIGNMENT_0_CURRENT_ADDR = i * sizeof(vuprs::AXI_DMA_ScatterGatherDescriptor);
+        (*descriptorList)[i].NXTDESC = (i + 1) * sizeof(vuprs::AXI_DMA_ScatterGatherDescriptor) + config.sgBRAM_FPGABaseAddr;
+
+        /* Current descriptor address */
+
+        (*descriptorList)[i].ALIGNMENT_0_CURRENT_ADDR = i * sizeof(vuprs::AXI_DMA_ScatterGatherDescriptor) + config.sgBRAM_FPGABaseAddr;
+        
+        /* Previous descriptor address */
+
+        if (i == 0)
+        {
+            (*descriptorList)[i].ALIGNMENT_1_PREVIOUS_ADDR = INVALID_SG_DESCRIPTOR_POINTER;
+        }
+        else
+        {
+            (*descriptorList)[i].ALIGNMENT_1_PREVIOUS_ADDR = (i - 1) * sizeof(vuprs::AXI_DMA_ScatterGatherDescriptor) + config.sgBRAM_FPGABaseAddr;
+        }
 
         /* Current buffer address (in bytes) = i * buffer size */
 
-        (*descriptorList)[i].BUFFER_ADDRESS = i * bufferSize + ddrBaseAddr;
+        (*descriptorList)[i].BUFFER_ADDRESS = i * config.bufferSize + config.ddr_FPGABaseAddr;
 
         /* Current buffer length CONTROL[25:0] = buffer size */
 
-        (*descriptorList)[i].CONTROL |= (bufferSize & vuprs::DMA_BUFFER_LENGTH_MASK);
+        (*descriptorList)[i].CONTROL |= (config.bufferSize & vuprs::DMA_BUFFER_LENGTH_MASK);
     }
-    if (isCyclicMode)
+
+    /* Special operation for Cyclic DMA Mode */
+
+    if (config.isCyclicDMAMode)
     {
-        (*descriptorList)[bufferCount - 1].NXTDESC = 0;  /* point to begining */
+        (*descriptorList)[0].ALIGNMENT_1_PREVIOUS_ADDR = (*descriptorList)[config.bufferCount - 1].ALIGNMENT_0_CURRENT_ADDR;
+        (*descriptorList)[config.bufferCount - 1].NXTDESC = (*descriptorList)[0].ALIGNMENT_0_CURRENT_ADDR;  /* point to begining */
     }
 }
 
@@ -105,9 +125,6 @@ vuprs::FPGA_Device__ADCController::FPGA_Device__ADCController()
     this->maxSamplingFrequencyHz = 10000.0;
     this->voltageRangeRadiusV = 10.0;
     this->workClockFrequencyHz = 50000000.0;
-
-    this->currentSamplingFrequency = 0.0;
-    this->currentSCI = 0xFFFFFFFF;
 
     this->GenerateRegisterTable();
     this->SetRegisterOffsetDefault();
@@ -180,16 +197,9 @@ double vuprs::FPGA_Device__ADCController::SCI2FS(uint32_t SCI) const
     return this->workClockFrequencyHz / (2.0 * static_cast<double>(SCI));
 }
 
-void vuprs::FPGA_Device__ADCController::SetSCI(uint32_t SCI) 
-{
-    this->currentSCI = SCI;
-    this->currentSamplingFrequency = this->SCI2FS(SCI);
-}
-
 double vuprs::FPGA_Device__ADCController::MaxSamplingFrequency() const {return this->maxSamplingFrequencyHz;}
 double vuprs::FPGA_Device__ADCController::VoltageRangeRadius() const {return this->voltageRangeRadiusV;}
 double vuprs::FPGA_Device__ADCController::WorkFrequency() const {return this->workClockFrequencyHz;}
-double vuprs::FPGA_Device__ADCController::CurrentSamplingFrequency() const {return this->currentSamplingFrequency;}
 
 /* ---------------------------------------------------------------------- */
 /* --------------------------- Circular Buffer -------------------------- */

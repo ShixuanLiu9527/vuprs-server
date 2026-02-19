@@ -3,6 +3,8 @@
 
 #include "fpga_module_template.h"
 
+#define INVALID_SG_DESCRIPTOR_POINTER (uint32_t)0x0FFFFFFF
+
 namespace vuprs
 {
 
@@ -33,11 +35,20 @@ namespace vuprs
         uint32_t APP4;  /* 30h: User Application Field 4 */
 
         uint32_t ALIGNMENT_0_CURRENT_ADDR;  /* Address of this descriptor, to aligned to 16-word */
-        uint32_t ALIGNMENT_1;  /* to aligned to 16-word */
+        uint32_t ALIGNMENT_1_PREVIOUS_ADDR;  /* Address of previous descriptor, to aligned to 16-word */
         uint32_t ALIGNMENT_2;  /* to aligned to 16-word */
     };
 
     #pragma pack(pop)
+
+    struct AXI_DMA_SGDescriptor_Config
+    {
+        uint32_t bufferSize;  /* buffer size (4 byte aligned) */
+        uint32_t bufferCount;  /* buffer count */
+        uint32_t ddr_FPGABaseAddr;  /* DDR base address in FPGA */
+        uint32_t sgBRAM_FPGABaseAddr;  /* SG BRAM base address in FPGA */
+        bool isCyclicDMAMode;  /* true: Cyclic DMA Mode, false: Normal DMA Mode */
+    };
 
     constexpr uint32_t DMA_DESCRIPTOR_ALIGNMENT_16_WORD = (uint32_t)(16 * sizeof(uint32_t));  /* 16-word alignment */
     constexpr uint32_t DMA_BUFFER_ALIGNMENT_1_WORD = (uint32_t)(1 * sizeof(uint32_t));  /* 1-word alignment */
@@ -58,16 +69,12 @@ namespace vuprs
      * @note Address of descriptors will be 16-word aligned.
      * @note Address of buffer will be 1-word aligned.
      * 
-     * @param descriptorList target descriptor list.
-     * @param bufferSize buffer size of each descriptor (should be aligned to 1-word).
-     * @param bufferCount buffer count (descriptor count).
-     * @param ddrBaseAddr DDR base address in FPGA AXI-Full network.
-     * @param isCyclicMode true: cyclic DMA mode, false: normal mode.
+     * @param config Scatter/Gather Descriptor config.
      * 
      * @throw std::runtime_error
      */
     void CreateDMAScatterGatherDescriptorChain(std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> *descriptorList, 
-        uint32_t bufferSize, uint32_t bufferCount, uint32_t ddrBaseAddr, bool isCyclicMode = false);
+        const vuprs::AXI_DMA_SGDescriptor_Config &config);
 
     enum class AXI_DMA__Registers
     {

@@ -1,11 +1,15 @@
 {
     "beam_forming_array": {
         "format": {
+            "max-element-position-error-radius": "unit: m",
             "index": "0, 1, ..., N",
             "position_x": "unit: m",
             "position_y": "unit: m",
             "position_z": "unit: m",
             "adc_channel": "CH-A-1, ..., CH-A-8, CH-B-1, ..., CH-B-8"
+        },
+        "info": {
+            "max-element-position-error-radius": "0.005"
         },
         "array": [
             {

@@ -7,10 +7,6 @@ namespace vuprs
 {
     class Beamformer_DCRCB: public vuprs::WidebandBeamformerTemplate
     {
-        private:
-
-            double steeringErrorRadius;
-        
         protected:
 
             void CalculateBeamformingForOneFreq(int freqIndex) override;
@@ -20,8 +16,6 @@ namespace vuprs
             Beamformer_DCRCB();
 
             ~Beamformer_DCRCB();
-
-            void SetSteeringErrorRadius(double r);
     };
 
     class Beamformer_CBF: public vuprs::WidebandBeamformerTemplate

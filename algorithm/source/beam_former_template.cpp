@@ -2,20 +2,8 @@
 
 vuprs::WidebandBeamformerTemplate::WidebandBeamformerTemplate()
 {
-    this->fs = 0.0;
-
-    this->is_arrayConfigDown = false;
-    this->is_beamfomerConfigDown = false;
-
-    this->is_signalEmpty = true;
-    this->is_covMatrixEmpty = true;
-
     this->threadPool = std::make_unique<vuprs::ThreadPool>(std::thread::hardware_concurrency());
-    
-    this->firstSnapshot = true;
-    this->COVARIANCE_SNAP_WINDOW_SIZE = DEFAULT_COVARIANCE_SNAP_WINDOW_SIZE;
-    this->ADJACENT_FREQ_AVERAGE_INDEX = DEFAULT_ADJACENT_FREQ_AVERAGE_INDEX;
-    this->UpdateParameters();
+    this->ResetAll();
 }
 
 bool vuprs::WidebandBeamformerTemplate::ConfigArrayFromJson(const std::string &arrayConfigJsonFilename)
@@ -24,36 +12,40 @@ bool vuprs::WidebandBeamformerTemplate::ConfigArrayFromJson(const std::string &a
     {
         int arraySize = this->array.elementArray.size();
         this->elementChannelName.resize(arraySize);
-        this->elementPredelay.resize(arraySize);
+        this->elementPredelayTime.resize(arraySize);
         this->elementPredelayCount.resize(arraySize);
         for (int i = 0; i < arraySize; i++)
         {
             this->elementChannelName[i] = this->array.elementArray[i].adcChannel;
         }
-        this->is_arrayConfigDown = true;
+        this->is_arrayConfigDone = true;
         return true;
     }
     return false;
 }
 
-bool vuprs::WidebandBeamformerTemplate::ConfigDown() const
+bool vuprs::WidebandBeamformerTemplate::ConfigDone() const
 {
-    return this->is_arrayConfigDown && this->is_beamfomerConfigDown;
+    return this->is_arrayConfigDone;
 }
 
 bool vuprs::WidebandBeamformerTemplate::CalculateEnable() const
 {
-    return this->ConfigDown() && !this->is_signalEmpty && !this->is_covMatrixEmpty;
+    return this->ConfigDone() && !this->is_signalEmpty && !this->is_covMatrixEmpty;
 }
 
-bool vuprs::WidebandBeamformerTemplate::PredelayEnable() const
+int vuprs::WidebandBeamformerTemplate::ElementCount() const
 {
-    return this->ConfigDown() && !this->is_signalEmpty;
+    if (!this->ConfigDone())
+    {
+        throw std::runtime_error("Config not complete.");
+    }
+    return this->array.elementArray.size();
 }
 
 void vuprs::WidebandBeamformerTemplate::InputSignal(const vuprs::SignalData &signal)
 {
-    if (!this->ConfigDown())
+    if (!this->ConfigDone())
     {
         throw std::runtime_error("Config not complete.");
     }
@@ -61,26 +53,26 @@ void vuprs::WidebandBeamformerTemplate::InputSignal(const vuprs::SignalData &sig
     this->array.InputElementSignal(signal);
     this->fs = signal.samplingFrequency;
     this->is_signalEmpty = false;
+
+    this->signalFrequencyList = vuprs::GenerateRealFrequencyList(signal.signalPoints, this->fs);
+    this->signalFrequencyList_complex = vuprs::GenerateComplexFrequencyList(signal.signalPoints, this->fs);
+
+    this->array.GetSteeringVectorMatrix(&this->steeringVectors);  /* Get steering vectors */
 }
 
 void vuprs::WidebandBeamformerTemplate::SetTargetDirection(double alt, double az, double waveVelocity)
 {
-    if (!this->ConfigDown())
+    if (!this->ConfigDone())
     {
         throw std::runtime_error("Config not complete.");
     }
-    if (this->is_signalEmpty)
-    {
-        throw std::runtime_error("Signal is empty.");
-    }
 
     this->array.UpdateTimeDelay(alt, az, waveVelocity);  /* Update time delay */
-    this->array.GetSteeringVectorMatrix(&this->steeringVectors);  /* Get steering vectors */
 }
 
 void vuprs::WidebandBeamformerTemplate::UpdateCovarianceMatrix()
 {
-    if (!this->ConfigDown())
+    if (!this->ConfigDone())
     {
         throw std::runtime_error("Config not complete.");
     }
@@ -177,23 +169,66 @@ void vuprs::WidebandBeamformerTemplate::GetWeightVectorValues(Eigen::Matrix<Eige
     *dst = this->resultWeightVectors;
 }
 
-void vuprs::WidebandBeamformerTemplate::GetElementPredelay(
-    double firLength, bool includeFIRGroupDelay, 
-    std::vector<int> *elementPredelayCount, 
-    std::vector<double> *elementPredelay, 
-    std::vector<std::string> *channelName)
+void vuprs::WidebandBeamformerTemplate::GetFIRExpectedFrequencyResponse(Eigen::Matrix<Eigen::dcomplex, -1, -1> *dst, bool considerPredelay) const
 {
+    if (dst == nullptr)
+    {
+        throw std::runtime_error("Destination cannot be NULL.");
+    }
     if (this->is_signalEmpty)
     {
         throw std::runtime_error("No signal input.");
     }
+    
+    if (!considerPredelay) 
+    {
+        *dst = this->resultWeightVectors;
+        return;
+    }
+
+    uint64_t arraySize = this->array.elementArray.size();
+    Eigen::Matrix<Eigen::dcomplex, 1, -1> j_2_pi_fk = this->signalFrequencyList_complex.transpose() * 2.0 * PI;
+    Eigen::Matrix<Eigen::dcomplex, 1, -1> exp_j_2_pi_fk_Tm;  /* exp(j * 2 * pi * fk * Tm) */
+    double Tm;
+
+    dst->resize(this->resultWeightVectors.rows(), this->resultWeightVectors.cols());
+    
+    for (uint64_t i = 0; i < arraySize; i++)
+    {
+        Tm = this->elementPredelayTime[i];
+
+        /* exp(j2*pi*fk*Tm) */
+
+        exp_j_2_pi_fk_Tm = j_2_pi_fk * Tm;
+        exp_j_2_pi_fk_Tm = exp_j_2_pi_fk_Tm.array().exp().matrix();
+        
+        /* Hd(fk) = conj(w(fk)) * exp(j2*pi*fk*Tm), k = 0, 1, ..., N/2 + 1 */
+
+        dst->row(i) = this->resultWeightVectors.row(i).array().conjugate() * exp_j_2_pi_fk_Tm.array();
+    }
+}
+
+void vuprs::WidebandBeamformerTemplate::UpdateElementPredelay_externalFS(
+    double firLength, double fs, bool includeFIRGroupDelay, 
+    std::vector<int> *elementPredelayCount,
+    std::vector<double> *elementPredelayTime,
+    std::vector<std::string> *channelName)
+{
+    if (!this->ConfigDone())
+    {
+        throw std::runtime_error("No signal input.");
+    }
+    if (elementPredelayTime == nullptr || elementPredelayCount == nullptr || channelName == nullptr)
+    {
+        throw std::runtime_error("Predelay pointer is NULL.");
+    }
 
     /* Calculate predelay */
 
-    int arraySize = this->array.elementArray.size(), minPredelay = 0;
-    double Ts = 1.0 / this->fs;
+    uint64_t arraySize = this->array.elementArray.size();
+    double Ts = 1.0 / fs;
 
-    for (int i = 0; i < arraySize; i++)
+    for (uint64_t i = 0; i < arraySize; i++)
     {
         if (includeFIRGroupDelay)
         {
@@ -205,25 +240,53 @@ void vuprs::WidebandBeamformerTemplate::GetElementPredelay(
         {
             this->elementPredelayCount[i] = -std::round(this->array.elementArray[i].timeDelay / Ts);
         }
-        
-        if (this->elementPredelayCount[i] < minPredelay)
-        {
-            minPredelay = this->elementPredelayCount[i];
-        }
+        this->elementPredelayTime[i] = this->elementPredelayCount[i] * Ts;
     }
 
-    for (int i = 0; i < arraySize; i++)
-    {
-        if (minPredelay < 0)
-        {
-            this->elementPredelayCount[i] = this->elementPredelayCount[i] - minPredelay;
-        }
-        this->elementPredelay[i] = this->elementPredelayCount[i] * Ts;
-    }
-
+    *elementPredelayTime = this->elementPredelayTime;
     *elementPredelayCount = this->elementPredelayCount;
-    *elementPredelay = this->elementPredelay;
     *channelName = this->elementChannelName;
+
+    int minPredelay = (*elementPredelayCount)[0];
+
+    /* find min predelay count */
+
+    for (uint64_t i = 0; i < arraySize; i++)
+    {
+        if ((*elementPredelayCount)[i] < minPredelay)
+        {
+            minPredelay = (*elementPredelayCount)[i];
+        }
+    }
+    for (uint64_t i = 0; i < arraySize; i++)
+    {
+        (*elementPredelayCount)[i] -= minPredelay;
+        (*elementPredelayTime)[i] = (*elementPredelayCount)[i] * Ts;
+    }
+}
+
+void vuprs::WidebandBeamformerTemplate::UpdateAndGetElementPredelay(
+    double firLength, bool includeFIRGroupDelay, 
+    std::vector<int> *elementPredelayCount, 
+    std::vector<double> *elementPredelayTime, 
+    std::vector<std::string> *channelName)
+{
+    if (this->is_signalEmpty || !this->ConfigDone())
+    {
+        throw std::runtime_error("Signal is empty.");
+    }
+    this->UpdateElementPredelay_externalFS(firLength, this->fs, includeFIRGroupDelay, 
+        elementPredelayCount, elementPredelayTime, channelName);
+}
+
+void vuprs::WidebandBeamformerTemplate::UpdateAndGetElementPredelay(
+    double firLength, double fs, bool includeFIRGroupDelay, 
+    std::vector<int> *elementPredelayCount, 
+    std::vector<double> *elementPredelayTime, 
+    std::vector<std::string> *channelName)
+{
+    this->UpdateElementPredelay_externalFS(firLength, fs, includeFIRGroupDelay, 
+        elementPredelayCount, elementPredelayTime, channelName);
 }
 
 void vuprs::WidebandBeamformerTemplate::CalculateBeamforming()
@@ -253,4 +316,22 @@ void vuprs::WidebandBeamformerTemplate::CalculateBeamforming()
     {
         f.get();
     }
+}
+
+void vuprs::WidebandBeamformerTemplate::ResetAll()
+{
+    this->fs = 0.0;
+
+    /* flags */
+
+    this->is_arrayConfigDone = false;
+    this->is_signalEmpty = true;
+    this->is_covMatrixEmpty = true;
+
+    this->firstSnapshot = true;
+    this->COVARIANCE_SNAP_WINDOW_SIZE = DEFAULT_COVARIANCE_SNAP_WINDOW_SIZE;
+    this->ADJACENT_FREQ_AVERAGE_INDEX = DEFAULT_ADJACENT_FREQ_AVERAGE_INDEX;
+
+    this->ResetCovarianceMatrices();
+    this->UpdateParameters();
 }

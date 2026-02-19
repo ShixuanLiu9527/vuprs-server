@@ -25,24 +25,46 @@ namespace vuprs
 
             void UpdateParameters();
 
+            /**
+             * @brief Get element predelay parameters.
+             * 
+             * @note Check PredelayEnable() in advance.
+             * 
+             * @param firLength FIR filter bank length.
+             * @param fs sampling frequency
+             * @param includeFIRGroupDelay true: include FIR group delay, false: exclude FIR group delay.
+             * @param elementPredelayCount integer delay. (count = -round[delay{m}/Ts + (L-1)/2])
+             * @param elementPredelay integer delay time. (Tm = -round[delay{m}/Ts + (L-1)/2] * Ts)
+             * @param channelName corresponding channel name.
+             */
+            void UpdateElementPredelay_externalFS(
+                double firLength, double fs, bool includeFIRGroupDelay, 
+                std::vector<int> *elementPredelayCount,
+                std::vector<double> *elementPredelayTime,
+                std::vector<std::string> *channelName);
+
         protected:
 
             bool firstSnapshot;
 
-            bool is_arrayConfigDown, is_beamfomerConfigDown;
+            bool is_arrayConfigDone;
             bool is_signalEmpty, is_covMatrixEmpty;
 
             vuprs::BeamFormingArray array;
 
             Eigen::Matrix<Eigen::dcomplex, -1, -1> snap_signalMatrix_freqDomain;  /* Size: (M) x (N / 2 + 1) */
             Eigen::Matrix<Eigen::dcomplex, -1, -1> steeringVectors;  /* Size: (M) x (N / 2 + 1) */
+
             Eigen::Matrix<Eigen::dcomplex, -1, -1> resultWeightVectors;  /* Size: (M) x (N / 2 + 1) */
+
+            Eigen::Matrix<double, -1, 1> signalFrequencyList;  /* [F0, F1, ..., FN/2] Size: (N / 2 + 1) */
+            Eigen::Matrix<Eigen::dcomplex, -1, 1> signalFrequencyList_complex;  /* [jF0, jF1, ..., jFN/2] Size: (N / 2 + 1) */
 
             double fs;  /* Sampling frequency */
 
-            std::vector<int> elementPredelayCount;  /* Predelay count */
-            std::vector<double> elementPredelay;  /* Predelay time = count * Ts */
-            std::vector<std::string> elementChannelName;  /* element channel name list */
+            std::vector<int> elementPredelayCount;  /* Predelay count (size = M) */
+            std::vector<double> elementPredelayTime;  /* Predelay time = count * Ts (size = M) */
+            std::vector<std::string> elementChannelName;  /* element channel name list (size = M) */
 
             vuprs::AlignedEigenVector<Eigen::Matrix<Eigen::dcomplex, -1, -1>> mean_covMatrix;  /* Size: N / 2 + 1, covMatrix[i] is the mean cov matrix in band [i] */
             vuprs::AlignedEigenVector<Eigen::Matrix<Eigen::dcomplex, -1, -1>> estimate_covMatrix;  /* Size: N / 2 + 1, covMatrix[i] is the mean cov matrix in band [i] */
@@ -91,8 +113,6 @@ namespace vuprs
              */
             void UpdateCovarianceMatrix();
 
-            /* STEP 4: SET TARGET DIRECTION */
-
             /**
              * @brief Set target direction.
              * 
@@ -120,6 +140,14 @@ namespace vuprs
             void GetWeightVectorValues(Eigen::Matrix<Eigen::dcomplex, -1, -1> *dst) const;
 
             /**
+             * @brief Get expected frequency response of FIR filter bank.
+             * 
+             * @param dst output expected frequency response.
+             * @param considerPredelay if consider predelay in frequency response.
+             */
+            void GetFIRExpectedFrequencyResponse(Eigen::Matrix<Eigen::dcomplex, -1, -1> *dst, bool considerPredelay) const;
+
+            /**
              * @brief Set covariance matrix fitting parameters.
              */
             void SetCovarianceMatrixFittingParam(int snapsWindowSize = 100, double adjacentFreqAverageIndex = 0.8);
@@ -132,23 +160,55 @@ namespace vuprs
             /**
              * @brief Get element predelay parameters.
              * 
-             * @note Check PredelayEnable() in advance.
+             * @note Use internal sampling frequency (set by certain signal).
+             * @note The output predelay count will be aligned to 0.
+             * @note e.g. predelay count = [13, 12, 23]
+             * @note then: output predelay count = [13 - 12, 12 - 12, 23 - 12] = [1, 0, 11].
              * 
              * @param firLength FIR filter bank length.
              * @param includeFIRGroupDelay true: include FIR group delay, false: exclude FIR group delay.
-             * @param elementPredelayCount integer delay. (count = -round[delay{m}/Ts + (L-1)/2])
-             * @param elementPredelay integer delay time. (Tm = -round[delay{m}/Ts + (L-1)/2] * Ts)
-             * @param channelName corresponding channel name.
+             * @param elementPredelayCount (cannot be NULL) integer delay. (count = -round[delay{m}/Ts + (L-1)/2])
+             * @param elementPredelayTime (cannot be NULL) integer delay time. (Tm = -round[delay{m}/Ts + (L-1)/2] * Ts)
+             * @param channelName (cannot be NULL) corresponding channel name.
              */
-            void GetElementPredelay(
+            void UpdateAndGetElementPredelay(
                 double firLength, bool includeFIRGroupDelay, 
                 std::vector<int> *elementPredelayCount,
-                std::vector<double> *elementPredelay,
+                std::vector<double> *elementPredelayTime,
                 std::vector<std::string> *channelName);
 
-            bool ConfigDown() const;
+            /**
+             * @brief Get element predelay parameters.
+             * 
+             * @note The output predelay count will be aligned to 0.
+             * @note e.g. predelay count = [13, 12, 23]
+             * @note then: output predelay count = [13 - 12, 12 - 12, 23 - 12] = [1, 0, 11].
+             * 
+             * @param firLength FIR filter bank length.
+             * @param fs sampling frequency.
+             * @param includeFIRGroupDelay true: include FIR group delay, false: exclude FIR group delay.
+             * @param elementPredelayCount (cannot be NULL) integer delay. (count = -round[delay{m}/Ts + (L-1)/2])
+             * @param elementPredelayTime (cannot be NULL) integer delay time. (Tm = -round[delay{m}/Ts + (L-1)/2] * Ts)
+             * @param channelName (cannot be NULL) corresponding channel name.
+             */
+            void UpdateAndGetElementPredelay(
+                double firLength, double fs, bool includeFIRGroupDelay, 
+                std::vector<int> *elementPredelayCount,
+                std::vector<double> *elementPredelayTime,
+                std::vector<std::string> *channelName);
+
+            bool ConfigDone() const;
             bool CalculateEnable() const;
-            bool PredelayEnable() const;
+
+            /**
+             * @brief Reset all.
+             */
+            void ResetAll();
+
+            /**
+             * @brief Beam forming element count.
+             */
+            int ElementCount() const;
     };
 }
 

@@ -25,6 +25,8 @@
 
 #define VUPRS_EPS_1 1e-5
 
+#define DEFAULT_SOUND_VELOCITY_MPS 346.0  /* (unit: m/s) NOTE: Default value, can only used for estimating steering vector error. */
+
 namespace vuprs
 {
     /**
@@ -83,6 +85,7 @@ namespace vuprs
         private:
 
             std::unique_ptr<vuprs::ThreadPool> threadPool;
+            double maxElementPositionError;
 
         public:
 
@@ -170,6 +173,13 @@ namespace vuprs
             void GetArraySignalMatrix(Eigen::Matrix<Eigen::dcomplex, -1, -1> *signalMatrix, double *samplingFrequency = nullptr, bool frequencyDomain = true);
 
             double GetMaxAbsoluteTimeDelay() const;
+
+            /**
+             * @brief Calculate steering vector error radius.
+             * 
+             * @param signalFrequency signal frequency.
+             */
+            double CalculateSteeringVectorErrorRadius(double signalFrequency) const;
 
             bool empty() const;
 
