@@ -71,16 +71,16 @@ namespace vuprs
 
     enum class AXI_DMA__Registers
     {
-        SG_CTL,
-        S2MM_DMACR,
-        S2MM_DMASR,
-        S2MM_CURDESC,
-        S2MM_CURDESC_MSB,
-        S2MM_TAILDESC,
-        S2MM_TAILDESC_MSB,
-        S2MM_DA,
-        S2MM_DA_MSB,
-        S2MM_LENGTH
+        SG_CTL,  /* [3:0]: SG_CACHE, [7:4]: Reserved, [11:8]: SG_USER, [31:12]: Reserved */
+        S2MM_DMACR,  /* [0]: RS, [1]: Reserved, [2]: Reset, [3]: Keyhole, [4]: Cyclic BD Enable, [11:5]: Reserved, [31:12]: Interrupt flags */
+        S2MM_DMASR,  /* [0]: Halted, [1]: Idle, [2]: Reserved, [3]: SGIncld, [31:4]: Interrupt & error flags */
+        S2MM_CURDESC,  /* [5:0]: Reserved, [31:6]: Current Descriptor Pointer (26 bits) */
+        S2MM_CURDESC_MSB,  /* [31:0]: Current Descriptor Pointer */
+        S2MM_TAILDESC,  /* [5:0]: Reserved, [31:6]: Tail Descriptor Pointer (26 bits) */
+        S2MM_TAILDESC_MSB,  /* [31:0]: Tail Descriptor Pointer */
+        S2MM_DA,  /* [31:0]: Destination Address */
+        S2MM_DA_MSB,  /* [31:0]: Destination Address */
+        S2MM_LENGTH  /* [25:0]: Length, [31:26]: Reserved */
     };
 
     class FPGA_Device__AXIDirectMemoryAccess: public FPGADeviceTemplate<AXI_DMA__Registers>
@@ -132,9 +132,6 @@ namespace vuprs
             double voltageRangeRadiusV;
             double workClockFrequencyHz;
 
-            double currentSamplingFrequency;
-            uint32_t currentSCI;
-
             uint32_t offset_ADC_SCI;
             uint32_t offset_ADC_SP;
             uint32_t offset_ADC_SF;
@@ -174,19 +171,9 @@ namespace vuprs
             double WorkFrequency() const;
 
             /**
-             * @brief Current sampling frequency.
-             */
-            double CurrentSamplingFrequency() const;
-
-            /**
              * @brief Convert SCI value to sampling frequency.
              */
             double SCI2FS(uint32_t SCI) const;
-
-            /**
-             * @brief Set SCI value.
-             */
-            void SetSCI(uint32_t SCI);
     };
 
     /* ---------------------------------------------------------------------- */

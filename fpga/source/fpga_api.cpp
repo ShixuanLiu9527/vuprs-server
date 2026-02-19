@@ -36,8 +36,6 @@ bool vuprs::FPGA_API__ADC__StartADC(vuprs::FPGAController *controller, double fs
     w_val = controller->dev__ADC_Controller.GetSCIValueForSamplingFrequency(fs);
     operateStatus &= controller->dev__ADC_Controller.WriteSingleRegister(vuprs::ADC_Controller__Registers::ADC_SCI, w_val);
     
-    controller->dev__ADC_Controller.SetSCI(w_val);
-    
     /* STEP 4: Set continuous sampling */
 
     w_val = 0x00000001;
@@ -145,7 +143,12 @@ bool vuprs::FPGA_API__CBUF__ReadCircularBuffer(vuprs::FPGAController *controller
     /* Data convert */
 
     double voltageScale = controller->dev__ADC_Controller.VoltageRangeRadius();
-    double fs = controller->dev__ADC_Controller.CurrentSamplingFrequency();
+
+    /* Read SCI */
+
+    operateStatus &= controller->dev__ADC_Controller.ReadSingleRegister(vuprs::ADC_Controller__Registers::ADC_SCI, &r_val);
+
+    double fs = controller->dev__ADC_Controller.SCI2FS(r_val);
 
     operateStatus &= vuprs::FPGACircularBuffer2Frames(&controller->buffer, signal, fs, voltageScale, r_val);
 
@@ -389,6 +392,35 @@ bool vuprs::FPGA_API__FIR__SetLengthAndCoefficients(vuprs::FPGAController *contr
     return operateStatus;
 }
 
+bool vuprs::FPGA_API__FIR__ResetFIR(vuprs::FPGAController *controller)
+{
+    if (!controller->ConfigDown())
+    {
+        throw std::runtime_error("FPGA Controller not configured in advance.");
+    }
+
+    bool operateStatus = false;
+
+    operateStatus &= controller->dev__FIR_Filter_Bank.WriteSingleRegister(vuprs::FIR_Filter_Bank__Registers::FIR_RST, 0);
+    operateStatus &= controller->dev__FIR_Filter_Bank.WriteSingleRegisterBIT(vuprs::FIR_Filter_Bank__Registers::FIR_RSC, 0, false);
+
+    return operateStatus;
+}
+
+bool vuprs::FPGA_API__FIR__RuningControl(vuprs::FPGAController *controller, bool runEnable)
+{
+    if (!controller->ConfigDown())
+    {
+        throw std::runtime_error("FPGA Controller not configured in advance.");
+    }
+
+    bool operateStatus = false;
+
+    operateStatus &= controller->dev__FIR_Filter_Bank.WriteSingleRegisterBIT(vuprs::FIR_Filter_Bank__Registers::FIR_RSC, 0, runEnable);
+
+    return operateStatus;
+}
+
 /* ----------------------------------------------------------------------------- */
 /* ------------------------------------ DDR ------------------------------------ */
 /* ----------------------------------------------------------------------------- */
@@ -435,11 +467,9 @@ bool vuprs::FPGA_API__DMA__StartScatterGatherDMA_S2MM(vuprs::FPGAController *con
 
     controller->buffer.release();
 
-    /* STEP 1: Stop DMA */
+    /* STEP 1: Stop DMA, clear S2MM_DMACR.RS */
 
-    operateStatus &= controller->dev__AXI_DMA.ReadSingleRegister(vuprs::AXI_DMA__Registers::S2MM_DMACR, &r_val);
-    w_val = FPGA_CLEAR_REG_BIT(r_val, 0);  /* clear S2MM_DMACR.RS */
-    operateStatus &= controller->dev__AXI_DMA.WriteSingleRegister(vuprs::AXI_DMA__Registers::S2MM_DMACR, w_val);
+    operateStatus &= controller->dev__AXI_DMA.WriteSingleRegisterBIT(vuprs::AXI_DMA__Registers::S2MM_DMACR, 0, false);
 
     /* Wait for S2MM_DMASR.Halted = 1 */
 
@@ -458,11 +488,16 @@ bool vuprs::FPGA_API__DMA__StartScatterGatherDMA_S2MM(vuprs::FPGAController *con
 
     operateStatus &= controller->dev__AXI_DMA.WriteSingleRegister(vuprs::AXI_DMA__Registers::S2MM_CURDESC, 0x00);  /* write with 0x00 */
 
-    /* STEP 3: Start DMA */
+    /* (STEP 2): Set Cyclic BD Enable */
 
-    operateStatus &= controller->dev__AXI_DMA.ReadSingleRegister(vuprs::AXI_DMA__Registers::S2MM_DMACR, &r_val);
-    w_val = FPGA_SET_REG_BIT(r_val, 0);  /* set S2MM_DMACR.RS */
-    operateStatus &= controller->dev__AXI_DMA.WriteSingleRegister(vuprs::AXI_DMA__Registers::S2MM_DMACR, w_val);
+    if (isCyclicMode)  /* Set bit: S2MM_DMACR.[4] */
+    {
+        operateStatus &= controller->dev__AXI_DMA.WriteSingleRegisterBIT(vuprs::AXI_DMA__Registers::S2MM_DMACR, 4, true);
+    }
+
+    /* STEP 3: Start DMA, set S2MM_DMACR.RS */
+
+    operateStatus &= controller->dev__AXI_DMA.WriteSingleRegisterBIT(vuprs::AXI_DMA__Registers::S2MM_DMACR, 0, true);
     
     /* Wait for S2MM_DMASR.Halted = 0 */
 
@@ -486,7 +521,7 @@ bool vuprs::FPGA_API__DMA__StartScatterGatherDMA_S2MM(vuprs::FPGAController *con
 
     if (isCyclicMode)
     {
-        w_val = (uint32_t)((uint32_t)0x50 << 6);
+        w_val = (uint32_t)((uint32_t)0x50 << 6);  /* Write to [31:6] */
     }
     else
     {
@@ -494,6 +529,36 @@ bool vuprs::FPGA_API__DMA__StartScatterGatherDMA_S2MM(vuprs::FPGAController *con
     }
 
     operateStatus &= controller->dev__AXI_DMA.WriteSingleRegister(vuprs::AXI_DMA__Registers::S2MM_TAILDESC, w_val);
+
+    return operateStatus;
+}
+
+bool vuprs::FPGA_API__DMA__ResetDMA(vuprs::FPGAController *controller)
+{
+    if (!controller->ConfigDown())
+    {
+        throw std::runtime_error("FPGA Controller not configured in advance.");
+    }
+
+    uint32_t r_val;
+    bool operateStatus = true;
+    int timeout = 0;
+
+    /* Reset */
+
+    operateStatus &= controller->dev__AXI_DMA.WriteSingleRegisterBIT(vuprs::AXI_DMA__Registers::S2MM_DMACR, 2, true);
+
+    /* Wait for Halted */
+
+    do
+    {
+        operateStatus &= controller->dev__AXI_DMA.ReadSingleRegister(vuprs::AXI_DMA__Registers::S2MM_DMASR, &r_val);
+        if (FPGA_REG_BIT(r_val, 0)) break;
+        if (timeout > 1000) break;
+        timeout++;
+        usleep(1000);
+    }
+    while (!FPGA_REG_BIT(r_val, 0));
 
     return operateStatus;
 }

@@ -116,6 +116,25 @@ namespace vuprs
     bool FPGA_API__FIR__SetLengthAndCoefficients(vuprs::FPGAController *controller, 
         std::vector<std::vector<double>> *coefficients, double maxAbsoluteCoefficient, uint32_t len);
 
+    /**
+     * @brief Reset FIR filter bank.
+     * 
+     * @note Controller must be configured in advance.
+     * @note Step 1: Reset FIR.
+     * @note Step 2: Disable run.
+     */
+    bool FPGA_API__FIR__ResetFIR(vuprs::FPGAController *controller);
+
+    /**
+     * @brief Enable/Disable FIR filter run.
+     * 
+     * @note Controller must be configured in advance.
+     * 
+     * @param controller FPGA controller.
+     * @param runEnable true: enable run, false: disable run.
+     */
+    bool FPGA_API__FIR__RuningControl(vuprs::FPGAController *controller, bool runEnable);
+
     /* ----------------------------------------------------------------------------- */
     /* ------------------------------------ DDR ------------------------------------ */
     /* ----------------------------------------------------------------------------- */
@@ -163,6 +182,7 @@ namespace vuprs
      *          the S2MM streaming channel is written to the memory.
      * @note For Cyclic DMA Mode: Program the Tail Descriptor register with some value 
      *       which is not a part of the BD chain. Say for example 0x50.
+     * @note For Cyclic DMA Mode: Ensure that the cyclic bit in the control register is set (S2MM_DMACR.[4] = 1).
      * 
      * @param controller FPGA controller.
      * @param descriptors AXI DMA Scatter/Gather Descriptor list.
@@ -175,6 +195,13 @@ namespace vuprs
      */
     bool FPGA_API__DMA__StartScatterGatherDMA_S2MM(vuprs::FPGAController *controller,
         const std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> &descriptors, bool isCyclicMode = false);
+
+    /**
+     * @brief Reset AXI DMA.
+     * 
+     * @note Controller must be configured in advance.
+     */
+    bool FPGA_API__DMA__ResetDMA(vuprs::FPGAController *controller);
 }
 
 #endif
