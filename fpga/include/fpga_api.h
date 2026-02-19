@@ -53,6 +53,11 @@ namespace vuprs
     bool FPGA_API__CBUF__ReadCircularBuffer(vuprs::FPGAController *controller, 
         vuprs::SignalData *signal);
 
+    /**
+     * @brief Reset Circular Buffer.
+     */
+    bool FPGA_API__CBUF__ResetCircularBuffer(vuprs::FPGAController *controller);
+
     /* ----------------------------------------------------------------------------- */
     /* ------------------------------ Predelay Unit -------------------------------- */
     /* ----------------------------------------------------------------------------- */
@@ -74,6 +79,11 @@ namespace vuprs
      */
     bool FPGA_API__PDLY__SetPredelay(vuprs::FPGAController *controller, 
         const std::vector<uint16_t> &channelPredelay, const std::vector<std::string> &channelName);
+
+    /**
+     * @brief Reset Predelay Unit.
+     */
+    bool FPGA_API__PDLY__ResetPredelay(vuprs::FPGAController *controller);
 
     /* ----------------------------------------------------------------------------- */
     /* ---------------------------- FIR Filter Bank -------------------------------- */
