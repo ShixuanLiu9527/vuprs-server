@@ -11,7 +11,11 @@
 
 #define __LINUX_DMA_MAX_TRANSFER_BYTES__          0x7ffff000  /* Maximum transfer size in Linux-32bit & Linux-64bit */
 
-#define _IS_CODING_MODE false  /* be false before compilering */
+#define _IS_CODING_MODE false  /* should be false before compilering */
+
+#define FPGA_REG_BIT(REG, BIT) ((REG) & (uint32_t)((uint32_t)0x00000001 << (BIT)))
+#define FPGA_CLEAR_REG_BIT(REG, BIT) (uint32_t)((REG) & ~(uint32_t)((uint32_t)1U << (BIT)))
+#define FPGA_SET_REG_BIT(REG, BIT) (uint32_t)((REG) | (uint32_t)((uint32_t)1U << (BIT)))
 
 namespace vuprs
 {
@@ -30,11 +34,10 @@ namespace vuprs
         REG_SEL_ENUM enumVal;
     };
 
-#if !_IS_CODING_MODE
-    enum class REG_SEL_ENUM
+#if _IS_CODING_MODE
+    enum class REG_SEL_ENUM  /* for coding */
     {
-        A,
-        B
+        REG_A, REG_B, REG_C
     };
 #endif
 
@@ -62,7 +65,7 @@ namespace vuprs
         private:
 
             bool isIOManagerBind;
-            vuprs::FPGA_IOManager* bindIOManager;
+            std::weak_ptr<vuprs::FPGA_IOManager> bindIOManager;
             std::string controlDeviceFilename;
 
             bool RegisterIO(uint32_t registerAddress, uint32_t* ioValue, bool isRead)
@@ -73,7 +76,12 @@ namespace vuprs
                 {
                     throw std::runtime_error("FPGA file manager is NULL.");
                 }
-                return this->bindIOManager->RegisterIO(ioValue, registerAddress, isRead);
+
+                auto manager = this->bindIOManager.lock();
+
+                if (!manager) return false;
+
+                return manager->RegisterIO(ioValue, registerAddress, isRead);
             }
 
             bool RegisterIO(const std::vector<REG_SEL_ENUM> &mulRegisterSelection, std::vector<uint32_t> *ioValue, bool isRead)
@@ -94,6 +102,10 @@ namespace vuprs
                 {
                     throw std::runtime_error("mulReadValue.size() != register count to read.");
                 }
+
+                auto manager = this->bindIOManager.lock();
+
+                if (!manager) return false;
                
                 /* Operation */
 
@@ -106,7 +118,7 @@ namespace vuprs
                     multiRegisterAddressOffset[i] = this->GetRegisterAbsoluteAddress(mulRegisterSelection[i]);
                 }
 
-                return this->bindIOManager->RegisterListIO(ioValue, multiRegisterAddressOffset, isRead);
+                return manager->RegisterListIO(ioValue, multiRegisterAddressOffset, isRead);
             }
             
         protected:
@@ -180,7 +192,7 @@ namespace vuprs
                 this->configdone = false;
                 this->isIOManagerBind = false;
                 this->registerTable.clear();
-                this->bindIOManager = nullptr;
+                this->bindIOManager.reset();
             }
 
             virtual ~FPGADeviceTemplate() {}
@@ -194,16 +206,32 @@ namespace vuprs
             /**
              * @brief Bind FPGA file manager.
              */
-            bool BindFPGAFileManager(vuprs::FPGA_IOManager* ioManager)
+            bool BindFPGAFileManager(std::shared_ptr<vuprs::FPGA_IOManager> ioManager)
             {
-                if (ioManager != nullptr)
+                if (!ioManager) 
                 {
-                    this->isIOManagerBind = true;
-                    this->bindIOManager = ioManager;
-                    return true;
+                    return false;
                 }
+
+                auto manager = this->bindIOManager.lock();
+
+                if (manager && manager != ioManager) 
+                {
+                    UnbindFileManager();
+                }
+
+                this->isIOManagerBind = true;
+                bindIOManager = ioManager;
+                return true;
+            }
+    
+            /**
+             * @brief Unbind FPGA file manager.
+             */
+            void UnbindFileManager()
+            {
+                this->bindIOManager.reset();
                 this->isIOManagerBind = false;
-                return false;
             }
 
             /**
@@ -308,6 +336,42 @@ namespace vuprs
                 return this->RegisterIO(registerAddress, &writeValue, false);
             }
 
+            /**
+             * @brief Set/Clear one bit of certain register.
+             * 
+             * @param registerSelection register to operate.
+             * @param bit bit select (valid value: 0, 1, ..., 31).
+             * @param isSet true: set this bit to 1, false: set this bit to 0.
+             * 
+             * @retval true: success, false: failed.
+             */
+            bool WriteSingleRegisterBIT(REG_SEL_ENUM registerSelection, uint32_t bit, bool isSet)
+            {
+                if (bit > 31)
+                {
+                    throw std::runtime_error("Invalid Bit position (valid <= 31).");
+                }
+
+                bool operateStatus = true;
+                uint32_t r_val, w_val;
+                uint32_t registerAddress = this->GetRegisterAbsoluteAddress(registerSelection);
+
+                operateStatus &= this->RegisterIO(registerAddress, &r_val, true);  /* read */
+
+                if (isSet)
+                {
+                    w_val = FPGA_SET_REG_BIT(r_val, bit);
+                }
+                else
+                {
+                    w_val = FPGA_CLEAR_REG_BIT(r_val, bit);
+                }
+
+                operateStatus &= this->RegisterIO(registerAddress, &w_val, false);
+
+                return operateStatus;
+            }
+
             /* ----------------------------- Multiple Register IO ----------------------------- */
 
             /**
@@ -368,6 +432,11 @@ namespace vuprs
 
                 return true;
             }
+
+            bool ConfigDone() const
+            {
+                return this->configdone;
+            }
     };
 
     /**
@@ -387,7 +456,7 @@ namespace vuprs
         private:
 
             bool isIOManagerBind;
-            vuprs::FPGA_IOManager *bindIOManager_h2c, *bindIOManager_c2h;
+            std::weak_ptr<vuprs::FPGA_IOManager> bindIOManager_h2c, bindIOManager_c2h;
             std::string h2c_controlDeviceFilename, c2h_controlDeviceFilename;
 
             bool BufferIO(uint32_t offset, vuprs::AlignedBufferDMA *buffer, uint64_t transferByteSize, bool isRead)
@@ -421,11 +490,13 @@ namespace vuprs
 
                 if (isRead) 
                 {
-                    return this->bindIOManager_c2h->BufferIO(buffer->data(), targetOffset, transferByteSize, true);
+                    auto c2h_manager = this->bindIOManager_c2h.lock();
+                    return c2h_manager->BufferIO(buffer->data(), targetOffset, transferByteSize, true);
                 }
-                else 
+                else
                 {
-                    return this->bindIOManager_h2c->BufferIO(buffer->data(), targetOffset, transferByteSize, false);
+                    auto h2c_manager = this->bindIOManager_h2c.lock();
+                    return h2c_manager->BufferIO(buffer->data(), targetOffset, transferByteSize, false);
                 }
             }
 
@@ -452,11 +523,13 @@ namespace vuprs
 
                 if (isRead) 
                 {
-                    return this->bindIOManager_c2h->BufferIO(ioValue, targetOffset, sizeof(uint32_t), true);
+                    auto c2h_manager = this->bindIOManager_c2h.lock();
+                    return c2h_manager->BufferIO(ioValue, targetOffset, sizeof(uint32_t), true);
                 }
                 else 
                 {
-                    return this->bindIOManager_h2c->BufferIO(ioValue, targetOffset, sizeof(uint32_t), false);
+                    auto h2c_manager = this->bindIOManager_h2c.lock();
+                    return h2c_manager->BufferIO(ioValue, targetOffset, sizeof(uint32_t), false);
                 }
             }
 
@@ -465,6 +538,8 @@ namespace vuprs
             FPGABus dataBus;
             uint32_t fpgaAddress;
             uint32_t maxCapacityKB;
+
+            bool configdone;
 
             bool LoadMainInfoFromJsonObj(const nlohmann::json &obj)
             {
@@ -483,9 +558,11 @@ namespace vuprs
                 this->fpgaAddress = 0;
                 this->maxCapacityKB = 1;
 
+                this->configdone = false;
+
                 this->isIOManagerBind = false;
-                this->bindIOManager_c2h = nullptr;
-                this->bindIOManager_h2c = nullptr;
+                this->bindIOManager_c2h.reset();
+                this->bindIOManager_h2c.reset();
             }
 
             virtual ~FPGAMemoryTemplate() {}
@@ -504,17 +581,41 @@ namespace vuprs
             /**
              * @brief Bind FPGA file manager.
              */
-            bool BindFPGAFileManager(vuprs::FPGA_IOManager* ioManager_h2c, vuprs::FPGA_IOManager* ioManager_c2h)
+            bool BindFPGAFileManager(std::shared_ptr<vuprs::FPGA_IOManager> ioManager_h2c,
+                                     std::shared_ptr<vuprs::FPGA_IOManager> ioManager_c2h)
             {
-                if (ioManager_h2c != nullptr && ioManager_c2h != nullptr)
+        
+                if (ioManager_h2c == nullptr || ioManager_c2h == nullptr)
                 {
-                    this->isIOManagerBind = true;
-                    this->bindIOManager_h2c = ioManager_h2c;
-                    this->bindIOManager_c2h = ioManager_c2h;
-                    return true;
+                    return false;
                 }
+            
+                auto current_h2c = this->bindIOManager_h2c.lock();
+                auto current_c2h = this->bindIOManager_c2h.lock();
+            
+                if (this->isIOManagerBind) 
+                {
+                    if ((current_h2c && current_h2c != ioManager_h2c) || (current_c2h && current_c2h != ioManager_c2h)) 
+                    {
+                        UnbindFileManager();
+                    }
+                }
+            
+                this->bindIOManager_h2c = ioManager_h2c;
+                this->bindIOManager_c2h = ioManager_c2h;
+                this->isIOManagerBind = true;
+
+                return true;
+            }
+
+            /**
+             * @brief Unbind FPGA file manager.
+             */
+            void UnbindFileManager()
+            {
+                this->bindIOManager_h2c.reset();
+                this->bindIOManager_c2h.reset();
                 this->isIOManagerBind = false;
-                return false;
             }
 
             /**
@@ -581,6 +682,11 @@ namespace vuprs
             bool WriteMemory(uint32_t offset, uint32_t writeValue)
             {
                 return this->WordIO(offset, &writeValue, false);
+            }
+
+            bool ConfigDone() const
+            {
+                return this->configdone;
             }
     };
 }

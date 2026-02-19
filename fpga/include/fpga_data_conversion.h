@@ -6,14 +6,18 @@
 #include <stdint.h>
 #include <complex>
 #include <unordered_map>
+#include <algorithm>
 
 #include "aligned_buffer.h"
+#include "fpga_data_conv.h"
 
 #define ADC_CHANNEL_NUMBER               16U
-#define ADC_FRAME_HALF_WORD_SIZE         20U  /* 10 words */
+#define ADC_FRAME_WORD_SIZE              10U  /* 10 words */
 
 #define ADC_FRAME_HEADER                 (uint32_t)0x0000FFF0U
 #define ADC_FRAME_TAILER                 (uint32_t)0x0000FF0FU
+
+constexpr uint32_t ADC_FRAME_HALF_WORD_SIZE = (uint32_t)(ADC_FRAME_WORD_SIZE * 2);
 
 constexpr uint16_t ADC_FRAME_HEADER__H = (uint16_t)((ADC_FRAME_HEADER >> 16) & 0xFFFF);
 constexpr uint16_t ADC_FRAME_HEADER__L = (uint16_t)(ADC_FRAME_HEADER & 0xFFFF);
@@ -23,6 +27,8 @@ constexpr uint16_t ADC_FRAME_TAILER__L = (uint16_t)(ADC_FRAME_TAILER & 0xFFFF);
 
 #define IS_FRAME_HEADER(VAL_L, VAL_H) (VAL_L == ADC_FRAME_HEADER__L && VAL_H == ADC_FRAME_HEADER__H)
 #define IS_FRAME_TAILER(VAL_L, VAL_H) (VAL_L == ADC_FRAME_TAILER__L && VAL_H == ADC_FRAME_TAILER__H)
+
+#define UINT16_SPLI_TO_UINT32(L, H) (uint32_t)((int32_t)((uint32_t)(H) << 16) | (uint32_t)(L))  /* {H, L} */
 
 /* -------------------------------------------------------------------- */
 /* ---------------- Circular Buffer - ADC Channel Index --------------- */
@@ -45,52 +51,6 @@ constexpr uint16_t ADC_FRAME_TAILER__L = (uint16_t)(ADC_FRAME_TAILER & 0xFFFF);
 #define ADC_CHANNEL__B_6                         13U
 #define ADC_CHANNEL__B_7                         14U
 #define ADC_CHANNEL__B_8                         15U
-
-/* -------------------------------------------------------------------- */
-/* ------------ Circular Buffer - Channel Position Define ------------- */
-/* -------------------------------------------------------------------- */
-
-/**
- * 
- * Define the storage order of ADC channels here.
- * 
- * e.g. If the data is stored in the following order (word is 32 bit):
- * 
- *      half word 0:  ADC-CH-A2
- *      half word 1:  ADC-CH-A3
- *      half word 2:  ADC-CH-A1
- *      ...      ...
- * 
- * then the storage order must be defined in the following way:
- * 
- *      ADC_CHANNEL_POSITION__A_1                 2U
- *      ADC_CHANNEL_POSITION__A_2                 0U
- *      ADC_CHANNEL_POSITION__A_3                 1U
- *      ...                                       ...
- * 
- * -----------------------------------------------------------------
- *      ADC Channel                               Storage position
- * -----------------------------------------------------------------
- * 
- */
-
-#define ADC_CHANNEL_POSITION__A_1                 0U
-#define ADC_CHANNEL_POSITION__A_2                 1U
-#define ADC_CHANNEL_POSITION__A_3                 2U
-#define ADC_CHANNEL_POSITION__A_4                 3U
-#define ADC_CHANNEL_POSITION__A_5                 4U
-#define ADC_CHANNEL_POSITION__A_6                 5U
-#define ADC_CHANNEL_POSITION__A_7                 6U
-#define ADC_CHANNEL_POSITION__A_8                 7U
-
-#define ADC_CHANNEL_POSITION__B_1                 8U
-#define ADC_CHANNEL_POSITION__B_2                 9U
-#define ADC_CHANNEL_POSITION__B_3                 10U
-#define ADC_CHANNEL_POSITION__B_4                 11U
-#define ADC_CHANNEL_POSITION__B_5                 12U
-#define ADC_CHANNEL_POSITION__B_6                 13U
-#define ADC_CHANNEL_POSITION__B_7                 14U
-#define ADC_CHANNEL_POSITION__B_8                 15U
 
 /* -------------------------------------------------------------------- */
 /* -------------- Circular Buffer - Channel Name Define --------------- */
@@ -134,6 +94,13 @@ constexpr uint16_t ADC_FRAME_TAILER__L = (uint16_t)(ADC_FRAME_TAILER & 0xFFFF);
 
 namespace vuprs
 {
+    const std::vector<std::string> ADC_CHANNEL_ADDR_MAP = {
+        ADC_CHANNEL_NAME__A_1, ADC_CHANNEL_NAME__A_2, ADC_CHANNEL_NAME__A_3, ADC_CHANNEL_NAME__A_4,
+        ADC_CHANNEL_NAME__A_5, ADC_CHANNEL_NAME__A_6, ADC_CHANNEL_NAME__A_7, ADC_CHANNEL_NAME__A_8,
+        ADC_CHANNEL_NAME__B_1, ADC_CHANNEL_NAME__B_2, ADC_CHANNEL_NAME__B_3, ADC_CHANNEL_NAME__B_4,
+        ADC_CHANNEL_NAME__B_5, ADC_CHANNEL_NAME__B_6, ADC_CHANNEL_NAME__B_7, ADC_CHANNEL_NAME__B_8
+    };  /* addr in one frame: [0, 1, 2, ...], corresponding channel: [A1, A2, ...] */
+
     class SignalData
     {
         private:
@@ -204,15 +171,35 @@ namespace vuprs
     };
 
     /**
+     * @brief Rotate data in circular buffer.
+     * 
+     * @note e.g. Input: vec = [1, 2, 3, 4, 5, 6],
+     * @note and currentPointer = 2,
+     * @note then Output = [4, 5, 6, 1, 2, 3].
+     */
+    template<typename T>
+    void RotateCircularBuffer(std::vector<T> *vec, uint32_t currentPointer) 
+    {
+        if (vec.empty() || currentPointer >= vec.size() - 1) 
+        {
+            return;
+        }
+        std::rotate(vec->begin(), vec->begin() + currentPointer + 1, vec->end());
+    }
+
+    /**
      * @brief Parse circular buffer data to adcData.
      * 
      * @param buffer Input aligned DMA buffer.
      * @param adcData Output ADC data (ch1: adcData[0], ch2: adcData[1], ...).
+     * @param fs sampling frequency.
+     * @param v_scale ADC voltage scale (5.0 or 10.0 for AD7606)
+     * @param currentBramPointer current BRAM pointer (point to newest data).
      * 
      * @retval true: success.
      * @retval false: failed.
      */
-    bool FPGACircularBuffer2Frames(vuprs::AlignedBufferDMA *buffer, vuprs::SignalData *adcData, double samplingFrequency = 1.0);
+    bool FPGACircularBuffer2Frames(vuprs::AlignedBufferDMA *buffer, vuprs::SignalData *adcData, double fs, double v_scale, uint32_t currentBramPointer);
 
     /**
      * @brief Convert memory data to signed float.
@@ -221,11 +208,12 @@ namespace vuprs
      * 
      * @param buffer Input aligned DMA buffer.
      * @param beamformingResult Output beam forming result.
+     * @param fs sampling frequency.
      * 
      * @retval true: success.
      * @retval false: failed.
      */
-    bool FPGAMemoryBuffer2Frames(vuprs::AlignedBufferDMA *buffer, std::vector<double> *beamformingResult, double samplingFrequency = 1.0);
+    bool FPGAMemoryBuffer2Frames(vuprs::AlignedBufferDMA *buffer, std::vector<double> *beamformingResult, double fs);
 }
 
 #endif

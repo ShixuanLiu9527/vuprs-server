@@ -13,8 +13,8 @@ namespace vuprs
     {
         private:
 
-            std::vector<vuprs::FPGA_IOManager> ioManagerList;
-            bool configdown;
+            std::vector<std::shared_ptr<vuprs::FPGA_IOManager>> ioManagerList;
+            bool configdone;
 
             /**
              * @brief Bind IO manager to devices & memories.
@@ -27,14 +27,13 @@ namespace vuprs
              * @param deviceFile device filename.
              * @param index index of corrsponding io manager in this->ioManagerList.
              * 
-             * @retval true: success.
-             * @retval false: error occurred.
-             * 
              * @throw std::runtime_error
              */
-            bool GetIOManagerIndex(const std::string &deviceFile, int *index);
+            void GetOrCreateIOManagerIndex(const std::string &deviceFile, int *index);
 
         public:
+
+            vuprs::AlignedBufferDMA buffer;  /* aligned buffer for user */
 
             /* FPGA Devices */
 

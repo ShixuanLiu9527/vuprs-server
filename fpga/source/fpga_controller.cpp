@@ -4,14 +4,14 @@ vuprs::FPGAController::FPGAController()
 {
     this->ioManagerList.clear();
     this->ioManagerList.reserve(FPGA_MODULE_COUNT * 2);
-    this->configdown = false;
+    this->configdone = false;
 }
 
 vuprs::FPGAController::FPGAController(const std::string &configJsonFilename)
 {
     this->ioManagerList.clear();
     this->ioManagerList.reserve(FPGA_MODULE_COUNT * 2);
-    this->configdown = false;
+    this->configdone = false;
 
     this->ConfigFPGAFromJson(configJsonFilename);
 }
@@ -44,24 +44,26 @@ bool vuprs::FPGAController::ConfigFPGAFromJson(const std::string &configJsonFile
         throw std::runtime_error("Error occurred when parsing JSON file." + std::string(e.what()));
     }
 
+    bool configStatus = true;
+
     try
     {
         auto devices = configJsonData["devices"];
 
         /* Load devices */
 
-        this->dev__AXI_DMA.LoadFromJsonObj(devices["axi_dma"]);
-        this->dev__ADC_Controller.LoadFromJsonObj(devices["adc_controller"]);
-        this->dev__Circular_Buffer.LoadFromJsonObj(devices["circular_buffer"]);
-        this->dev__FIR_Filter_Bank.LoadFromJsonObj(devices["fir_bank"]);
-        this->dev__PreDelay_Unit.LoadFromJsonObj(devices["pre_delay_unit"]);
+        configStatus &= this->dev__AXI_DMA.LoadFromJsonObj(devices["axi_dma"]);
+        configStatus &= this->dev__ADC_Controller.LoadFromJsonObj(devices["adc_controller"]);
+        configStatus &= this->dev__Circular_Buffer.LoadFromJsonObj(devices["circular_buffer"]);
+        configStatus &= this->dev__FIR_Filter_Bank.LoadFromJsonObj(devices["fir_bank"]);
+        configStatus &= this->dev__PreDelay_Unit.LoadFromJsonObj(devices["pre_delay_unit"]);
 
         /* Load memorys */
 
-        this->mem__DDR.LoadFromJsonObj(devices["ddr"]);
-        this->mem__FIR_BRAM.LoadFromJsonObj(devices["fir_bram"]);
-        this->mem__SG_BRAM.LoadFromJsonObj(devices["sg_bram"]);
-        this->mem__Circular_Buffer_BRAM.LoadFromJsonObj(devices["cbuf_bram"]);
+        configStatus &= this->mem__DDR.LoadFromJsonObj(devices["ddr"]);
+        configStatus &= this->mem__FIR_BRAM.LoadFromJsonObj(devices["fir_bram"]);
+        configStatus &= this->mem__SG_BRAM.LoadFromJsonObj(devices["sg_bram"]);
+        configStatus &= this->mem__Circular_Buffer_BRAM.LoadFromJsonObj(devices["cbuf_bram"]);
 
     }
     catch(const std::exception& e)
@@ -69,15 +71,19 @@ bool vuprs::FPGAController::ConfigFPGAFromJson(const std::string &configJsonFile
         throw std::runtime_error("Error occurred in parsing: " + std::string(e.what()));
     }
 
-    this->BindIOManager();
+    configStatus &= this->BindIOManager();
 
-    this->configdown = true;
+    if (!configStatus)
+    {
+        throw std::runtime_error("Config failed.");
+    }
+
+    this->configdone = true;
     return true;
 }
 
-bool vuprs::FPGAController::GetIOManagerIndex(const std::string &deviceFile, int *index)
+void vuprs::FPGAController::GetOrCreateIOManagerIndex(const std::string &deviceFile, int *index)
 {
-    bool isNew = true;
     int len = this->ioManagerList.size();
     if (index == nullptr)
     {
@@ -86,20 +92,14 @@ bool vuprs::FPGAController::GetIOManagerIndex(const std::string &deviceFile, int
     *index = 0;
     for (int i = 0; i < len; i++)
     {
-        if (this->ioManagerList[i].GetDeviceFilename() == deviceFile)
+        if (this->ioManagerList[i]->GetDeviceFilename() == deviceFile)
         {
             *index = i;
-            isNew = false;
-            break;
+            return;
         }
     }
-    if (isNew)
-    {
-        this->ioManagerList.push_back(vuprs::FPGA_IOManager(deviceFile));
-        *index = this->ioManagerList.size() - 1;
-        return true;
-    }
-    return false;
+    this->ioManagerList.emplace_back(std::make_shared<vuprs::FPGA_IOManager>(deviceFile));
+    *index = this->ioManagerList.size() - 1;
 }
 
 bool vuprs::FPGAController::BindIOManager()
@@ -111,43 +111,45 @@ bool vuprs::FPGAController::BindIOManager()
     int i_h2c_SG_BRAM, i_c2h_SG_BRAM;
     int i_h2c_Circular_Buffer_BRAM, i_c2h_Circular_Buffer_BRAM;
 
+    bool bindStatus = true;
+
     /* Generate */
 
-    this->GetIOManagerIndex(this->dev__AXI_DMA.ControlDeviceFilename(), &i_AXI_DMA);
-    this->GetIOManagerIndex(this->dev__ADC_Controller.ControlDeviceFilename(), &i_ADC_Controller);
-    this->GetIOManagerIndex(this->dev__Circular_Buffer.ControlDeviceFilename(), &i_Circular_Buffer);
-    this->GetIOManagerIndex(this->dev__FIR_Filter_Bank.ControlDeviceFilename(), &i_FIR_Filter_Bank);
-    this->GetIOManagerIndex(this->dev__PreDelay_Unit.ControlDeviceFilename(), &i_PreDelay_Unit);
+    this->GetOrCreateIOManagerIndex(this->dev__AXI_DMA.ControlDeviceFilename(), &i_AXI_DMA);
+    this->GetOrCreateIOManagerIndex(this->dev__ADC_Controller.ControlDeviceFilename(), &i_ADC_Controller);
+    this->GetOrCreateIOManagerIndex(this->dev__Circular_Buffer.ControlDeviceFilename(), &i_Circular_Buffer);
+    this->GetOrCreateIOManagerIndex(this->dev__FIR_Filter_Bank.ControlDeviceFilename(), &i_FIR_Filter_Bank);
+    this->GetOrCreateIOManagerIndex(this->dev__PreDelay_Unit.ControlDeviceFilename(), &i_PreDelay_Unit);
 
-    this->GetIOManagerIndex(this->mem__DDR.H2C_ControlDeviceFilename(), &i_h2c_DDR);
-    this->GetIOManagerIndex(this->mem__DDR.C2H_ControlDeviceFilename(), &i_c2h_DDR);
+    this->GetOrCreateIOManagerIndex(this->mem__DDR.H2C_ControlDeviceFilename(), &i_h2c_DDR);
+    this->GetOrCreateIOManagerIndex(this->mem__DDR.C2H_ControlDeviceFilename(), &i_c2h_DDR);
 
-    this->GetIOManagerIndex(this->mem__FIR_BRAM.H2C_ControlDeviceFilename(), &i_h2c_FIR_BRAM);
-    this->GetIOManagerIndex(this->mem__FIR_BRAM.C2H_ControlDeviceFilename(), &i_c2h_FIR_BRAM);
+    this->GetOrCreateIOManagerIndex(this->mem__FIR_BRAM.H2C_ControlDeviceFilename(), &i_h2c_FIR_BRAM);
+    this->GetOrCreateIOManagerIndex(this->mem__FIR_BRAM.C2H_ControlDeviceFilename(), &i_c2h_FIR_BRAM);
 
-    this->GetIOManagerIndex(this->mem__SG_BRAM.H2C_ControlDeviceFilename(), &i_h2c_SG_BRAM);
-    this->GetIOManagerIndex(this->mem__SG_BRAM.C2H_ControlDeviceFilename(), &i_c2h_SG_BRAM);
+    this->GetOrCreateIOManagerIndex(this->mem__SG_BRAM.H2C_ControlDeviceFilename(), &i_h2c_SG_BRAM);
+    this->GetOrCreateIOManagerIndex(this->mem__SG_BRAM.C2H_ControlDeviceFilename(), &i_c2h_SG_BRAM);
 
-    this->GetIOManagerIndex(this->mem__Circular_Buffer_BRAM.H2C_ControlDeviceFilename(), &i_h2c_Circular_Buffer_BRAM);
-    this->GetIOManagerIndex(this->mem__Circular_Buffer_BRAM.C2H_ControlDeviceFilename(), &i_c2h_Circular_Buffer_BRAM);
+    this->GetOrCreateIOManagerIndex(this->mem__Circular_Buffer_BRAM.H2C_ControlDeviceFilename(), &i_h2c_Circular_Buffer_BRAM);
+    this->GetOrCreateIOManagerIndex(this->mem__Circular_Buffer_BRAM.C2H_ControlDeviceFilename(), &i_c2h_Circular_Buffer_BRAM);
 
     /* Bind */
 
-    this->dev__AXI_DMA.BindFPGAFileManager(&this->ioManagerList[i_AXI_DMA]);
-    this->dev__ADC_Controller.BindFPGAFileManager(&this->ioManagerList[i_ADC_Controller]);
-    this->dev__Circular_Buffer.BindFPGAFileManager(&this->ioManagerList[i_Circular_Buffer]);
-    this->dev__FIR_Filter_Bank.BindFPGAFileManager(&this->ioManagerList[i_FIR_Filter_Bank]);
-    this->dev__PreDelay_Unit.BindFPGAFileManager(&this->ioManagerList[i_PreDelay_Unit]);
+    bindStatus &= this->dev__AXI_DMA.BindFPGAFileManager(this->ioManagerList[i_AXI_DMA]);
+    bindStatus &= this->dev__ADC_Controller.BindFPGAFileManager(this->ioManagerList[i_ADC_Controller]);
+    bindStatus &= this->dev__Circular_Buffer.BindFPGAFileManager(this->ioManagerList[i_Circular_Buffer]);
+    bindStatus &= this->dev__FIR_Filter_Bank.BindFPGAFileManager(this->ioManagerList[i_FIR_Filter_Bank]);
+    bindStatus &= this->dev__PreDelay_Unit.BindFPGAFileManager(this->ioManagerList[i_PreDelay_Unit]);
 
-    this->mem__DDR.BindFPGAFileManager(&this->ioManagerList[i_h2c_DDR], &this->ioManagerList[i_c2h_DDR]);
-    this->mem__FIR_BRAM.BindFPGAFileManager(&this->ioManagerList[i_h2c_FIR_BRAM], &this->ioManagerList[i_c2h_FIR_BRAM]);
-    this->mem__SG_BRAM.BindFPGAFileManager(&this->ioManagerList[i_h2c_SG_BRAM], &this->ioManagerList[i_c2h_SG_BRAM]);
-    this->mem__Circular_Buffer_BRAM.BindFPGAFileManager(&this->ioManagerList[i_h2c_Circular_Buffer_BRAM], &this->ioManagerList[i_c2h_Circular_Buffer_BRAM]);
+    bindStatus &= this->mem__DDR.BindFPGAFileManager(this->ioManagerList[i_h2c_DDR], this->ioManagerList[i_c2h_DDR]);
+    bindStatus &= this->mem__FIR_BRAM.BindFPGAFileManager(this->ioManagerList[i_h2c_FIR_BRAM], this->ioManagerList[i_c2h_FIR_BRAM]);
+    bindStatus &= this->mem__SG_BRAM.BindFPGAFileManager(this->ioManagerList[i_h2c_SG_BRAM], this->ioManagerList[i_c2h_SG_BRAM]);
+    bindStatus &= this->mem__Circular_Buffer_BRAM.BindFPGAFileManager(this->ioManagerList[i_h2c_Circular_Buffer_BRAM], this->ioManagerList[i_c2h_Circular_Buffer_BRAM]);
 
-    return true;
+    return bindStatus;
 }
 
 bool vuprs::FPGAController::ConfigDown() const
 {
-    return this->configdown;
+    return this->configdone;
 }

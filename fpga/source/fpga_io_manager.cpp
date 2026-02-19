@@ -3,7 +3,10 @@
 vuprs::FPGA_IOManager::FPGA_IOManager(const std::string &deviceFilename)
 {
     this->fd = -1;
-    this->Open(deviceFilename);
+    if (!this->Open(deviceFilename))
+    {
+        throw std::runtime_error("Cannot open device file: " + deviceFilename);
+    }
 }
 
 vuprs::FPGA_IOManager::FPGA_IOManager()
