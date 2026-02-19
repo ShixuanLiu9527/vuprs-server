@@ -13,6 +13,10 @@
 
 #define _IS_CODING_MODE false  /* should be false before compilering */
 
+#define FPGA_REG_BIT(REG, BIT) ((REG) & (uint32_t)((uint32_t)0x00000001 << (BIT)))
+#define FPGA_CLEAR_REG_BIT(REG, BIT) (uint32_t)((REG) & ~(uint32_t)((uint32_t)1U << (BIT)))
+#define FPGA_SET_REG_BIT(REG, BIT) (uint32_t)((REG) | (uint32_t)((uint32_t)1U << (BIT)))
+
 namespace vuprs
 {
     enum class FPGABus
@@ -330,6 +334,42 @@ namespace vuprs
                 }
                 uint32_t registerAddress = offset + this->barOffset;
                 return this->RegisterIO(registerAddress, &writeValue, false);
+            }
+
+            /**
+             * @brief Set/Clear one bit of certain register.
+             * 
+             * @param registerSelection register to operate.
+             * @param bit bit select (valid value: 0, 1, ..., 31).
+             * @param isSet true: set this bit to 1, false: set this bit to 0.
+             * 
+             * @retval true: success, false: failed.
+             */
+            bool WriteSingleRegisterBIT(REG_SEL_ENUM registerSelection, uint32_t bit, bool isSet)
+            {
+                if (bit > 31)
+                {
+                    throw std::runtime_error("Invalid Bit position (valid <= 31).");
+                }
+
+                bool operateStatus = true;
+                uint32_t r_val, w_val;
+                uint32_t registerAddress = this->GetRegisterAbsoluteAddress(registerSelection);
+
+                operateStatus &= this->RegisterIO(registerAddress, &r_val, true);  /* read */
+
+                if (isSet)
+                {
+                    w_val = FPGA_SET_REG_BIT(r_val, bit);
+                }
+                else
+                {
+                    w_val = FPGA_CLEAR_REG_BIT(r_val, bit);
+                }
+
+                operateStatus &= this->RegisterIO(registerAddress, &w_val, false);
+
+                return operateStatus;
             }
 
             /* ----------------------------- Multiple Register IO ----------------------------- */

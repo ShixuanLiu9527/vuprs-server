@@ -116,6 +116,25 @@ namespace vuprs
     bool FPGA_API__FIR__SetLengthAndCoefficients(vuprs::FPGAController *controller, 
         std::vector<std::vector<double>> *coefficients, double maxAbsoluteCoefficient, uint32_t len);
 
+    /**
+     * @brief Reset FIR filter bank.
+     * 
+     * @note Controller must be configured in advance.
+     * @note Step 1: Reset FIR.
+     * @note Step 2: Disable run.
+     */
+    bool FPGA_API__FIR__ResetFIR(vuprs::FPGAController *controller);
+
+    /**
+     * @brief Enable/Disable FIR filter run.
+     * 
+     * @note Controller must be configured in advance.
+     * 
+     * @param controller FPGA controller.
+     * @param runEnable true: enable run, false: disable run.
+     */
+    bool FPGA_API__FIR__RuningControl(vuprs::FPGAController *controller, bool runEnable);
+
     /* ----------------------------------------------------------------------------- */
     /* ------------------------------------ DDR ------------------------------------ */
     /* ----------------------------------------------------------------------------- */
@@ -135,8 +154,54 @@ namespace vuprs
      * 
      * @throw std::runtime_error
      */
-    bool FPGA_API__FIR__ReadDDR(vuprs::FPGAController *controller, 
+    bool FPGA_API__DDR__ReadDDR(vuprs::FPGAController *controller, 
         vuprs::AlignedBufferDMA *buffer, uint32_t ddrOffset, uint32_t transferSize);
+
+    /* ----------------------------------------------------------------------------- */
+    /* ---------------------------------- AXI DMA ---------------------------------- */
+    /* ----------------------------------------------------------------------------- */
+
+    /**
+     * @brief Start Scatter/Gather Transfer.
+     * 
+     * @note Controller must be configured in advance.
+     * @note A DMA operation for the S2MM channel is set up and started by using the following sequence:
+     * @note 1. Write the address of the starting descriptor to the Current Descriptor register. 
+     *          If AXI DMA is configured for an address space greater than 32, 
+     *          then also program the MSB 32 bits of the current descriptor.
+     * @note 2. Start the S2MM channel running by setting the run/stop bit to 1 (S2MM_DMACR.RS =1). 
+     *          The halted bit (DMASR.Halted) should deassert indicating the S2MM channel is running.
+     * @note 3. If desired, enable interrupts by writing a 1 to S2MM_DMACR.IOC_IrqEn and 
+     *          S2MM_DMACR.Err_IrqEn.
+     * @note 4. Write a valid address to the Tail Descriptor register. 
+     *          If AXI DMA is configured for an address space greater than 32, 
+     *          then also program the MSB 32 bits of the current descriptor.
+     * @note 5. Writing to the Tail Descriptor register triggers the DMA to start 
+     *          fetching the descriptors from the memory.
+     * @note 6. The fetched descriptors are processed and any data received from 
+     *          the S2MM streaming channel is written to the memory.
+     * @note For Cyclic DMA Mode: Program the Tail Descriptor register with some value 
+     *       which is not a part of the BD chain. Say for example 0x50.
+     * @note For Cyclic DMA Mode: Ensure that the cyclic bit in the control register is set (S2MM_DMACR.[4] = 1).
+     * 
+     * @param controller FPGA controller.
+     * @param descriptors AXI DMA Scatter/Gather Descriptor list.
+     * @param isCyclicMode true: Cyclic DMA Mode, false: Normal Mode.
+     * 
+     * @retval true: success.
+     * @retval false: failed.
+     * 
+     * @throw std::runtime_error
+     */
+    bool FPGA_API__DMA__StartScatterGatherDMA_S2MM(vuprs::FPGAController *controller,
+        const std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> &descriptors, bool isCyclicMode = false);
+
+    /**
+     * @brief Reset AXI DMA.
+     * 
+     * @note Controller must be configured in advance.
+     */
+    bool FPGA_API__DMA__ResetDMA(vuprs::FPGAController *controller);
 }
 
 #endif

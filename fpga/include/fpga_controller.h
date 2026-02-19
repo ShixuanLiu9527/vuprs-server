@@ -7,8 +7,6 @@
 
 #define FPGA_MODULE_COUNT 9U  /* = 5 Devices + 4 Memories */
 
-#define FPGA_REG_BIT(REG, BIT) ((REG) & (uint32_t)((uint32_t)0x00000001 << (BIT)))
-
 namespace vuprs
 {
     class FPGAController
