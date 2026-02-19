@@ -7,6 +7,23 @@
 
 namespace vuprs
 {
+    struct ARM_FPGA_BF_Config
+    {
+        double fs;  /* sampling frequency (unit: Hz) */
+
+        double bf_target__alt;  /* altitude (unit: degree) beam former pointing target */
+        double bf_target__az;  /* azimuth (unit: degree) beam former pointing target */
+
+        double bf_freq__lower;  /* lower boundary of beam former work frequency (unit: Hz) */
+        double bf_freq__upper;  /* upper boundary of beam former work frequency (unit: Hz) */
+
+        int bf_cov_snapshotsWindowSize;  /* Snapshots window size (to fit covariance matrix) */
+        double bf_cov_freqAverageIndex;  /* frequency average index (to fit covariance matrix) */
+
+        uint32_t dma__bufferSize;  /* AXI DMA descriptor buffer size */
+        uint32_t dma__bufferCount;  /* AXI DMA descriptor buffer count */
+    };
+
     class ARM_FPGA_CollaborationBeamfomer
     {
         private:
@@ -39,9 +56,12 @@ namespace vuprs
              * 
              * @throw std::runtime_error
              */
-            void InitHardwareBeamformer();
+            bool ResetHardwareBeamformer();
 
-            void StartBeamforming(double fs);
+            /**
+             * @brief Start beam forming.
+             */
+            bool StartBeamforming(const ARM_FPGA_BF_Config &config);
     };
 }
 
