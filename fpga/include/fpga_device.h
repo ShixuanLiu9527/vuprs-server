@@ -94,6 +94,8 @@ namespace vuprs
     {
         private:
 
+            uint32_t s2mmTransferRegisterLength;  /* max = 26 bit */
+            
             uint32_t offset_SG_CTL;
             uint32_t offset_S2MM_DMACR;
             uint32_t offset_S2MM_DMASR;
@@ -214,6 +216,13 @@ namespace vuprs
 
             FPGA_Device__CircularBuffer();
             bool LoadFromJsonObj(const nlohmann::json &obj) override;
+
+            /**
+             * @brief Circular buffer refreshed.
+             * 
+             * @note function will read Circular buffer.
+             */
+            bool Refreshed();
 
             uint32_t SignalPoints() const;
     };

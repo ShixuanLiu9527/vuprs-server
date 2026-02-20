@@ -197,6 +197,7 @@ namespace vuprs
      * @param controller FPGA controller.
      * @param descriptors AXI DMA Scatter/Gather Descriptor list.
      * @param isCyclicMode true: Cyclic DMA Mode, false: Normal Mode.
+     * @param enableIOCInterrupt true: enable IOC Interrupt, false: disable IOC Interrupt.
      * 
      * @retval true: success.
      * @retval false: failed.
@@ -204,7 +205,24 @@ namespace vuprs
      * @throw std::runtime_error
      */
     bool FPGA_API__DMA__StartScatterGatherDMA_S2MM(vuprs::FPGAController *controller,
-        const std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> &descriptors, bool isCyclicMode = false);
+        const std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> &descriptors, bool isCyclicMode = false, bool enableIOCInterrupt = false);
+
+    /**
+     * @brief Get IOC interrupt flag of AXI DMA (in Scatter/Gather mode). 
+     * 
+     * @note Controller must be configured in advance.
+     * @note Make sure that the IOC interrupt is enabled.
+     * @note If IOC interrupt detected, this API function will clear IOC interrupt flag in AXI DMA.
+     * 
+     * @param controller FPGA controller.
+     * @param flag 1: IOC Interrupt detected, 0: No IOC Interrupt.
+     * 
+     * @retval true: success.
+     * @retval false: failed.
+     * 
+     * @throw std::runtime_error
+     */
+    bool FPGA_API__DMA__GetAndClearInterruptFlag(vuprs::FPGAController *controller, uint32_t* flag);
 
     /**
      * @brief Reset AXI DMA.

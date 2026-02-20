@@ -13,7 +13,9 @@ namespace vuprs
     {
         private:
 
-            std::vector<std::shared_ptr<vuprs::FPGA_IOManager>> ioManagerList;
+            std::vector<std::shared_ptr<vuprs::FPGA_IOManagerForInterrput>> ioManagerList_irq;
+            std::vector<std::shared_ptr<vuprs::FPGA_IOManagerForDevice>> ioManagerList_dev;
+            std::vector<std::shared_ptr<vuprs::FPGA_IOManagerForMemory>> ioManagerList_mem;
             bool configdone;
 
             /**
@@ -22,14 +24,25 @@ namespace vuprs
             bool BindIOManager();
 
             /**
-             * @brief Get FPGA_IOManager obj index in this->ioManagerList of the certain device filename.
+             * @brief Get FPGA_IOManager obj index in this->ioManagerList_dev or this->ioManagerList_mem of the certain device filename.
+             * 
+             * @param deviceFile device filename.
+             * @param index index of corrsponding io manager in this->ioManagerList.
+             * @param isDevice true: for device, false: for memory.
+             * 
+             * @throw std::runtime_error
+             */
+            void GetOrCreateNormalIOManagerIndex(const std::string &deviceFile, int *index, bool isDevice);
+
+            /**
+             * @brief (For interrupt) Get FPGA_IOManager obj index in this->ioManagerList_irq of the certain device filename.
              * 
              * @param deviceFile device filename.
              * @param index index of corrsponding io manager in this->ioManagerList.
              * 
              * @throw std::runtime_error
              */
-            void GetOrCreateIOManagerIndex(const std::string &deviceFile, int *index);
+            void GetOrCreateInterruptIOManagerIndex(const std::string &deviceFile, int *index);
 
         public:
 

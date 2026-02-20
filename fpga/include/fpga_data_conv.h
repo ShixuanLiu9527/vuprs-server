@@ -132,7 +132,7 @@ namespace vuprs
     /**
      * @brief Convert FIR coefficient from double to Q31.
      * 
-     * @param input_scaled scaled FIR coefficients.
+     * @param input_scaled FIR coefficients (raw data, no need to scale).
      * @param output output Q31 coefficients (send to FPGA).
      * @param maxAbsCoef max absolute coefficient (= max(abs(coef{i}))).
      * 

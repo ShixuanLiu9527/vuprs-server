@@ -6,12 +6,15 @@
 #include "aligned_buffer.h"
 #include "fpga_io_manager.h"
 
+#define _IS_CODING_MODE false  /* should be false before compilering */
+#if _IS_CODING_MODE
+    #error "In coding mode."
+#endif
+
 #define __MEGABYTES__                             (1024U * 1024U);
 #define __KILOBYTES__                             1024U
 
 #define __LINUX_DMA_MAX_TRANSFER_BYTES__          0x7ffff000  /* Maximum transfer size in Linux-32bit & Linux-64bit */
-
-#define _IS_CODING_MODE false  /* should be false before compilering */
 
 #define FPGA_REG_BIT(REG, BIT) ((REG) & (uint32_t)((uint32_t)0x00000001 << (BIT)))
 #define FPGA_CLEAR_REG_BIT(REG, BIT) (uint32_t)((REG) & ~(uint32_t)((uint32_t)1U << (BIT)))
@@ -65,8 +68,13 @@ namespace vuprs
         private:
 
             bool isIOManagerBind;
-            std::weak_ptr<vuprs::FPGA_IOManager> bindIOManager;
+            bool isIOManagerBind_Interrupt;
+
+            std::weak_ptr<vuprs::FPGA_IOManagerForDevice> bindIOManager;
+            std::weak_ptr<vuprs::FPGA_IOManagerForInterrput> bindIOManager_Interrput;
+            
             std::string controlDeviceFilename;
+            std::string eventDeviceFilename;
 
             bool RegisterIO(uint32_t registerAddress, uint32_t* ioValue, bool isRead)
             {
@@ -120,6 +128,20 @@ namespace vuprs
 
                 return manager->RegisterListIO(ioValue, multiRegisterAddressOffset, isRead);
             }
+
+            bool EventIO(uint32_t *readValue)
+            {
+                if (!this->isIOManagerBind_Interrupt) 
+                {
+                    throw std::runtime_error("FPGA event file manager is NULL.");
+                }
+
+                auto manager = this->bindIOManager_Interrput.lock();
+
+                if (!manager) return false;
+
+                return manager->ReadEvent(readValue);
+            }
             
         protected:
 
@@ -172,6 +194,8 @@ namespace vuprs
                 vuprs::__JsonStringParseINT<uint32_t>(&this->barOffset, obj, "bar-offset", true);
                 vuprs::__JsonParseString(&this->controlDeviceFilename, obj, "control-device-file", true);
 
+                vuprs::__JsonParseString(&this->eventDeviceFilename, obj, "event-device-file", false);  /* event is not required for all devices */
+                
                 return true;
             }
 
@@ -190,9 +214,13 @@ namespace vuprs
                 this->fpgaAddress = 0;
                 this->barOffset = 0;
                 this->configdone = false;
-                this->isIOManagerBind = false;
                 this->registerTable.clear();
+
+                this->isIOManagerBind = false;
+                this->isIOManagerBind_Interrupt = false;
+
                 this->bindIOManager.reset();
+                this->bindIOManager_Interrput.reset();
             }
 
             virtual ~FPGADeviceTemplate() {}
@@ -203,10 +231,15 @@ namespace vuprs
                 return this->controlDeviceFilename;
             }
 
+            std::string EventDeviceFilename() const
+            {
+                return this->eventDeviceFilename;
+            }
+
             /**
              * @brief Bind FPGA file manager.
              */
-            bool BindFPGAFileManager(std::shared_ptr<vuprs::FPGA_IOManager> ioManager)
+            bool BindFPGAFileManager(std::shared_ptr<vuprs::FPGA_IOManagerForDevice> ioManager)
             {
                 if (!ioManager) 
                 {
@@ -221,7 +254,29 @@ namespace vuprs
                 }
 
                 this->isIOManagerBind = true;
-                bindIOManager = ioManager;
+                this->bindIOManager = ioManager;
+                return true;
+            }
+
+            /**
+             * @brief Bind FPGA file manager (for interrupt).
+             */
+            bool BindFPGAFileManager_Interrupt(std::shared_ptr<vuprs::FPGA_IOManagerForInterrput> ioManager_interrupt)
+            {
+                if (!ioManager_interrupt) 
+                {
+                    return false;
+                }
+
+                auto manager = this->bindIOManager_Interrput.lock();
+
+                if (manager && manager != ioManager_interrupt) 
+                {
+                    UnbindFileManager();
+                }
+
+                this->isIOManagerBind_Interrupt = true;
+                this->bindIOManager_Interrput = ioManager_interrupt;
                 return true;
             }
     
@@ -232,6 +287,15 @@ namespace vuprs
             {
                 this->bindIOManager.reset();
                 this->isIOManagerBind = false;
+            }
+
+            /**
+             * @brief Unbind FPGA file manager (for interrupt).
+             */
+            void UnbindFileManager_Interrupt()
+            {
+                this->bindIOManager_Interrput.reset();
+                this->isIOManagerBind_Interrupt = false;
             }
 
             /**
@@ -337,6 +401,47 @@ namespace vuprs
             }
 
             /**
+             * @brief Read one bit of certain register.
+             * 
+             * @param registerSelection register to operate.
+             * @param bit bit select (valid value: 0, 1, ..., 31).
+             * @param value read result.
+             * 
+             * @retval true: success, false: failed.
+             */
+            bool ReadSingleRegisterBIT(REG_SEL_ENUM registerSelection, uint32_t bit, uint32_t *value)
+            {
+                uint32_t registerAddress = this->GetRegisterAbsoluteAddress(registerSelection);
+                return this->ReadSingleRegisterBIT(registerAddress, bit, value);
+            }
+
+            /**
+             * @brief Read one bit of certain register.
+             * 
+             * @param registerAddress register address.
+             * @param bit bit select (valid value: 0, 1, ..., 31).
+             * @param value read result.
+             * 
+             * @retval true: success, false: failed.
+             */
+            bool ReadSingleRegisterBIT(uint32_t registerAddress, uint32_t bit, uint32_t *value)
+            {
+                if (bit > 31)
+                {
+                    throw std::runtime_error("Invalid Bit position (valid <= 31).");
+                }
+
+                bool operateStatus = true;
+                uint32_t r_val;
+                
+                operateStatus &= this->RegisterIO(registerAddress, &r_val, true);  /* read */
+                
+                *value = FPGA_REG_BIT(r_val, bit);
+
+                return operateStatus;
+            }
+
+            /**
              * @brief Set/Clear one bit of certain register.
              * 
              * @param registerSelection register to operate.
@@ -366,6 +471,130 @@ namespace vuprs
                 {
                     w_val = FPGA_CLEAR_REG_BIT(r_val, bit);
                 }
+
+                operateStatus &= this->RegisterIO(registerAddress, &w_val, false);
+
+                return operateStatus;
+            }
+
+            /**
+             * @brief Wait for register bit to certain value.
+             * 
+             * @param registerSelection register to operate.
+             * @param bit bit select (valid value: 0, 1, ..., 31).
+             * @param waitForValue 0 or 1.
+             * @param timeout_us timeout (unit: us).
+             * 
+             * @retval true: success, false: failed.
+             */
+            bool WaitForRegisterBIT(REG_SEL_ENUM registerSelection, uint32_t bit, uint32_t waitForValue, uint32_t timeout_us = 1000)
+            {
+                if (bit > 31)
+                {
+                    throw std::runtime_error("Invalid Bit position (valid <= 31).");
+                }
+
+                uint32_t waitTime = 0;
+                uint32_t r_val;
+                uint32_t registerOffset = this->GetRegisterAbsoluteAddress(registerSelection);
+                bool operateStatus = true;
+
+                if (timeout_us <= 0)
+                {
+                    timeout_us = 100;
+                }
+                do
+                {
+                    operateStatus &= this->ReadSingleRegisterBIT(registerOffset, bit, &r_val);
+                    if (r_val == waitForValue) break;
+                    if (waitTime > timeout_us) break;
+                    usleep(100);
+                    waitTime += 100;
+                }
+                while (r_val != waitForValue);
+
+                return operateStatus & (waitTime <= timeout_us);
+            }
+
+            /**
+             * @brief Read value to bits of certain register.
+             * 
+             * @param registerSelection register to operate.
+             * @param lower lower boundary of written.
+             * @param upper upper boundary of written.
+             * @param value read value.
+             * 
+             * @note e.g. lower = 1, upper = 4, value = 0x10
+             * @note then, region [1:4] (contains bit-1 and bit-4) of the register will be read.
+             * @note [0:0], [1:1], ..., [31:31] are also supported.
+             * @note lower <= upper.
+             * 
+             * @retval true: success, false: failed.
+             */
+            bool ReadSingleRegisterBITRegion(REG_SEL_ENUM registerSelection, uint32_t lower, uint32_t upper, uint32_t *value)
+            {
+                if (lower > 31 || upper > 31)
+                {
+                    throw std::runtime_error("Invalid Bit position (valid <= 31).");
+                }
+                if (lower == upper)
+                {
+                    return this->ReadSingleRegisterBIT(registerSelection, lower, value);
+                }
+
+                bool operateStatus = true;
+                uint32_t r_val;
+                uint32_t registerAddress = this->GetRegisterAbsoluteAddress(registerSelection);
+
+                operateStatus &= this->RegisterIO(registerAddress, &r_val, true);  /* read */
+
+                uint32_t bitCount = upper - lower + 1;
+                uint32_t mask = ((1 << bitCount) - 1) << lower;
+
+                *value = (r_val & mask) >> lower;
+
+                return operateStatus;
+            }
+
+            /**
+             * @brief Write value to bits of certain register.
+             * 
+             * @param registerSelection register to operate.
+             * @param lower lower boundary of written.
+             * @param upper upper boundary of written.
+             * @param value write value.
+             * 
+             * @note e.g. lower = 1, upper = 4, value = 0x10
+             * @note then, region [1:4] (contains bit-1 and bit-4) of the register will be set with 0x10.
+             * @note [0:0], [1:1], ..., [31:31] are also supported.
+             * @note lower <= upper.
+             * 
+             * @retval true: success, false: failed.
+             */
+            bool WriteSingleRegisterBITRegion(REG_SEL_ENUM registerSelection, uint32_t lower, uint32_t upper, uint32_t value)
+            {
+                if (lower > 31 || upper > 31)
+                {
+                    throw std::runtime_error("Invalid Bit position (valid <= 31).");
+                }
+                if (lower == upper)
+                {
+                    return this->WriteSingleRegisterBIT(registerSelection, lower, (bool)(value & 0x01));
+                }
+
+                bool operateStatus = true;
+                uint32_t r_val, w_val;
+                uint32_t registerAddress = this->GetRegisterAbsoluteAddress(registerSelection);
+
+                operateStatus &= this->RegisterIO(registerAddress, &r_val, true);  /* read */
+
+                uint32_t bitCount = upper - lower + 1;
+                uint32_t mask = ((1 << bitCount) - 1) << lower;
+
+                uint32_t maxValue = (1 << bitCount) - 1;
+                uint32_t safeValue = value & maxValue;
+
+                w_val = (r_val & ~mask) | (safeValue << lower);
 
                 operateStatus &= this->RegisterIO(registerAddress, &w_val, false);
 
@@ -433,6 +662,21 @@ namespace vuprs
                 return true;
             }
 
+            /* ----------------------------- Hardware Interrupt IO ----------------------------- */
+
+            /**
+             * @brief Read hardware interrupt.
+             * 
+             * @param readValue read value (1: interrupt detected, 0: no interrupt).
+             * 
+             * @retval true: success.
+             * @retval false: failed.
+             */
+            bool ReadEvent(uint32_t *readValue)
+            {
+                return this->EventIO(readValue);
+            }
+
             bool ConfigDone() const
             {
                 return this->configdone;
@@ -456,7 +700,7 @@ namespace vuprs
         private:
 
             bool isIOManagerBind;
-            std::weak_ptr<vuprs::FPGA_IOManager> bindIOManager_h2c, bindIOManager_c2h;
+            std::weak_ptr<vuprs::FPGA_IOManagerForMemory> bindIOManager_h2c, bindIOManager_c2h;
             std::string h2c_controlDeviceFilename, c2h_controlDeviceFilename;
 
             bool BufferIO(uint32_t offset, vuprs::AlignedBufferDMA *buffer, uint64_t transferByteSize, bool isRead)
@@ -581,8 +825,8 @@ namespace vuprs
             /**
              * @brief Bind FPGA file manager.
              */
-            bool BindFPGAFileManager(std::shared_ptr<vuprs::FPGA_IOManager> ioManager_h2c,
-                                     std::shared_ptr<vuprs::FPGA_IOManager> ioManager_c2h)
+            bool BindFPGAFileManager(std::shared_ptr<vuprs::FPGA_IOManagerForMemory> ioManager_h2c,
+                                     std::shared_ptr<vuprs::FPGA_IOManagerForMemory> ioManager_c2h)
             {
         
                 if (ioManager_h2c == nullptr || ioManager_c2h == nullptr)

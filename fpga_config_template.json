@@ -20,13 +20,14 @@
     },
     "devices":
     {
-        "axi_dma": 
+        "axi_dma":
         {
             "control-bus": "axi-lite",
             "data-bus": "axi-stream",
             "fpga-address": "0x40000000",
             "bar-offset": "0x00000000",
             "control-device-file": "/dev/xdma0_user",
+            "event-device-file": "/dev/xdma0_events_0",
             "register-offset": 
             {
                 "SG_CTL":             "0x2c",

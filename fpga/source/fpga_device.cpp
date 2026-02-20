@@ -29,6 +29,7 @@ void vuprs::FPGA_Device__AXIDirectMemoryAccess::GenerateRegisterTable()
 bool vuprs::FPGA_Device__AXIDirectMemoryAccess::LoadFromJsonObj(const nlohmann::json &obj)
 {
     this->LoadMainInfoFromJsonObj(obj);
+    vuprs::__JsonStringParseINT<uint32_t>(&this->s2mmTransferRegisterLength, obj, "s2mm-length-register-width", true);
     this->configdone = true;
     return true;
 }
@@ -232,6 +233,18 @@ bool vuprs::FPGA_Device__CircularBuffer::LoadFromJsonObj(const nlohmann::json &o
 uint32_t vuprs::FPGA_Device__CircularBuffer::SignalPoints() const
 {
     return this->signalPoints;
+}
+
+bool vuprs::FPGA_Device__CircularBuffer::Refreshed()
+{
+    uint32_t r_val;
+    bool operationStatus;
+    operationStatus = this->ReadSingleRegisterBIT(vuprs::Circular_Buffer__Registers::CBUF_RS, 1, &r_val);
+    if (!operationStatus)
+    {
+        throw std::runtime_error("Cannot read circular buffer.");
+    }
+    return r_val == 1;
 }
 
 /* ---------------------------------------------------------------------- */

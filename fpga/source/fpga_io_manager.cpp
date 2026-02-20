@@ -1,6 +1,6 @@
 #include "fpga_io_manager.h"
 
-vuprs::FPGA_IOManager::FPGA_IOManager(const std::string &deviceFilename)
+vuprs::FPGA_IOManagerBase::FPGA_IOManagerBase(const std::string &deviceFilename)
 {
     this->fd = -1;
     if (!this->Open(deviceFilename))
@@ -9,18 +9,18 @@ vuprs::FPGA_IOManager::FPGA_IOManager(const std::string &deviceFilename)
     }
 }
 
-vuprs::FPGA_IOManager::FPGA_IOManager()
+vuprs::FPGA_IOManagerBase::FPGA_IOManagerBase()
 {
     this->fd = -1;
     this->deviceFilename = "";
 }
 
-vuprs::FPGA_IOManager::~FPGA_IOManager()
+vuprs::FPGA_IOManagerBase::~FPGA_IOManagerBase()
 {
     this->Close();
 }
 
-void vuprs::FPGA_IOManager::Close() noexcept
+void vuprs::FPGA_IOManagerBase::Close() noexcept
 {
     if (this->IsOpen())
     {
@@ -30,12 +30,12 @@ void vuprs::FPGA_IOManager::Close() noexcept
     }
 }
 
-std::string vuprs::FPGA_IOManager::GetDeviceFilename() const
+std::string vuprs::FPGA_IOManagerBase::GetDeviceFilename() const
 {
     return this->deviceFilename;
 }
 
-bool vuprs::FPGA_IOManager::Open(const std::string &deviceFilename) noexcept
+bool vuprs::FPGA_IOManagerBase::Open(const std::string &deviceFilename) noexcept
 {
     if (this->IsOpen())
     {
@@ -47,7 +47,7 @@ bool vuprs::FPGA_IOManager::Open(const std::string &deviceFilename) noexcept
     }
     
     this->deviceFilename = deviceFilename; 
-    this->fd = ::open(deviceFilename.c_str(), O_RDWR | O_SYNC);  /* For FPGA */
+    this->fd = ::open(deviceFilename.c_str(), this->OpenFlags());  /* For FPGA */
 
     if (!this->IsOpen()) 
     {
@@ -57,12 +57,139 @@ bool vuprs::FPGA_IOManager::Open(const std::string &deviceFilename) noexcept
     return true;
 }
 
-bool vuprs::FPGA_IOManager::IsOpen() const
+bool vuprs::FPGA_IOManagerBase::IsOpen() const
 {
     return this->fd >= 0;
 }
 
-bool vuprs::FPGA_IOManager::BufferIO(void* source, uint32_t absoluteAddress, uint32_t transferBytes, bool isRead)
+/* --------------------------------- FPGA IO Manager For Devices --------------------------------- */
+
+vuprs::FPGA_IOManagerForDevice::FPGA_IOManagerForDevice()
+{
+    this->isMemoryMapped = false;
+}
+
+vuprs::FPGA_IOManagerForDevice::~FPGA_IOManagerForDevice()
+{
+    this->MemoryUnmap();
+}
+
+int vuprs::FPGA_IOManagerForDevice::OpenFlags()
+{
+    return (O_RDWR | O_SYNC);
+}
+
+bool vuprs::FPGA_IOManagerForDevice::MemoryMap()
+{
+    if (this->IsOpen() && !this->isMemoryMapped)
+    {
+        this->mmap_base = ::mmap(0, __XDMA_AXI_LITE_MMAP_SIZE__, PROT_READ | PROT_WRITE, MAP_SHARED, this->fd, 0);
+        if (this->mmap_base == MAP_FAILED)
+        {
+            throw std::runtime_error("Failed to map with mmap size = " + std::to_string(__XDMA_AXI_LITE_MMAP_SIZE__));
+        }
+        this->isMemoryMapped = true;
+        return true;
+    }
+    return false;
+}
+
+bool vuprs::FPGA_IOManagerForDevice::MemoryUnmap()
+{
+    if (this->isMemoryMapped && this->mmap_base != MAP_FAILED)
+    {
+        int result = ::munmap(this->mmap_base, __XDMA_AXI_LITE_MMAP_SIZE__);
+        if (result == 0) 
+        {
+            this->isMemoryMapped = false;
+            this->mmap_base = nullptr;
+            return true;
+        }
+    }
+    return false;
+}
+
+bool vuprs::FPGA_IOManagerForDevice::RegisterIO(uint32_t* ioValue, uint32_t absoluteAddress, bool isRead)
+{
+    if (!this->IsOpen())
+    {
+        throw std::runtime_error("FPGA device file is not opened.");
+    }
+    if (ioValue == nullptr)
+    {
+        throw std::runtime_error("iovalue is NULL.");
+    }
+    this->MemoryMap();
+    try
+    {
+        volatile uint32_t *reg_addr = (volatile uint32_t *)((uint8_t *)this->mmap_base + absoluteAddress);
+        if (isRead) 
+        {
+            *ioValue = ltohl(*reg_addr);
+        }
+        else
+        {
+            *reg_addr = htoll(*ioValue);
+        }
+        return true;
+    }
+    catch(const std::exception& e)
+    {
+        throw std::runtime_error("Memory operating failed.");
+    }
+    return false;
+}
+
+bool vuprs::FPGA_IOManagerForDevice::RegisterListIO(std::vector<uint32_t> *ioValueList, const std::vector<uint32_t> &absoluteAddressList, bool isRead)
+{
+    if (!this->IsOpen())
+    {
+        throw std::runtime_error("FPGA device file is not opened.");
+    }
+    if (ioValueList->size() != absoluteAddressList.size() && !isRead)
+    {
+        throw std::runtime_error("ioValueList.size() != absoluteAddressList.size()");
+    }
+    int registerNumer = absoluteAddressList.size();
+
+    if (isRead) ioValueList->resize(registerNumer);
+
+    this->MemoryMap();
+    
+    try
+    {
+        for (int i = 0; i < registerNumer; i++)
+        {
+            if (ioValueList == nullptr)
+            {
+                throw std::runtime_error("iovalue is NULL.");
+            }
+            volatile uint32_t *reg_addr = (volatile uint32_t *)((uint8_t *)this->mmap_base + absoluteAddressList[i]);
+            if (isRead) 
+            {
+                (*ioValueList)[i] = ltohl(*reg_addr);
+            }
+            else
+            {
+                *reg_addr = htoll((*ioValueList)[i]);
+            }
+        }
+        return true;
+    }
+    catch(const std::exception &e)
+    {
+        throw std::runtime_error("Memory operating failed.");
+    }
+}
+
+/* --------------------------------- FPGA IO Manager For Memories --------------------------------- */
+
+int vuprs::FPGA_IOManagerForMemory::OpenFlags()
+{
+    return (O_RDWR);
+}
+
+bool vuprs::FPGA_IOManagerForMemory::BufferIO(void* source, uint32_t absoluteAddress, uint32_t transferBytes, bool isRead)
 {
     if (!this->IsOpen())
     {
@@ -93,102 +220,21 @@ bool vuprs::FPGA_IOManager::BufferIO(void* source, uint32_t absoluteAddress, uin
     return static_cast<uint64_t>(ioBytes) == transferBytes;
 }
 
-bool vuprs::FPGA_IOManager::RegisterIO(uint32_t* ioValue, uint32_t absoluteAddress, bool isRead)
+/* --------------------------------- FPGA IO Manager For Interrupt --------------------------------- */
+
+int vuprs::FPGA_IOManagerForInterrput::OpenFlags()
 {
-    if (!this->IsOpen())
-    {
-        throw std::runtime_error("FPGA device file is not opened.");
-    }
-    if (ioValue == nullptr)
-    {
-        throw std::runtime_error("iovalue is NULL.");
-    }
-    void *map_base;
-    
-    map_base = ::mmap(0, __XDMA_AXI_LITE_MMAP_SIZE__, PROT_READ | PROT_WRITE, MAP_SHARED, this->fd, 0);
-    
-    if (map_base != MAP_FAILED)
-    {
-        /* Address convert */
-
-        try
-        {
-            volatile uint32_t *reg_addr = (volatile uint32_t *)((uint8_t *)map_base + absoluteAddress);
-    
-            if (isRead) 
-            {
-                *ioValue = ltohl(*reg_addr);
-            }
-            else
-            {
-                *reg_addr = htoll(*ioValue);
-            }
-
-            ::munmap(map_base, __XDMA_AXI_LITE_MMAP_SIZE__);
-            return true;
-        }
-        catch(const std::exception& e)
-        {
-            ::munmap(map_base, __XDMA_AXI_LITE_MMAP_SIZE__);
-            throw std::runtime_error("Memory operating failed.");
-        }
-    }
-    else
-    {
-        throw std::runtime_error("Failed to map with mmap size = " + std::to_string(__XDMA_AXI_LITE_MMAP_SIZE__));
-    }
+    return (O_RDONLY);
 }
 
-bool vuprs::FPGA_IOManager::RegisterListIO(std::vector<uint32_t> *ioValueList, const std::vector<uint32_t> &absoluteAddressList, bool isRead)
+bool vuprs::FPGA_IOManagerForInterrput::ReadEvent(uint32_t *readValue)
 {
     if (!this->IsOpen())
     {
         throw std::runtime_error("FPGA device file is not opened.");
     }
-    if (ioValueList->size() != absoluteAddressList.size() && !isRead)
-    {
-        throw std::runtime_error("ioValueList.size() != absoluteAddressList.size()");
-    }
-    void *map_base;
-    int registerNumer = absoluteAddressList.size();
 
-    if (isRead) ioValueList->resize(registerNumer);
+    int ioBytes = ::read(this->fd, readValue, sizeof(uint32_t));
 
-    map_base = ::mmap(0, __XDMA_AXI_LITE_MMAP_SIZE__, PROT_READ | PROT_WRITE, MAP_SHARED, this->fd, 0);
-    
-    if (map_base != MAP_FAILED)
-    {
-        /* Address convert */
-
-        try
-        {
-            for (int i = 0; i < registerNumer; i++)
-            {
-                if (ioValueList == nullptr)
-                {
-                    throw std::runtime_error("iovalue is NULL.");
-                }
-                volatile uint32_t *reg_addr = (volatile uint32_t *)((uint8_t *)map_base + absoluteAddressList[i]);
-                if (isRead) 
-                {
-                    (*ioValueList)[i] = ltohl(*reg_addr);
-                }
-                else
-                {
-                    *reg_addr = htoll((*ioValueList)[i]);
-                }
-            }
-            ::munmap(map_base, __XDMA_AXI_LITE_MMAP_SIZE__);
-            return true;
-        }
-        catch(const std::exception &e)
-        {
-            ::munmap(map_base, __XDMA_AXI_LITE_MMAP_SIZE__);
-            throw std::runtime_error("Memory operating failed.");
-        }
-    }
-    else
-    {
-        throw std::runtime_error("Failed to map with mmap size = " + std::to_string(__XDMA_AXI_LITE_MMAP_SIZE__));
-    }
+     return static_cast<uint64_t>(ioBytes) == sizeof(uint32_t);
 }
