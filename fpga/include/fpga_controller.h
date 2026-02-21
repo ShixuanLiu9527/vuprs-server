@@ -9,6 +9,11 @@
 
 namespace vuprs
 {
+    /**
+     * @brief FPGA controller.
+     * 
+     * @note Thread safety.
+     */
     class FPGAController
     {
         private:
@@ -16,7 +21,9 @@ namespace vuprs
             std::vector<std::shared_ptr<vuprs::FPGA_IOManagerForInterrput>> ioManagerList_irq;
             std::vector<std::shared_ptr<vuprs::FPGA_IOManagerForDevice>> ioManagerList_dev;
             std::vector<std::shared_ptr<vuprs::FPGA_IOManagerForMemory>> ioManagerList_mem;
-            bool configdone;
+            std::atomic<bool> configdone;
+
+            std::mutex mut;
 
             /**
              * @brief Bind IO manager to devices & memories.
@@ -44,10 +51,10 @@ namespace vuprs
              */
             void GetOrCreateInterruptIOManagerIndex(const std::string &deviceFile, int *index);
 
+            void ResetController();
+
         public:
-
-            vuprs::AlignedBufferDMA buffer;  /* aligned buffer for user */
-
+            
             /* FPGA Devices */
 
             vuprs::FPGA_Device__AXIDirectMemoryAccess dev__AXI_DMA;  /* AXI Direct Memory Access */

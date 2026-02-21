@@ -9,6 +9,10 @@
 #include <fstream>
 #include <stdexcept>
 
+#include <mutex>
+#include <atomic>
+#include <condition_variable>
+
 #ifndef _WIN32
 #include <sys/mman.h>
 #endif
@@ -42,15 +46,25 @@ namespace vuprs
 {
     /**
      * @brief Base class for IOManager.
+     * 
+     * @note Thread safety.
      */
     class FPGA_IOManagerBase
     {
         protected:
 
-            int fd;
+            std::atomic<int> fd;
             std::string deviceFilename;
+            std::mutex mut;
 
             virtual int OpenFlags() = 0;
+
+            /**
+             * @brief Operation after opened.
+             * 
+             * @note e.g. mmap().
+             */
+            virtual bool OperationAfterOpened() = 0;
 
         public:
 
@@ -85,12 +99,14 @@ namespace vuprs
 
     /**
      * @brief IO Manager for device registers.
+     * 
+     * @note Thread safety.
      */
     class FPGA_IOManagerForDevice: public FPGA_IOManagerBase
     {
         private:
 
-            bool isMemoryMapped;
+            std::atomic<bool> isMemoryMapped;
             void *mmap_base;  /* memory map base address */
 
             /**
@@ -104,6 +120,7 @@ namespace vuprs
             bool MemoryUnmap();
 
             int OpenFlags() override;
+            bool OperationAfterOpened() override;
 
         public:
 
@@ -145,12 +162,15 @@ namespace vuprs
 
     /**
      * @brief IO Manager for memories.
+     * 
+     * @note Thread safety.
      */
     class FPGA_IOManagerForMemory: public FPGA_IOManagerBase
     {
         protected:
 
             int OpenFlags() override;
+            bool OperationAfterOpened() override;
 
         public:
 
@@ -172,11 +192,17 @@ namespace vuprs
             bool BufferIO(void* source, uint32_t absoluteAddress, uint32_t transferBytes, bool isRead);
     };
 
+    /**
+     * @brief IO Manager for interrupt.
+     * 
+     * @note Thread safety.
+     */
     class FPGA_IOManagerForInterrput: public FPGA_IOManagerBase
     {
         protected:
 
             int OpenFlags() override;
+            bool OperationAfterOpened() override;
 
         public:
 

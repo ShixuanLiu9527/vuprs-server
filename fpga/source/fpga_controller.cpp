@@ -2,19 +2,19 @@
 
 vuprs::FPGAController::FPGAController()
 {
-    this->ioManagerList_dev.clear();
-    this->ioManagerList_mem.clear();
-    this->ioManagerList_irq.clear();
-
-    this->ioManagerList_dev.reserve(FPGA_MODULE_COUNT * 2);
-    this->ioManagerList_mem.reserve(FPGA_MODULE_COUNT * 2);
-    this->ioManagerList_irq.reserve(FPGA_MODULE_COUNT);
-    
-    this->configdone = false;
+    this->ResetController();
 }
 
 vuprs::FPGAController::FPGAController(const std::string &configJsonFilename)
 {
+    this->ResetController();
+    this->ConfigFPGAFromJson(configJsonFilename);
+}
+
+void vuprs::FPGAController::ResetController()
+{
+    std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
+
     this->ioManagerList_dev.clear();
     this->ioManagerList_mem.clear();
     this->ioManagerList_irq.clear();
@@ -24,12 +24,12 @@ vuprs::FPGAController::FPGAController(const std::string &configJsonFilename)
     this->ioManagerList_irq.reserve(FPGA_MODULE_COUNT);
     
     this->configdone = false;
-
-    this->ConfigFPGAFromJson(configJsonFilename);
 }
 
 vuprs::FPGAController::~FPGAController()
 {
+    std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
+
     this->ioManagerList_dev.clear();
     this->ioManagerList_mem.clear();
     this->ioManagerList_irq.clear();
@@ -63,29 +63,30 @@ bool vuprs::FPGAController::ConfigFPGAFromJson(const std::string &configJsonFile
     try
     {
         auto devices = configJsonData["devices"];
+        {
+            std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
 
-        /* Load devices */
+            /* Load devices */
 
-        configStatus &= this->dev__AXI_DMA.LoadFromJsonObj(devices["axi_dma"]);
-        configStatus &= this->dev__ADC_Controller.LoadFromJsonObj(devices["adc_controller"]);
-        configStatus &= this->dev__Circular_Buffer.LoadFromJsonObj(devices["circular_buffer"]);
-        configStatus &= this->dev__FIR_Filter_Bank.LoadFromJsonObj(devices["fir_bank"]);
-        configStatus &= this->dev__PreDelay_Unit.LoadFromJsonObj(devices["pre_delay_unit"]);
+            configStatus &= this->dev__AXI_DMA.LoadFromJsonObj(devices["axi_dma"]);
+            configStatus &= this->dev__ADC_Controller.LoadFromJsonObj(devices["adc_controller"]);
+            configStatus &= this->dev__Circular_Buffer.LoadFromJsonObj(devices["circular_buffer"]);
+            configStatus &= this->dev__FIR_Filter_Bank.LoadFromJsonObj(devices["fir_bank"]);
+            configStatus &= this->dev__PreDelay_Unit.LoadFromJsonObj(devices["pre_delay_unit"]);
 
-        /* Load memorys */
+            /* Load memorys */
 
-        configStatus &= this->mem__DDR.LoadFromJsonObj(devices["ddr"]);
-        configStatus &= this->mem__FIR_BRAM.LoadFromJsonObj(devices["fir_bram"]);
-        configStatus &= this->mem__SG_BRAM.LoadFromJsonObj(devices["sg_bram"]);
-        configStatus &= this->mem__Circular_Buffer_BRAM.LoadFromJsonObj(devices["cbuf_bram"]);
-
+            configStatus &= this->mem__DDR.LoadFromJsonObj(devices["ddr"]);
+            configStatus &= this->mem__FIR_BRAM.LoadFromJsonObj(devices["fir_bram"]);
+            configStatus &= this->mem__SG_BRAM.LoadFromJsonObj(devices["sg_bram"]);
+            configStatus &= this->mem__Circular_Buffer_BRAM.LoadFromJsonObj(devices["cbuf_bram"]);
+        }
+        configStatus &= this->BindIOManager();
     }
     catch(const std::exception& e)
     {
         throw std::runtime_error("Error occurred in parsing: " + std::string(e.what()));
     }
-
-    configStatus &= this->BindIOManager();
 
     if (!configStatus)
     {
@@ -103,69 +104,85 @@ void vuprs::FPGAController::GetOrCreateInterruptIOManagerIndex(const std::string
         throw std::runtime_error("Index is NULL.");
     }
 
-    int len = this->ioManagerList_irq.size();
+    int len;
+
+    {
+        std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
+        len = this->ioManagerList_irq.size();
+    }
 
     *index = 0;
-    for (int i = 0; i < len; i++)
     {
-        if (this->ioManagerList_irq[i]->GetDeviceFilename() == deviceFile)
+        std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
+        
+        for (int i = 0; i < len; i++)
         {
-            *index = i;
-            return;
+            if (this->ioManagerList_irq[i]->GetDeviceFilename() == deviceFile)
+            {
+                *index = i;
+                return;
+            }
         }
+        this->ioManagerList_irq.emplace_back(std::make_shared<vuprs::FPGA_IOManagerForInterrput>(deviceFile));
+        *index = this->ioManagerList_irq.size() - 1;
     }
-    this->ioManagerList_irq.emplace_back(std::make_shared<vuprs::FPGA_IOManagerForInterrput>(deviceFile));
-    *index = this->ioManagerList_irq.size() - 1;
 }
 
 void vuprs::FPGAController::GetOrCreateNormalIOManagerIndex(const std::string &deviceFile, int *index, bool isDevice)
 {
-    int len;
-
-    if (isDevice) 
-    {
-        len = this->ioManagerList_dev.size();
-    }
-    else 
-    {
-        len = this->ioManagerList_mem.size();
-    }
-
     if (index == nullptr)
     {
         throw std::runtime_error("Index is NULL.");
     }
 
-    *index = 0;
-    for (int i = 0; i < len; i++)
+    int len;
+
     {
+        std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
+        if (isDevice) 
+        {
+            len = this->ioManagerList_dev.size();
+        }
+        else 
+        {
+            len = this->ioManagerList_mem.size();
+        }
+    }
+
+    *index = 0;
+
+    {
+        std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
+
+        for (int i = 0; i < len; i++)
+        {
+            if (isDevice)
+            {
+                if (this->ioManagerList_dev[i]->GetDeviceFilename() == deviceFile)
+                {
+                    *index = i;
+                    return;
+                }
+            }
+            else
+            {
+                if (this->ioManagerList_mem[i]->GetDeviceFilename() == deviceFile)
+                {
+                    *index = i;
+                    return;
+                }
+            }
+        }
         if (isDevice)
         {
-            if (this->ioManagerList_dev[i]->GetDeviceFilename() == deviceFile)
-            {
-                *index = i;
-                return;
-            }
+            this->ioManagerList_dev.emplace_back(std::make_shared<vuprs::FPGA_IOManagerForDevice>(deviceFile));
+            *index = this->ioManagerList_dev.size() - 1;
         }
         else
         {
-            if (this->ioManagerList_mem[i]->GetDeviceFilename() == deviceFile)
-            {
-                *index = i;
-                return;
-            }
+            this->ioManagerList_mem.emplace_back(std::make_shared<vuprs::FPGA_IOManagerForMemory>(deviceFile));
+            *index = this->ioManagerList_mem.size() - 1;
         }
-    }
-    
-    if (isDevice)
-    {
-        this->ioManagerList_dev.emplace_back(std::make_shared<vuprs::FPGA_IOManagerForDevice>(deviceFile));
-        *index = this->ioManagerList_dev.size() - 1;
-    }
-    else
-    {
-        this->ioManagerList_mem.emplace_back(std::make_shared<vuprs::FPGA_IOManagerForMemory>(deviceFile));
-        *index = this->ioManagerList_mem.size() - 1;
     }
 }
 
@@ -206,22 +223,26 @@ bool vuprs::FPGAController::BindIOManager()
     this->GetOrCreateNormalIOManagerIndex(this->mem__Circular_Buffer_BRAM.H2C_ControlDeviceFilename(), &i_h2c_Circular_Buffer_BRAM, false);
     this->GetOrCreateNormalIOManagerIndex(this->mem__Circular_Buffer_BRAM.C2H_ControlDeviceFilename(), &i_c2h_Circular_Buffer_BRAM, false);
 
-    /* Bind devices */
+    {
+        std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
 
-    bindStatus &= this->dev__AXI_DMA.BindFPGAFileManager(this->ioManagerList_dev[i_AXI_DMA]);
-    bindStatus &= this->dev__ADC_Controller.BindFPGAFileManager(this->ioManagerList_dev[i_ADC_Controller]);
-    bindStatus &= this->dev__Circular_Buffer.BindFPGAFileManager(this->ioManagerList_dev[i_Circular_Buffer]);
-    bindStatus &= this->dev__FIR_Filter_Bank.BindFPGAFileManager(this->ioManagerList_dev[i_FIR_Filter_Bank]);
-    bindStatus &= this->dev__PreDelay_Unit.BindFPGAFileManager(this->ioManagerList_dev[i_PreDelay_Unit]);
+        /* Bind devices */
 
-    bindStatus &= this->dev__AXI_DMA.BindFPGAFileManager_Interrupt(this->ioManagerList_irq[i_AXI_DMA_irq]);
+        bindStatus &= this->dev__AXI_DMA.BindFPGAFileManager(this->ioManagerList_dev[i_AXI_DMA]);
+        bindStatus &= this->dev__ADC_Controller.BindFPGAFileManager(this->ioManagerList_dev[i_ADC_Controller]);
+        bindStatus &= this->dev__Circular_Buffer.BindFPGAFileManager(this->ioManagerList_dev[i_Circular_Buffer]);
+        bindStatus &= this->dev__FIR_Filter_Bank.BindFPGAFileManager(this->ioManagerList_dev[i_FIR_Filter_Bank]);
+        bindStatus &= this->dev__PreDelay_Unit.BindFPGAFileManager(this->ioManagerList_dev[i_PreDelay_Unit]);
 
-    /* Bind memories */
+        bindStatus &= this->dev__AXI_DMA.BindFPGAFileManager_Interrupt(this->ioManagerList_irq[i_AXI_DMA_irq]);
 
-    bindStatus &= this->mem__DDR.BindFPGAFileManager(this->ioManagerList_mem[i_h2c_DDR], this->ioManagerList_mem[i_c2h_DDR]);
-    bindStatus &= this->mem__FIR_BRAM.BindFPGAFileManager(this->ioManagerList_mem[i_h2c_FIR_BRAM], this->ioManagerList_mem[i_c2h_FIR_BRAM]);
-    bindStatus &= this->mem__SG_BRAM.BindFPGAFileManager(this->ioManagerList_mem[i_h2c_SG_BRAM], this->ioManagerList_mem[i_c2h_SG_BRAM]);
-    bindStatus &= this->mem__Circular_Buffer_BRAM.BindFPGAFileManager(this->ioManagerList_mem[i_h2c_Circular_Buffer_BRAM], this->ioManagerList_mem[i_c2h_Circular_Buffer_BRAM]);
+        /* Bind memories */
+
+        bindStatus &= this->mem__DDR.BindFPGAFileManager(this->ioManagerList_mem[i_h2c_DDR], this->ioManagerList_mem[i_c2h_DDR]);
+        bindStatus &= this->mem__FIR_BRAM.BindFPGAFileManager(this->ioManagerList_mem[i_h2c_FIR_BRAM], this->ioManagerList_mem[i_c2h_FIR_BRAM]);
+        bindStatus &= this->mem__SG_BRAM.BindFPGAFileManager(this->ioManagerList_mem[i_h2c_SG_BRAM], this->ioManagerList_mem[i_c2h_SG_BRAM]);
+        bindStatus &= this->mem__Circular_Buffer_BRAM.BindFPGAFileManager(this->ioManagerList_mem[i_h2c_Circular_Buffer_BRAM], this->ioManagerList_mem[i_c2h_Circular_Buffer_BRAM]);
+    }
 
     return bindStatus;
 }

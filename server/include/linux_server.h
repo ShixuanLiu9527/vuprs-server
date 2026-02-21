@@ -11,6 +11,7 @@
 
 #include "tcp_server.h"
 #include "log_manager.h"
+#include "arm_fpga_bf_collab.h"
 
 namespace vuprs
 {
@@ -37,6 +38,7 @@ namespace vuprs
         private:
 
             vuprs::TcpServer server;
+            vuprs::ARM_FPGA_CollaborationBeamfomer beamformer;
 
         public:
 

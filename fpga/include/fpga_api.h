@@ -205,7 +205,7 @@ namespace vuprs
      * @throw std::runtime_error
      */
     bool FPGA_API__DMA__StartScatterGatherDMA_S2MM(vuprs::FPGAController *controller,
-        const std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> &descriptors, bool isCyclicMode = false, bool enableIOCInterrupt = false);
+        const std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> &descriptors, bool isCyclicMode, bool enableIOCInterrupt);
 
     /**
      * @brief Get IOC interrupt flag of AXI DMA (in Scatter/Gather mode). 
@@ -228,8 +228,31 @@ namespace vuprs
      * @brief Reset AXI DMA.
      * 
      * @note Controller must be configured in advance.
+     * @note Interrupt will be disabled.
      */
     bool FPGA_API__DMA__ResetDMA(vuprs::FPGAController *controller);
+
+    /**
+     * @brief Get current descriptor.
+     * 
+     * @note Controller must be configured in advance.
+     * 
+     * @param controller FPGA controller.
+     * @param referenceDescriptors reference descriptors (to match).
+     * @param currentDescriptor current descriptor.
+     * @param previousDescriptor previous descriptor.
+     * @param nextDescriptor next descriptor.
+     * 
+     * @retval true: success.
+     * @retval false: failed.
+     * 
+     * @throw std::runtime_error
+     */
+    bool FPGA_API__DMA__GetCurrentDescriptor(vuprs::FPGAController *controller, 
+        const std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> &referenceDescriptors, 
+        vuprs::AXI_DMA_ScatterGatherDescriptor *currentDescriptor, 
+        vuprs::AXI_DMA_ScatterGatherDescriptor *previousDescriptor,
+        vuprs::AXI_DMA_ScatterGatherDescriptor *nextDescriptor);
 }
 
 #endif

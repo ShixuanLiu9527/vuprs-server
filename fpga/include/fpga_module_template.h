@@ -59,6 +59,8 @@ namespace vuprs
      * @note 2. Call method LoadFromJsonObj();
      * @note 3. Call method BindFPGAFileManager();
      * @note 4. Read/Write registers.
+     * 
+     * @note Thread safety.
      */
 #if !_IS_CODING_MODE
     template<typename REG_SEL_ENUM>
@@ -67,10 +69,10 @@ namespace vuprs
     {
         private:
 
-            bool isIOManagerBind;
-            bool isIOManagerBind_Interrupt;
+            std::atomic<bool> isIOManagerBind;
+            std::atomic<bool> isIOManagerBind_Interrupt;
 
-            std::weak_ptr<vuprs::FPGA_IOManagerForDevice> bindIOManager;
+            std::weak_ptr<vuprs::FPGA_IOManagerForDevice> bindIOManager_Device;
             std::weak_ptr<vuprs::FPGA_IOManagerForInterrput> bindIOManager_Interrput;
             
             std::string controlDeviceFilename;
@@ -85,7 +87,12 @@ namespace vuprs
                     throw std::runtime_error("FPGA file manager is NULL.");
                 }
 
-                auto manager = this->bindIOManager.lock();
+                std::shared_ptr<vuprs::FPGA_IOManagerForDevice> manager;
+
+                {
+                    std::unique_lock<std::mutex> lock(this->mut_dev);  /* LOCK */
+                    manager = this->bindIOManager_Device.lock();
+                }
 
                 if (!manager) return false;
 
@@ -111,10 +118,15 @@ namespace vuprs
                     throw std::runtime_error("mulReadValue.size() != register count to read.");
                 }
 
-                auto manager = this->bindIOManager.lock();
+                std::shared_ptr<vuprs::FPGA_IOManagerForDevice> manager;
+
+                {
+                    std::unique_lock<std::mutex> lock(this->mut_dev);  /* LOCK */
+                    manager = this->bindIOManager_Device.lock();
+                }
 
                 if (!manager) return false;
-               
+                
                 /* Operation */
 
                 std::vector<uint32_t> multiRegisterAddressOffset;
@@ -136,7 +148,12 @@ namespace vuprs
                     throw std::runtime_error("FPGA event file manager is NULL.");
                 }
 
-                auto manager = this->bindIOManager_Interrput.lock();
+                std::shared_ptr<vuprs::FPGA_IOManagerForInterrput> manager;
+                
+                {
+                    std::unique_lock<std::mutex> lock(this->mut_event);  /* LOCK */
+                    manager = this->bindIOManager_Interrput.lock();
+                }
 
                 if (!manager) return false;
 
@@ -148,12 +165,16 @@ namespace vuprs
             FPGABus controlBus;
             FPGABus dataBus;
             
-            uint32_t fpgaAddress;
-            uint32_t barOffset;
+            std::atomic<uint32_t> fpgaAddress;
+            std::atomic<uint32_t> barOffset;
 
             std::vector<vuprs::_DeviceRegisterConfig<REG_SEL_ENUM>> registerTable;
 
-            bool configdone;
+            mutable std::mutex mut;  /* Global lock */
+            mutable std::mutex mut_dev;  /* Device IO manager lock */
+            mutable std::mutex mut_event;  /* Event IO manager lock */
+
+            std::atomic<bool> configdone;
 
             virtual void GenerateRegisterTable() = 0;
 
@@ -162,6 +183,8 @@ namespace vuprs
              */
             void SetRegisterOffsetDefault()
             {
+                std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
+
                 int registerNumber = this->registerTable.size();
                 for (int i = 0; i < registerNumber; i++)
                 {
@@ -180,22 +203,31 @@ namespace vuprs
                 
                 /* Operation */
 
-                int registerNumber = this->registerTable.size();
-            
-                auto registers = obj["register-offset"];
-                for (int i = 0; i < registerNumber; i++)
                 {
-                    vuprs::__JsonStringParseINT<uint32_t>(this->registerTable[i].offsetVal, registers, this->registerTable[i].name, true);
-                }
-            
-                /* Base Address */
-            
-                vuprs::__JsonStringParseINT<uint32_t>(&this->fpgaAddress, obj, "fpga-address", true);
-                vuprs::__JsonStringParseINT<uint32_t>(&this->barOffset, obj, "bar-offset", true);
-                vuprs::__JsonParseString(&this->controlDeviceFilename, obj, "control-device-file", true);
+                    std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
 
-                vuprs::__JsonParseString(&this->eventDeviceFilename, obj, "event-device-file", false);  /* event is not required for all devices */
+                    int registerNumber = this->registerTable.size();
                 
+                    auto registers = obj["register-offset"];
+                    for (int i = 0; i < registerNumber; i++)
+                    {
+                        vuprs::__JsonStringParseINT<uint32_t>(this->registerTable[i].offsetVal, registers, this->registerTable[i].name, true);
+                    }
+                
+                    /* Base Address */
+
+                    uint32_t fpgaAddress, barOffset;
+                
+                    vuprs::__JsonStringParseINT<uint32_t>(&fpgaAddress, obj, "fpga-address", true);
+                    vuprs::__JsonStringParseINT<uint32_t>(&barOffset, obj, "bar-offset", true);
+
+                    this->fpgaAddress = fpgaAddress;
+                    this->barOffset = barOffset;
+
+                    vuprs::__JsonParseString(&this->controlDeviceFilename, obj, "control-device-file", true);
+                    vuprs::__JsonParseString(&this->eventDeviceFilename, obj, "event-device-file", false);  /* event is not required for all devices */
+                }
+
                 return true;
             }
 
@@ -209,18 +241,27 @@ namespace vuprs
 
             FPGADeviceTemplate()
             {
-                this->controlBus = vuprs::FPGABus::AXI_LITE;
-                this->dataBus = vuprs::FPGABus::AXI_STREAM;
-                this->fpgaAddress = 0;
-                this->barOffset = 0;
-                this->configdone = false;
-                this->registerTable.clear();
+                {
+                    std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
 
-                this->isIOManagerBind = false;
-                this->isIOManagerBind_Interrupt = false;
+                    this->controlBus = vuprs::FPGABus::AXI_LITE;
+                    this->dataBus = vuprs::FPGABus::AXI_STREAM;
+                    this->fpgaAddress = 0;
+                    this->barOffset = 0;
+                    this->configdone = false;
+                    this->registerTable.clear();
 
-                this->bindIOManager.reset();
-                this->bindIOManager_Interrput.reset();
+                    this->isIOManagerBind = false;
+                    this->isIOManagerBind_Interrupt = false;
+                }
+                {
+                    std::unique_lock<std::mutex> lock(this->mut_dev);  /* LOCK */
+                    this->bindIOManager_Device.reset();
+                }
+                {
+                    std::unique_lock<std::mutex> lock(this->mut_event);  /* LOCK */
+                    this->bindIOManager_Interrput.reset();
+                }
             }
 
             virtual ~FPGADeviceTemplate() {}
@@ -228,11 +269,13 @@ namespace vuprs
 
             std::string ControlDeviceFilename() const
             {
+                std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
                 return this->controlDeviceFilename;
             }
 
             std::string EventDeviceFilename() const
             {
+                std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
                 return this->eventDeviceFilename;
             }
 
@@ -246,15 +289,24 @@ namespace vuprs
                     return false;
                 }
 
-                auto manager = this->bindIOManager.lock();
+                std::shared_ptr<vuprs::FPGA_IOManagerForDevice> manager;
+
+                {
+                    std::unique_lock<std::mutex> lock(this->mut_dev);  /* LOCK */
+                    manager = this->bindIOManager_Device.lock();
+                }
 
                 if (manager && manager != ioManager) 
                 {
-                    UnbindFileManager();
+                    this->UnbindFileManager();
+                }
+                this->isIOManagerBind = true;
+
+                {
+                    std::unique_lock<std::mutex> lock(this->mut_dev);  /* LOCK */
+                    this->bindIOManager_Device = ioManager;
                 }
 
-                this->isIOManagerBind = true;
-                this->bindIOManager = ioManager;
                 return true;
             }
 
@@ -268,15 +320,24 @@ namespace vuprs
                     return false;
                 }
 
-                auto manager = this->bindIOManager_Interrput.lock();
+                std::shared_ptr<vuprs::FPGA_IOManagerForInterrput> manager;
+
+                {
+                    std::unique_lock<std::mutex> lock(this->mut_event);  /* LOCK */
+                    manager = this->bindIOManager_Interrput.lock();
+                }
 
                 if (manager && manager != ioManager_interrupt) 
                 {
-                    UnbindFileManager();
+                    this->UnbindFileManager();
+                }
+                this->isIOManagerBind_Interrupt = true;
+
+                {
+                    std::unique_lock<std::mutex> lock(this->mut_event);  /* LOCK */
+                    this->bindIOManager_Interrput = ioManager_interrupt;
                 }
 
-                this->isIOManagerBind_Interrupt = true;
-                this->bindIOManager_Interrput = ioManager_interrupt;
                 return true;
             }
     
@@ -285,7 +346,10 @@ namespace vuprs
              */
             void UnbindFileManager()
             {
-                this->bindIOManager.reset();
+                {
+                    std::unique_lock<std::mutex> lock(this->mut_dev);  /* LOCK */
+                    this->bindIOManager_Device.reset();
+                }
                 this->isIOManagerBind = false;
             }
 
@@ -294,7 +358,10 @@ namespace vuprs
              */
             void UnbindFileManager_Interrupt()
             {
-                this->bindIOManager_Interrput.reset();
+                {
+                    std::unique_lock<std::mutex> lock(this->mut_event);  /* LOCK */
+                    this->bindIOManager_Interrput.reset();
+                }
                 this->isIOManagerBind_Interrupt = false;
             }
 
@@ -314,15 +381,20 @@ namespace vuprs
 
                 uint32_t registerOffset = 0;
                 bool registerFound = false;
-                int registerNumber = this->registerTable.size();
+                int registerNumber;
 
-                for (int i = 0; i < registerNumber; i++)
                 {
-                    if (registerSelection == this->registerTable[i].enumVal)
+                    std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
+
+                    registerNumber = this->registerTable.size();
+                    for (int i = 0; i < registerNumber; i++)
                     {
-                        registerOffset = *(this->registerTable[i].offsetVal);
-                        registerFound = true;
-                        break;
+                        if (registerSelection == this->registerTable[i].enumVal)
+                        {
+                            registerOffset = *(this->registerTable[i].offsetVal);
+                            registerFound = true;
+                            break;
+                        }
                     }
                 }
 
@@ -330,7 +402,7 @@ namespace vuprs
                 {
                     throw std::runtime_error("Invalid register selection.");
                 }
-                
+
                 return registerOffset + this->barOffset;
             }
 
@@ -643,18 +715,23 @@ namespace vuprs
             bool ReadAllRegisters(std::vector<std::string> *registerName, std::vector<uint32_t> *registerOffset, std::vector<uint32_t> *readValue)
             {
                 std::vector<REG_SEL_ENUM> mulRegisterSelection;
-                
-                int registerNumber = this->registerTable.size();
-                registerName->resize(registerNumber);
-                registerOffset->resize(registerNumber);
+                int registerNumber;
 
-                mulRegisterSelection.resize(registerNumber);
-                
-                for (int i = 0; i < registerNumber; i++)
                 {
-                    mulRegisterSelection[i] = this->registerTable[i].enumVal;
-                    (*registerName)[i] = this->registerTable[i].name;
-                    (*registerOffset)[i] = *this->registerTable[i].offsetVal;
+                    std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
+
+                    registerNumber = this->registerTable.size();
+                    registerName->resize(registerNumber);
+                    registerOffset->resize(registerNumber);
+
+                    mulRegisterSelection.resize(registerNumber);
+
+                    for (int i = 0; i < registerNumber; i++)
+                    {
+                        mulRegisterSelection[i] = this->registerTable[i].enumVal;
+                        (*registerName)[i] = this->registerTable[i].name;
+                        (*registerOffset)[i] = *this->registerTable[i].offsetVal;
+                    }
                 }
 
                 this->ReadMultipleRegister(mulRegisterSelection, readValue);
@@ -694,13 +771,16 @@ namespace vuprs
      * @note 2. Call method LoadFromJsonObj();
      * @note 3. Call method BindFPGAFileManager();
      * @note 4. Read/Write memory.
+     * 
+     * @note Thread safety.
      */
     class FPGAMemoryTemplate
     {
         private:
 
-            bool isIOManagerBind;
-            std::weak_ptr<vuprs::FPGA_IOManagerForMemory> bindIOManager_h2c, bindIOManager_c2h;
+            std::atomic<bool> isIOManagerBind;
+            std::weak_ptr<vuprs::FPGA_IOManagerForMemory> bindIOManager_h2c;
+            std::weak_ptr<vuprs::FPGA_IOManagerForMemory> bindIOManager_c2h;
             std::string h2c_controlDeviceFilename, c2h_controlDeviceFilename;
 
             bool BufferIO(uint32_t offset, vuprs::AlignedBufferDMA *buffer, uint64_t transferByteSize, bool isRead)
@@ -715,7 +795,7 @@ namespace vuprs
                 {
                     throw std::runtime_error("Too big transfer size.");
                 }
-                if (transferByteSize + offset > this->maxCapacityKB * __KILOBYTES__ - 1)
+                if ((transferByteSize + offset) > static_cast<uint32_t>(this->maxCapacityKB * __KILOBYTES__ - 1))
                 {
                     throw std::runtime_error("Invalid transfer size (valid: <= " + std::to_string(this->maxCapacityKB * __KILOBYTES__ - offset) + ")");
                 }
@@ -729,17 +809,27 @@ namespace vuprs
                 }
 
                 /* Operation */
-
+                
                 uint32_t targetOffset = offset + this->fpgaAddress;
 
-                if (isRead) 
+                buffer->malloc(transferByteSize);
+
+                if (isRead)
                 {
-                    auto c2h_manager = this->bindIOManager_c2h.lock();
+                    std::shared_ptr<vuprs::FPGA_IOManagerForMemory> c2h_manager;
+                    {
+                        std::unique_lock<std::mutex> lock(this->mut_c2h);  /* LOCK */
+                        c2h_manager = this->bindIOManager_c2h.lock();
+                    }
                     return c2h_manager->BufferIO(buffer->data(), targetOffset, transferByteSize, true);
                 }
                 else
                 {
-                    auto h2c_manager = this->bindIOManager_h2c.lock();
+                    std::shared_ptr<vuprs::FPGA_IOManagerForMemory> h2c_manager;
+                    {
+                        std::unique_lock<std::mutex> lock(this->mut_h2c);  /* LOCK */
+                        h2c_manager = this->bindIOManager_h2c.lock();
+                    }
                     return h2c_manager->BufferIO(buffer->data(), targetOffset, transferByteSize, false);
                 }
             }
@@ -752,7 +842,7 @@ namespace vuprs
                 {
                     throw std::runtime_error("FPGA file manager is NULL.");
                 }
-                if (offset > this->maxCapacityKB * __KILOBYTES__ - 1) 
+                if (offset > static_cast<uint32_t>(this->maxCapacityKB * __KILOBYTES__ - 1)) 
                 {
                     throw std::runtime_error("Invalid offset (valid: <= " + std::to_string(this->maxCapacityKB * __KILOBYTES__ - 1) + ")");
                 }
@@ -767,12 +857,20 @@ namespace vuprs
 
                 if (isRead) 
                 {
-                    auto c2h_manager = this->bindIOManager_c2h.lock();
+                    std::shared_ptr<vuprs::FPGA_IOManagerForMemory> c2h_manager;
+                    {
+                        std::unique_lock<std::mutex> lock(this->mut_c2h);  /* LOCK */
+                        c2h_manager = this->bindIOManager_c2h.lock();
+                    }
                     return c2h_manager->BufferIO(ioValue, targetOffset, sizeof(uint32_t), true);
                 }
                 else 
                 {
-                    auto h2c_manager = this->bindIOManager_h2c.lock();
+                    std::shared_ptr<vuprs::FPGA_IOManagerForMemory> h2c_manager;
+                    {
+                        std::unique_lock<std::mutex> lock(this->mut_h2c);  /* LOCK */
+                        h2c_manager = this->bindIOManager_h2c.lock();
+                    }
                     return h2c_manager->BufferIO(ioValue, targetOffset, sizeof(uint32_t), false);
                 }
             }
@@ -780,17 +878,29 @@ namespace vuprs
         protected:
 
             FPGABus dataBus;
-            uint32_t fpgaAddress;
-            uint32_t maxCapacityKB;
+            std::atomic<uint32_t> fpgaAddress;
+            std::atomic<uint32_t> maxCapacityKB;
 
-            bool configdone;
+            mutable std::mutex mut;  /* Global mutex lock */
+            mutable std::mutex mut_c2h;  /* C2H mutex lock */
+            mutable std::mutex mut_h2c;  /* H2C mutex lock */
+
+            std::atomic<bool> configdone;
 
             bool LoadMainInfoFromJsonObj(const nlohmann::json &obj)
             {
-                vuprs::__JsonStringParseINT<uint32_t>(&this->fpgaAddress, obj, "fpga-address", true);
-                vuprs::__JsonStringParseINT<uint32_t>(&this->maxCapacityKB, obj, "memory-capacity-kilobytes", true);
+                std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
+
+                uint32_t fpgaAddress, maxCapacityKB;
+
+                vuprs::__JsonStringParseINT<uint32_t>(&fpgaAddress, obj, "fpga-address", true);
+                vuprs::__JsonStringParseINT<uint32_t>(&maxCapacityKB, obj, "memory-capacity-kilobytes", true);
                 vuprs::__JsonParseString(&this->h2c_controlDeviceFilename, obj, "h2c-device-file", true);
                 vuprs::__JsonParseString(&this->c2h_controlDeviceFilename, obj, "c2h-device-file", true);
+
+                this->fpgaAddress = fpgaAddress;
+                this->maxCapacityKB = maxCapacityKB;
+
                 return true;
             }
 
@@ -798,15 +908,25 @@ namespace vuprs
 
             FPGAMemoryTemplate()
             {
-                this->dataBus = vuprs::FPGABus::AXI_FULL;
-                this->fpgaAddress = 0;
-                this->maxCapacityKB = 1;
+                {
+                    std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
 
-                this->configdone = false;
+                    this->dataBus = vuprs::FPGABus::AXI_FULL;
+                    this->fpgaAddress = 0;
+                    this->maxCapacityKB = 1;
 
-                this->isIOManagerBind = false;
-                this->bindIOManager_c2h.reset();
-                this->bindIOManager_h2c.reset();
+                    this->configdone = false;
+
+                    this->isIOManagerBind = false;
+                }
+                {
+                    std::unique_lock<std::mutex> lock(this->mut_c2h);  /* LOCK */
+                    this->bindIOManager_c2h.reset();
+                }
+                {
+                    std::unique_lock<std::mutex> lock(this->mut_h2c);  /* LOCK */
+                    this->bindIOManager_h2c.reset();
+                }
             }
 
             virtual ~FPGAMemoryTemplate() {}
@@ -814,12 +934,23 @@ namespace vuprs
 
             std::string H2C_ControlDeviceFilename() const
             {
+                std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
                 return this->h2c_controlDeviceFilename;
             }
 
             std::string C2H_ControlDeviceFilename() const
             {
+                std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
                 return this->c2h_controlDeviceFilename;
+            }
+
+            /**
+             * @brief Memory capacity in bytes.
+             */
+            uint32_t MaxSizeBytes() const
+            {
+                std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
+                return this->maxCapacityKB * __KILOBYTES__;
             }
 
             /**
@@ -833,20 +964,36 @@ namespace vuprs
                 {
                     return false;
                 }
-            
-                auto current_h2c = this->bindIOManager_h2c.lock();
-                auto current_c2h = this->bindIOManager_c2h.lock();
-            
+                
+                std::shared_ptr<vuprs::FPGA_IOManagerForMemory> current_h2c;
+                std::shared_ptr<vuprs::FPGA_IOManagerForMemory> current_c2h;
+                
+                {
+                    std::unique_lock<std::mutex> lock(this->mut_h2c);  /* LOCK */
+                    current_h2c = this->bindIOManager_h2c.lock();
+                }
+                {
+                    std::unique_lock<std::mutex> lock(this->mut_c2h);  /* LOCK */
+                    current_c2h = this->bindIOManager_c2h.lock();
+                }
+                
                 if (this->isIOManagerBind) 
                 {
                     if ((current_h2c && current_h2c != ioManager_h2c) || (current_c2h && current_c2h != ioManager_c2h)) 
                     {
-                        UnbindFileManager();
+                        this->UnbindFileManager();
                     }
                 }
-            
-                this->bindIOManager_h2c = ioManager_h2c;
-                this->bindIOManager_c2h = ioManager_c2h;
+
+                {
+                    std::unique_lock<std::mutex> lock(this->mut_h2c);  /* LOCK */
+                    this->bindIOManager_h2c = ioManager_h2c;
+                }
+                {
+                    std::unique_lock<std::mutex> lock(this->mut_c2h);  /* LOCK */
+                    this->bindIOManager_c2h = ioManager_c2h;
+                }
+                
                 this->isIOManagerBind = true;
 
                 return true;
@@ -857,8 +1004,14 @@ namespace vuprs
              */
             void UnbindFileManager()
             {
-                this->bindIOManager_h2c.reset();
-                this->bindIOManager_c2h.reset();
+                {
+                    std::unique_lock<std::mutex> lock(this->mut_h2c);  /* LOCK */
+                    this->bindIOManager_h2c.reset();
+                }
+                {
+                    std::unique_lock<std::mutex> lock(this->mut_c2h);  /* LOCK */
+                    this->bindIOManager_c2h.reset();
+                }
                 this->isIOManagerBind = false;
             }
 

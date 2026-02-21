@@ -80,7 +80,7 @@ bool vuprs::FPGA_API__CBUF__ReadCircularBuffer(vuprs::FPGAController *controller
 
     /* STEP 1: Clear buffer */
 
-    controller->buffer.release();
+    vuprs::AlignedBufferDMA buffer;
 
     /* STEP 2: Freeze */
 
@@ -100,12 +100,12 @@ bool vuprs::FPGA_API__CBUF__ReadCircularBuffer(vuprs::FPGAController *controller
     /* STEP 3: Read circular buffer */
 
     uint32_t signalPoints = controller->dev__Circular_Buffer.SignalPoints();
-    operateStatus &= controller->mem__Circular_Buffer_BRAM.ReadMemory(&controller->buffer, 0, signalPoints * ADC_FRAME_WORD_SIZE * sizeof(uint32_t));
+    operateStatus &= controller->mem__Circular_Buffer_BRAM.ReadMemory(&buffer, 0, signalPoints * ADC_FRAME_WORD_SIZE * sizeof(uint32_t));
 
     /* STEP 4: Read current BRAM pointer & convert */
 
     operateStatus &= controller->dev__Circular_Buffer.ReadSingleRegister(vuprs::Circular_Buffer__Registers::CBUF_CBP, &CBF);
-    operateStatus &= vuprs::FPGACircularBuffer2Frames(&controller->buffer, signal, fs, voltageScale, CBF);
+    operateStatus &= vuprs::FPGACircularBuffer2Frames(&buffer, signal, fs, voltageScale, CBF);
 
     /* STEP 5: Reset */
 
@@ -239,9 +239,11 @@ bool vuprs::FPGA_API__FIR__SetCoefficients(vuprs::FPGAController *controller,
         throw std::runtime_error("len(FIR) != len(coef[0])");
     }
 
+    vuprs::AlignedBufferDMA buffer;
+
     /* Clear buffer */
 
-    controller->buffer.release();
+    buffer.release();
 
     std::vector<uint32_t> coefficientsToWrite, oneBankCoefficients;
     uint32_t totalCoefficientsCount = 0;
@@ -257,11 +259,11 @@ bool vuprs::FPGA_API__FIR__SetCoefficients(vuprs::FPGAController *controller,
 
     /* Data to buffer */
 
-    controller->buffer.from_vector<uint32_t>(coefficientsToWrite);
+    buffer.from_vector<uint32_t>(coefficientsToWrite);
 
     /* Write coefficients to BRAM */
 
-    operateStatus &= controller->mem__FIR_BRAM.WriteMemory(&controller->buffer, 0, totalCoefficientsCount * sizeof(uint32_t));
+    operateStatus &= controller->mem__FIR_BRAM.WriteMemory(&buffer, 0, totalCoefficientsCount * sizeof(uint32_t));
 
     /* Write scale to FIR */
 
@@ -330,7 +332,8 @@ bool vuprs::FPGA_API__FIR__SetLengthAndCoefficients(vuprs::FPGAController *contr
 
     /* Clear buffer */
 
-    controller->buffer.release();
+    vuprs::AlignedBufferDMA buffer;
+    buffer.release();
 
     std::vector<uint32_t> coefficientsToWrite, oneBankCoefficients;
     uint32_t totalCoefficientsCount = 0;
@@ -346,11 +349,11 @@ bool vuprs::FPGA_API__FIR__SetLengthAndCoefficients(vuprs::FPGAController *contr
 
     /* Read data from vector to buffer */
 
-    controller->buffer.from_vector<uint32_t>(coefficientsToWrite);
+    buffer.from_vector<uint32_t>(coefficientsToWrite);
 
     /* Write coefficients to BRAM */
 
-    operateStatus &= controller->mem__FIR_BRAM.WriteMemory(&controller->buffer, 0, totalCoefficientsCount * sizeof(uint32_t));
+    operateStatus &= controller->mem__FIR_BRAM.WriteMemory(&buffer, 0, totalCoefficientsCount * sizeof(uint32_t));
 
     /* Write length to FIR */
 
@@ -440,9 +443,12 @@ bool vuprs::FPGA_API__DMA__StartScatterGatherDMA_S2MM(vuprs::FPGAController *con
     uint32_t r_val, w_val;
     bool operateStatus = true;
 
-    /* Clear buffer */
+    /* Clear buffer & reset DMA */
 
-    controller->buffer.release();
+    vuprs::AlignedBufferDMA buffer;
+
+    buffer.release();
+    vuprs::FPGA_API__DMA__ResetDMA(controller);
 
     /* STEP 1: Stop DMA, clear S2MM_DMACR.RS */
 
@@ -490,8 +496,8 @@ bool vuprs::FPGA_API__DMA__StartScatterGatherDMA_S2MM(vuprs::FPGAController *con
 
     /* STEP 4: Write descriptors to SG_BRAM */
 
-    controller->buffer.from_vector<vuprs::AXI_DMA_ScatterGatherDescriptor>(descriptors);
-    operateStatus &= controller->mem__SG_BRAM.WriteMemory(&controller->buffer, 0x00, controller->buffer.size());
+    buffer.from_vector<vuprs::AXI_DMA_ScatterGatherDescriptor>(descriptors);
+    operateStatus &= controller->mem__SG_BRAM.WriteMemory(&buffer, 0x00, buffer.size());
 
     /* STEP 5: Write tail descriptor register to trigger. */
 
@@ -553,9 +559,62 @@ bool vuprs::FPGA_API__DMA__ResetDMA(vuprs::FPGAController *controller)
 
     operateStatus &= controller->dev__AXI_DMA.WriteSingleRegisterBIT(vuprs::AXI_DMA__Registers::S2MM_DMACR, 2, true);
 
+    /* S2MM_DMACR.IOC_IRqEn = 0 */
+
+    operateStatus &= controller->dev__AXI_DMA.WriteSingleRegisterBIT(vuprs::AXI_DMA__Registers::S2MM_DMACR, 12, false);
+
     /* Wait for Halted */
 
     operateStatus &= controller->dev__AXI_DMA.WaitForRegisterBIT(vuprs::AXI_DMA__Registers::S2MM_DMASR, 0, 1, 100);
+
+    return operateStatus;
+}
+
+bool vuprs::FPGA_API__DMA__GetCurrentDescriptor(vuprs::FPGAController *controller, 
+        const std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> &referenceDescriptors, 
+        vuprs::AXI_DMA_ScatterGatherDescriptor *currentDescriptor, 
+        vuprs::AXI_DMA_ScatterGatherDescriptor *previousDescriptor,
+        vuprs::AXI_DMA_ScatterGatherDescriptor *nextDescriptor)
+{
+    if (!controller->ConfigDown())
+    {
+        throw std::runtime_error("FPGA Controller not configured in advance.");
+    }
+
+    bool operateStatus = true, found = false;;
+    uint32_t r_val = INVALID_SG_DESCRIPTOR_POINTER + 1;
+    uint32_t nextAddr, previousAddr;
+
+    operateStatus &= controller->dev__AXI_DMA.ReadSingleRegisterBITRegion(vuprs::AXI_DMA__Registers::S2MM_CURDESC, 6, 31, &r_val);
+
+    /* Match */
+
+    for (auto &descriptor: referenceDescriptors)
+    {
+        if (descriptor.ALIGNMENT_0_CURRENT_ADDR == r_val)
+        {
+            *currentDescriptor = descriptor;
+            nextAddr = descriptor.NXTDESC;
+            previousAddr = descriptor.ALIGNMENT_1_PREVIOUS_ADDR;
+            found = true;
+        }
+    }
+    for (auto &descriptor: referenceDescriptors)
+    {
+        if (descriptor.ALIGNMENT_0_CURRENT_ADDR == nextAddr)
+        {
+            *nextDescriptor = descriptor;
+        }
+        if (descriptor.ALIGNMENT_0_CURRENT_ADDR == previousAddr)
+        {
+            *previousDescriptor = descriptor;
+        }
+    }
+
+    if (!found)
+    {
+        throw std::runtime_error("Cannot found current descriptor with address: " + std::to_string(r_val));
+    }
 
     return operateStatus;
 }

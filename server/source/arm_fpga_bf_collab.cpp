@@ -12,34 +12,40 @@ void vuprs::Set_ARM_FPGA_BF_Config_ToDefault(vuprs::ARM_FPGA_BF_Config *config)
     config->bf_cov_freqAverageIndex = 0.8;  /* frequency average index (to fit covariance matrix) */
     config->dma__bufferSize = 32768;  /* AXI DMA descriptor buffer size */
     config->dma__bufferCount = 10;  /* AXI DMA descriptor buffer count */
+    config->queue__circularBufferQueueSizeMAX = 10;
+    config->queue__resultQueueSizeMAX = 10;
 }
 
-bool vuprs::_Check_ARM_FPGA_BF_Config_Valid(const vuprs::ARM_FPGA_BF_Config &config)
+bool vuprs::_Check_ARM_FPGA_BF_Config_Valid(vuprs::FPGAController *controller, const vuprs::ARM_FPGA_BF_Config &config)
 {
+    bool retval = true;
 
+    retval &= (config.fs > 0 && config.fs < controller->dev__ADC_Controller.MaxSamplingFrequency());
+    retval &= (config.bf_freq__lower < config.fs / 2.0);
+    retval &= (config.bf_freq__upper < config.fs / 2.0);
+    retval &= (config.bf_freq__lower < config.bf_freq__upper);
+    retval &= (config.bf_cov_freqAverageIndex < 1.0);
+    retval &= (config.dma__bufferSize % DMA_BUFFER_ALIGNMENT_1_WORD == 0);
+    retval &= ((config.dma__bufferSize * config.dma__bufferCount) < controller->mem__DDR.MaxSizeBytes());
+
+    return retval;
 }
 
 vuprs::ARM_FPGA_CollaborationBeamfomer::ARM_FPGA_CollaborationBeamfomer()
 {
     this->configdone = false;
-    this->beamformerStarted = false;
+    this->system_run = false;
     this->hardwareSamplingFrequency = 0.0;
-    this->firstCoefficientsIssued = false;
 }
 
 vuprs::ARM_FPGA_CollaborationBeamfomer::~ARM_FPGA_CollaborationBeamfomer()
 {
-
+    this->STOP();
 }
 
 bool vuprs::ARM_FPGA_CollaborationBeamfomer::ConfigDone() const
 {
     return this->configdone;
-}
-
-bool vuprs::ARM_FPGA_CollaborationBeamfomer::BeamFormerHaveValidOutput() const
-{
-    return this->firstCoefficientsIssued;
 }
 
 bool vuprs::ARM_FPGA_CollaborationBeamfomer::InitCollaborationBeamfomer(const std::string &fpgaConfigJson, const std::string &bfArrayConfigJson, const std::string &firConfigJon)
@@ -60,11 +66,6 @@ bool vuprs::ARM_FPGA_CollaborationBeamfomer::InitCollaborationBeamfomer(const st
     return operateStatus;
 }
 
-void vuprs::ARM_FPGA_CollaborationBeamfomer::GetDMADescriptor(std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> *output) const
-{
-    *output = this->dmaDescriptors;
-}
-
 bool vuprs::ARM_FPGA_CollaborationBeamfomer::ResetHardwareBeamformer()
 {
     bool retval = true;
@@ -78,60 +79,96 @@ bool vuprs::ARM_FPGA_CollaborationBeamfomer::ResetHardwareBeamformer()
 
     /* Algorithm reset */
 
-    this->bf_dcrcb.ResetAll();
+    {
+        std::unique_lock<std::mutex> lock(this->mut_alg);
+        this->bf_dcrcb.ResetAll();
+    }
 
-    this->beamformerStarted = false;
+    this->system_run = false;
 
     return retval;
 }
 
-bool vuprs::ARM_FPGA_CollaborationBeamfomer::StartBeamformer(const ARM_FPGA_BF_Config &config)
+bool vuprs::ARM_FPGA_CollaborationBeamfomer::StartBeamformerWithConfiguration(const ARM_FPGA_BF_Config &config)
 {
     if (!this->ConfigDone())
     {
         throw std::runtime_error("Config not complete.");
     }
 
+    Eigen::Matrix<Eigen::dcomplex, -1, -1> firExpectedFrequencyResponse;  /* Expected frequency response of FIR filter bank */
+    std::vector<std::vector<double>> firCoefficients;  /* Coefficient of FIR filter bank */
+    std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> _dmaDescriptors;  /* SG descriptors for AXI DMA */
+
+    std::vector<int> predelayCount;
+    std::vector<double> predelayTime;
+    std::vector<std::string> channelName;
+
+    int descriptorUpdateCycle_us;
+    uint32_t FIR_LENGTH;
     bool retval = true;
+
+    /* max queue size */
+
+    this->circularBufferQueueSizeMAX = config.queue__circularBufferQueueSizeMAX;
+    this->resultQueueSizeMAX = config.queue__resultQueueSizeMAX;
 
     /* Generate descriptors */
 
-    this->sg_descriptorConfig.bufferCount = config.dma__bufferCount;
-    this->sg_descriptorConfig.bufferSize = config.dma__bufferSize;
-    this->sg_descriptorConfig.ddr_FPGABaseAddr = this->controller.mem__DDR.FPGAAddress();
-    this->sg_descriptorConfig.sgBRAM_FPGABaseAddr = this->controller.mem__SG_BRAM.FPGAAddress();
+    {
+        std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
 
-    this->sg_descriptorConfig.isCyclicDMAMode = true;
+        this->sg_descriptorConfig.bufferCount = config.dma__bufferCount;
+        this->sg_descriptorConfig.bufferSize = config.dma__bufferSize;
+        this->sg_descriptorConfig.ddr_FPGABaseAddr = this->controller.mem__DDR.FPGAAddress();
+        this->sg_descriptorConfig.sgBRAM_FPGABaseAddr = this->controller.mem__SG_BRAM.FPGAAddress();
 
-    vuprs::CreateDMAScatterGatherDescriptorChain(&this->dmaDescriptors, this->sg_descriptorConfig);
+        this->sg_descriptorConfig.isCyclicDMAMode = true;
 
-    /* Set algorithm parameters */
+        vuprs::CreateDMAScatterGatherDescriptorChain(&this->dmaDescriptors, this->sg_descriptorConfig);
+        _dmaDescriptors = this->dmaDescriptors;
 
-    this->fir.SetFrequencyRange(config.bf_freq__lower, config.bf_freq__upper);
+        descriptorUpdateCycle_us = static_cast<int>(1000000 * static_cast<double>(config.dma__bufferSize) / config.fs);
+    }
 
-    this->bf_dcrcb.ResetCovarianceMatrices();
-    this->bf_dcrcb.SetCovarianceMatrixFittingParam(config.bf_cov_snapshotsWindowSize, config.bf_cov_freqAverageIndex);
-    this->bf_dcrcb.SetTargetDirection(config.bf_target__alt, config.bf_target__az, config.bf_waveVelocity);
+    this->interruptWaitTime_us = descriptorUpdateCycle_us / 10;
+    this->circularBufferWaitTime_us = descriptorUpdateCycle_us / 5;
 
-    /* Get predelay */
+    /* Get sampling frequency */
 
     uint32_t SCI = this->controller.dev__ADC_Controller.GetSCIValueForSamplingFrequency(config.fs);
-    this->hardwareSamplingFrequency = this->controller.dev__ADC_Controller.SCI2FS(SCI);
 
-    this->bf_dcrcb.UpdateAndGetElementPredelay(this->fir.FIRLength(), this->hardwareSamplingFrequency, 
-        &this->predelayCount, &this->predelayTime, &this->channelName);
+    {
+        std::unique_lock<std::mutex> lock(this->mut_alg);  /* LOCK */
+        this->hardwareSamplingFrequency = this->controller.dev__ADC_Controller.SCI2FS(SCI);
+
+        this->bf_dcrcb.ResetCovarianceMatrices();
+        this->bf_dcrcb.SetCovarianceMatrixFittingParam(config.bf_cov_snapshotsWindowSize, config.bf_cov_freqAverageIndex);
+        this->bf_dcrcb.SetTargetDirection(config.bf_target__alt, config.bf_target__az, config.bf_waveVelocity);
+
+        /* Get predelay */
+
+        this->bf_dcrcb.UpdateAndGetElementPredelay(this->fir.FIRLength(), this->hardwareSamplingFrequency, 
+            &predelayCount, &predelayTime, &channelName);
+
+         /* Set frequency range */
+
+        this->fir.SetFrequencyRange(config.bf_freq__lower, config.bf_freq__upper);
+        this->fir.GetZeroFIRBankCoefficient(&firCoefficients, this->bf_dcrcb.ElementCount());
+        FIR_LENGTH = this->fir.FIRLength();
+    }
 
     /* System reset FPGA */
 
     retval &= this->ResetHardwareBeamformer();
 
-    /* FPGA: STEP1 - Config DMA */
+    /* FPGA: STEP 1 - Config DMA */
 
-    retval &= vuprs::FPGA_API__DMA__StartScatterGatherDMA_S2MM(&this->controller, this->dmaDescriptors, true);
+    retval &= vuprs::FPGA_API__DMA__StartScatterGatherDMA_S2MM(&this->controller, _dmaDescriptors, true, true);
 
     /* FPGA: STEP 2 - Config Pre-delay Unit */
 
-    retval &= vuprs::FPGA_API__PDLY__SetPredelay(&this->controller, this->predelayCount, this->channelName);
+    retval &= vuprs::FPGA_API__PDLY__SetPredelay(&this->controller, predelayCount, channelName);
 
     /* FPGA: STEP 3 - Enable FIR */
 
@@ -139,78 +176,296 @@ bool vuprs::ARM_FPGA_CollaborationBeamfomer::StartBeamformer(const ARM_FPGA_BF_C
     
     /* FPGA: STEP 4 - Update FIR coefficients with 0 */
 
-    this->fir.GetZeroFIRBankCoefficient(&this->firCoefficients, this->bf_dcrcb.ElementCount());
-    retval &= vuprs::FPGA_API__FIR__SetLengthAndCoefficients(&this->controller, &this->firCoefficients, 0.0, this->fir.FIRLength());
+    retval &= vuprs::FPGA_API__FIR__SetLengthAndCoefficients(&this->controller, &firCoefficients, 0.0, FIR_LENGTH);
 
     /* FPGA: STEP 4 - Start ADC */
 
     retval &= vuprs::FPGA_API__ADC__StartADC(&this->controller, config.fs);
 
-    this->beamformerStarted = retval;
-    this->firstCoefficientsIssued = false;
+    if (!retval)
+    {
+        throw std::runtime_error("Cannot start beam former with config");
+    }
 
+    /* Start threads */
+
+    this->system_run = true;
+
+    this->threads.emplace_back([this](){this->THREAD__ReadResult();});
+    this->threads.emplace_back([this](){this->THREAD__ListenDMAInterrupt();});
+    this->threads.emplace_back([this](){this->THREAD__AlgorithmCalculation();});
+    this->threads.emplace_back([this](){this->THREAD__ReadCircularBuffer();});
+    
     return retval;
 }
 
-bool vuprs::ARM_FPGA_CollaborationBeamfomer::BeamformerHasStarted() const
+bool vuprs::ARM_FPGA_CollaborationBeamfomer::IS_RUN() const
 {
-    return this->beamformerStarted;
+    return this->system_run;
 }
 
-bool vuprs::ARM_FPGA_CollaborationBeamfomer::GetSignalAndIssueFIRFilterCoefficients()
+void vuprs::ARM_FPGA_CollaborationBeamfomer::RUN(const vuprs::ARM_FPGA_BF_Config &config)
 {
-    if (!this->ConfigDone())
+    this->STOP();
+    this->StartBeamformerWithConfiguration(config);
+}
+
+void vuprs::ARM_FPGA_CollaborationBeamfomer::STOP()
+{
+    this->system_run = false;
+    
+    this->algorithmCV.notify_all();
+    this->dmaInterruptCV.notify_all();
+
+    for (auto &f: this->threads)
     {
-        throw std::runtime_error("Config not complete.");
+        if (f.joinable())
+        {
+            f.join();
+        }
     }
-    if (!this->BeamformerHasStarted())
+}
+
+/* ------------------------------------------ Thread Control ----------------------------------------- */
+
+bool vuprs::ARM_FPGA_CollaborationBeamfomer::NewResultDataInput() const
+{
+    return this->newResultDataInput;
+}
+
+bool vuprs::ARM_FPGA_CollaborationBeamfomer::ReadResultFromQueue(std::vector<double> *result)
+{
+    bool readSuccess = false;
+
+    if (this->newResultDataInput)
     {
-        std::runtime_error("Beam former not start.");
-    }
+        this->newResultDataInput = false;
+        {
+            std::unique_lock<std::mutex> lock(this->mut_dma);  /* LOCK */
 
-    uint32_t RS;
-    bool retval = true;
-
-    /* Check if circular buffer refreshed */
-
-    retval &= this->controller.dev__Circular_Buffer.ReadSingleRegister(vuprs::Circular_Buffer__Registers::CBUF_RS, &RS);
-
-    if (!FPGA_REG_BIT(RS, 1)) return false;  /* not refreshed, return */
-
-    /* --------------------------------------- Algorithm ------------------------------------------- */
-
-    /* Read Circular Buffer */
-
-    retval &= vuprs::FPGA_API__CBUF__ReadCircularBuffer(&this->controller, &this->multichannelSignal);
-
-    /* Push data to Beam forming algorithm */
-
-    this->bf_dcrcb.InputSignal(this->multichannelSignal);  /* Input signal */
-    this->bf_dcrcb.UpdateCovarianceMatrix();  /* Update covariance matrix */
-
-    if (!this->bf_dcrcb.CalculateEnable())
-    {
-        throw std::runtime_error("Beam forming algorithm cannot calculate.");
-    }
-
-    this->bf_dcrcb.CalculateBeamforming();  /* Calculate beam forming */
-    this->bf_dcrcb.GetFIRExpectedFrequencyResponse(&this->firExpectedFrequencyResponse, true);  /* Get FIR filter bank expected frequency response */
-
-    /* Convert frequency response to FIR coefficients */
-
-    this->fir.SolveCoeffUseExpectedFrequencyResponse(this->firExpectedFrequencyResponse, this->hardwareSamplingFrequency);
-    this->fir.GetFIRBankCoefficient(&this->firCoefficients);
-
-    /* --------------------------------------- Hardware ------------------------------------------- */
-
-    /* Write coefficients to FIT filter bank */
-
-    retval &= vuprs::FPGA_API__FIR__SetCoefficients(&this->controller, &this->firCoefficients, this->fir.MaxAbsoluteFIRCoefficient());
-
-    if (!this->firstCoefficientsIssued)
-    {
-        if (retval) this->firstCoefficientsIssued = true;
+            if (!this->resultQueue.empty())
+            {
+                *result = this->resultQueue.front();
+                this->resultQueue.pop();
+                readSuccess = true;
+            }
+        }
     }
 
-    return retval;
+    return readSuccess;
+}
+
+void vuprs::ARM_FPGA_CollaborationBeamfomer::THREAD__ListenDMAInterrupt()
+{
+    uint32_t r_val;
+    while (this->system_run)
+    {
+        try
+        {
+            vuprs::FPGA_API__DMA__GetAndClearInterruptFlag(&this->controller, &r_val);
+        }
+        catch(const std::exception& e)
+        {
+            std::cout << "Error: " << e.what() << std::endl;
+        }
+        if (r_val == 0x01)
+        {
+            this->dmaDescriptorIRQ = true;
+            this->dmaInterruptCV.notify_one();
+        }
+        if (!this->system_run) break;  /* Jump out */
+        usleep(this->interruptWaitTime_us);
+    }
+}
+
+void vuprs::ARM_FPGA_CollaborationBeamfomer::THREAD__ReadResult()
+{
+    vuprs::AXI_DMA_ScatterGatherDescriptor currentDescriptor, previousDescriptor, nextDescriptor;
+    vuprs::AlignedBufferDMA buffer;
+    std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> _refDescriptors;
+    bool hasInterrupt;
+
+    {
+        std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
+        _refDescriptors = this->dmaDescriptors;
+    }
+
+    while(this->system_run)
+    {
+        /* Sleep here to wait interrupt */
+
+        {
+            std::unique_lock<std::mutex> lock(this->mut_dma);  /* LOCK */
+            this->dmaInterruptCV.wait(lock, [this]() {
+                return this->dmaDescriptorIRQ || !this->system_run;
+            });
+        }
+
+        if (!this->system_run) break;  /* Jump out */
+
+        if (this->dmaDescriptorIRQ) hasInterrupt = true;
+        else hasInterrupt = false;
+
+        this->dmaDescriptorIRQ = false;  /* Clear interrupt */
+
+        if (!hasInterrupt) continue;
+
+        /* Read DDR */
+        
+        try
+        {
+            /* Get previous descriptor */
+
+            vuprs::FPGA_API__DMA__GetCurrentDescriptor(&this->controller, _refDescriptors, 
+                &currentDescriptor, &previousDescriptor, &nextDescriptor);
+
+            /* Read previous buffer (previous of current) */
+
+            vuprs::FPGA_API__DDR__ReadDDR(&this->controller, &buffer, 
+                previousDescriptor.BUFFER_ADDRESS, previousDescriptor.ALIGNMENT_2_BUFFER_SIZE);
+
+            /* Push to queue */
+
+            {
+                std::unique_lock<std::mutex> lock(this->mut_dma);  /* LOCK */
+                if (this->resultQueue.size() < this->resultQueueSizeMAX)
+                {
+                    this->resultQueue.push(buffer.to_vector<double>());
+                }
+            }
+
+            this->newResultDataInput = true;
+        }
+        catch(const std::exception& e)
+        {
+            std::cout << "Error: " << e.what() << std::endl;
+        }
+    }
+}
+
+void vuprs::ARM_FPGA_CollaborationBeamfomer::THREAD__ReadCircularBuffer()
+{
+    uint32_t r_val;
+    vuprs::SignalData multichannelSignal;  /* signal data (from circular buffer) */
+
+    while(this->system_run)
+    {
+        /* Check refreshed */
+
+        try
+        {
+            this->controller.dev__Circular_Buffer.ReadSingleRegisterBIT(vuprs::Circular_Buffer__Registers::CBUF_RS, 1, &r_val);
+        }
+        catch(const std::exception& e)
+        {
+            std::cout << "Error: " << e.what() << std::endl;
+        }
+
+        if (r_val == 0x01)
+        {
+            /* Read circular buffer */
+
+            try
+            {
+                if (vuprs::FPGA_API__CBUF__ReadCircularBuffer(&this->controller, &multichannelSignal))
+                {
+                    {
+                        std::unique_lock<std::mutex> lock(this->mut_alg);  /* LOCK */
+                        if (this->arraySignalQueue.size() < this->circularBufferQueueSizeMAX)
+                        {
+                            this->arraySignalQueue.push(multichannelSignal);
+                        }
+                    }
+                    this->circularBufferIRQ = true;
+                    algorithmCV.notify_all();
+                }
+                else
+                {
+                    throw std::runtime_error("Cannot read circular buffer.");
+                }
+            }
+            catch(const std::exception& e)
+            {
+                std::cout << "Error: " << e.what() << std::endl;
+            }
+        }
+
+        if (!this->system_run) break;  /* Jump out */
+        usleep(this->circularBufferWaitTime_us);
+    }
+}
+
+void vuprs::ARM_FPGA_CollaborationBeamfomer::THREAD__AlgorithmCalculation()
+{
+    bool hasInterrupt, fpgaOperationStatus;
+    vuprs::SignalData signal;
+    Eigen::Matrix<Eigen::dcomplex, -1, -1> firExpectedFrequencyResponse;  /* Expected frequency response of FIR filter bank */
+    std::vector<std::vector<double>> firCoefficients;  /* Coefficient of FIR filter bank */
+
+    while(this->system_run)
+    {
+        /* Sleep here to wait interrupt */
+
+        {
+            std::unique_lock<std::mutex> lock(this->mut_alg);  /* LOCK */
+            this->algorithmCV.wait(lock, [this]() {
+                return this->circularBufferIRQ || !this->system_run;
+            });
+        }
+
+        /* Check interrupt flag */
+
+        if (!this->system_run) break;  /* Jump out */
+
+        if (this->circularBufferIRQ) hasInterrupt = true;
+        else hasInterrupt = false;
+
+        this->circularBufferIRQ = false;
+
+        if (!hasInterrupt) continue;
+
+        /* Do algorithm calculation */
+
+        {
+            std::unique_lock<std::mutex> lock(this->mut_alg);  /* LOCK */
+            signal = this->arraySignalQueue.front();
+            this->arraySignalQueue.pop();
+        }
+
+        /* Push data to Beam forming algorithm */
+
+        this->bf_dcrcb.InputSignal(signal);  /* Input signal */
+        this->bf_dcrcb.UpdateCovarianceMatrix();  /* Update covariance matrix */
+
+        if (!this->bf_dcrcb.CalculateEnable())
+        {
+            throw std::runtime_error("Beam forming algorithm cannot calculate.");
+        }
+
+        this->bf_dcrcb.CalculateBeamforming();  /* Calculate beam forming */
+        this->bf_dcrcb.GetFIRExpectedFrequencyResponse(&firExpectedFrequencyResponse, true);  /* Get FIR filter bank expected frequency response */
+
+        /* Convert frequency response to FIR coefficients */
+
+        this->fir.SolveCoeffUseExpectedFrequencyResponse(firExpectedFrequencyResponse, this->hardwareSamplingFrequency);
+        this->fir.GetFIRBankCoefficient(&firCoefficients);
+
+        /* Issue coefficients to FIR */
+
+        fpgaOperationStatus = true;
+
+        try
+        {
+            fpgaOperationStatus &= vuprs::FPGA_API__FIR__SetCoefficients(&this->controller, 
+                &firCoefficients, this->fir.MaxAbsoluteFIRCoefficient());
+            if (!fpgaOperationStatus)
+            {
+                throw std::runtime_error("FPGA operation failed.");
+            }
+        }
+        catch(const std::exception& e)
+        {
+            std::cout << "Error: " << e.what() << std::endl;
+        }
+    }
 }

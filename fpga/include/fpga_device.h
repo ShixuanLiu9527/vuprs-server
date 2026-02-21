@@ -36,7 +36,7 @@ namespace vuprs
 
         uint32_t ALIGNMENT_0_CURRENT_ADDR;  /* Address of this descriptor, to aligned to 16-word */
         uint32_t ALIGNMENT_1_PREVIOUS_ADDR;  /* Address of previous descriptor, to aligned to 16-word */
-        uint32_t ALIGNMENT_2;  /* to aligned to 16-word */
+        uint32_t ALIGNMENT_2_BUFFER_SIZE;  /* to aligned to 16-word */
     };
 
     #pragma pack(pop)
