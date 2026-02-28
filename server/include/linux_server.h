@@ -12,6 +12,7 @@
 #include "linux_session.h"
 #include "string_parse.h"
 #include "arm_fpga_bf_collab.h"
+#include "protocol.h"
 
 #define DEFAULT_SENDING_DATA_QUEUE_LENGTH 10U
 
@@ -53,39 +54,58 @@ namespace vuprs
 
             std::vector<std::thread> threads;  /* Server threads */
 
-            /* Server */
+            /* --- Server --- */
 
             int server_fd;
             uint16_t server_port;
             std::atomic<bool> server_running;
-            vuprs::ServerConfig server_config;
+
+            vuprs::ServerConfig server_config;  /* controlled by mut_config */
 
             std::unique_ptr<vuprs::LinuxSession> server_session;
+            std::shared_ptr<vuprs::SocketIOManager> socketIOManager;  /* socket io manager */
 
-            /* Algorithms */
+            /* --- Algorithms --- */
 
             vuprs::ARM_FPGA_BF_Config beamFormerConfig;  /* Set by client or default value */
             vuprs::ARM_FPGA_CollaborationBeamfomer beamformer;  /* System beam former */
 
-            /* Tool functions */
+            /* --- Tool functions --- */
 
             bool LoadServerConfigFromJson(const std::string& jsonFilename);
 
             bool InitServer();
 
-            void SessionCallback(int client_fd, const struct sockaddr_in& client_addr, const std::string& message);
             void ConnectCallback(bool connect, const std::string &message);
 
-            /* Thread data */
+            /* --- Thread data --- */
 
-            std::mutex mut_data;
-            std::queue<std::vector<double>> resultQueue;  /* Result queue, controlled by mut_data */
+            std::mutex mut_config;
+
+            std::mutex mut_readResult;
+            std::condition_variable readResultCV;
+            std::atomic<bool> readResultIRQ;  /* true: should send */
+
+            std::queue<std::vector<double>> resultQueue;  /* Result queue (read from hardware), controlled by mut_readResult */
+
+            std::mutex mut_response;
+            std::atomic<bool> serverResponseIRQ;
+            std::atomic<bool> serverNeedResponse;  /* false = no need to send response */
+            std::condition_variable serverResponseCV;
+            std::string serverResponseMessage;
+
+            std::mutex mut_send;
+            std::condition_variable resultSendingCV;
+            std::atomic<bool> resultSendingIRQ;  /* true: should send */
 
             std::mutex mut_control;
-            std::atomic<bool> newTargetDirectionIRQ;
-            std::condition_variable beamFormerParameterCV;  /* Beam former parameter CV (when alt, az, ... is change) */
+            std::atomic<bool> controlIRQ;
+            std::condition_variable controlCV;  /* Beam former parameter CV (when alt, az, ... is change) */
 
-            /* Threads */
+            std::mutex mut_cmd;
+            vuprs::ServerCommandInformation cmdINFO;  /* Command information, parsed from message, controlled by mut_cmd */
+
+            /* --- Threads --- */
 
             void THREAD__AcceptClient();
 
@@ -93,9 +113,12 @@ namespace vuprs
 
             void THREAD__SendToMaster();
 
-            void THREAD__BeamFormerControl();
+            void THREAD__Control();
 
-            void THREAD__AcceptClient();
+            /**
+             * @brief Client session callback.
+             */
+            void SessionCallback(std::weak_ptr<vuprs::SocketIOManager> manager, const std::string& message);
 
         public:
 
@@ -107,7 +130,9 @@ namespace vuprs
              */
             void InitSystemConfigFiles(const vuprs::SystemConfigFiles &config);
 
-            void run();
+            void Run();
+
+            void Stop();
     };
 }
 
