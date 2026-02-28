@@ -186,6 +186,27 @@ bool vuprs::ARM_FPGA_CollaborationBeamfomer::StartBeamformerWithConfiguration(co
     {
         throw std::runtime_error("Cannot start beam former with config");
     }
+    
+    return retval;
+}
+
+void vuprs::ARM_FPGA_CollaborationBeamfomer::ReDirect(double alt, double az, double waveVelocity)
+{
+    {
+        std::unique_lock<std::mutex> lock(this->mut_alg);  /* LOCK */
+        this->bf_dcrcb.SetTargetDirection(alt, az, waveVelocity);
+    }
+}
+
+bool vuprs::ARM_FPGA_CollaborationBeamfomer::IS_RUN() const
+{
+    return this->system_run;
+}
+
+bool vuprs::ARM_FPGA_CollaborationBeamfomer::RUN(const vuprs::ARM_FPGA_BF_Config &config)
+{
+    this->STOP();
+    this->StartBeamformerWithConfiguration(config);
 
     /* Start threads */
 
@@ -195,19 +216,8 @@ bool vuprs::ARM_FPGA_CollaborationBeamfomer::StartBeamformerWithConfiguration(co
     this->threads.emplace_back([this](){this->THREAD__ListenDMAInterrupt();});
     this->threads.emplace_back([this](){this->THREAD__AlgorithmCalculation();});
     this->threads.emplace_back([this](){this->THREAD__ReadCircularBuffer();});
-    
-    return retval;
-}
 
-bool vuprs::ARM_FPGA_CollaborationBeamfomer::IS_RUN() const
-{
-    return this->system_run;
-}
-
-void vuprs::ARM_FPGA_CollaborationBeamfomer::RUN(const vuprs::ARM_FPGA_BF_Config &config)
-{
-    this->STOP();
-    this->StartBeamformerWithConfiguration(config);
+    return true;
 }
 
 void vuprs::ARM_FPGA_CollaborationBeamfomer::STOP()
@@ -430,25 +440,25 @@ void vuprs::ARM_FPGA_CollaborationBeamfomer::THREAD__AlgorithmCalculation()
             std::unique_lock<std::mutex> lock(this->mut_alg);  /* LOCK */
             signal = this->arraySignalQueue.front();
             this->arraySignalQueue.pop();
+
+            /* Push data to Beam forming algorithm */
+
+            this->bf_dcrcb.InputSignal(signal);  /* Input signal */
+            this->bf_dcrcb.UpdateCovarianceMatrix();  /* Update covariance matrix */
+
+            if (!this->bf_dcrcb.CalculateEnable())
+            {
+                throw std::runtime_error("Beam forming algorithm cannot calculate.");
+            }
+
+            this->bf_dcrcb.CalculateBeamforming();  /* Calculate beam forming */
+            this->bf_dcrcb.GetFIRExpectedFrequencyResponse(&firExpectedFrequencyResponse, true);  /* Get FIR filter bank expected frequency response */
+
+            /* Convert frequency response to FIR coefficients */
+
+            this->fir.SolveCoeffUseExpectedFrequencyResponse(firExpectedFrequencyResponse, this->hardwareSamplingFrequency);
+            this->fir.GetFIRBankCoefficient(&firCoefficients);
         }
-
-        /* Push data to Beam forming algorithm */
-
-        this->bf_dcrcb.InputSignal(signal);  /* Input signal */
-        this->bf_dcrcb.UpdateCovarianceMatrix();  /* Update covariance matrix */
-
-        if (!this->bf_dcrcb.CalculateEnable())
-        {
-            throw std::runtime_error("Beam forming algorithm cannot calculate.");
-        }
-
-        this->bf_dcrcb.CalculateBeamforming();  /* Calculate beam forming */
-        this->bf_dcrcb.GetFIRExpectedFrequencyResponse(&firExpectedFrequencyResponse, true);  /* Get FIR filter bank expected frequency response */
-
-        /* Convert frequency response to FIR coefficients */
-
-        this->fir.SolveCoeffUseExpectedFrequencyResponse(firExpectedFrequencyResponse, this->hardwareSamplingFrequency);
-        this->fir.GetFIRBankCoefficient(&firCoefficients);
 
         /* Issue coefficients to FIR */
 

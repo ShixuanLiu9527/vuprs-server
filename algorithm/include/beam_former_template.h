@@ -1,6 +1,8 @@
 #ifndef BEAM_FORMER_TEMPLATE_H
 #define BEAM_FORMER_TEMPLATE_H
 
+#include <mutex>
+
 #include "beam_forming_basic.h"
 #include "beam_forming_algorithm.h"
 
@@ -50,6 +52,8 @@ namespace vuprs
             bool is_arrayConfigDone;
             bool is_signalEmpty, is_covMatrixEmpty;
 
+            std::mutex mut;
+
             vuprs::BeamFormingArray array;
 
             Eigen::Matrix<Eigen::dcomplex, -1, -1> snap_signalMatrix_freqDomain;  /* Size: (M) x (N / 2 + 1) */
@@ -60,8 +64,9 @@ namespace vuprs
             Eigen::Matrix<double, -1, 1> signalFrequencyList;  /* [F0, F1, ..., FN/2] Size: (N / 2 + 1) */
             Eigen::Matrix<Eigen::dcomplex, -1, 1> signalFrequencyList_complex;  /* [jF0, jF1, ..., jFN/2] Size: (N / 2 + 1) */
 
-            double fs;  /* Sampling frequency */
-
+            double fs;  /* Current sampling frequency */
+            int signalPoints;  /* Current signal points */
+            
             std::vector<int> elementPredelayCount;  /* Predelay count (size = M) */
             std::vector<double> elementPredelayTime;  /* Predelay time = count * Ts (size = M) */
             std::vector<std::string> elementChannelName;  /* element channel name list (size = M) */

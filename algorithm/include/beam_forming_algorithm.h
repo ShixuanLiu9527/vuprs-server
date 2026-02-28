@@ -62,7 +62,18 @@ namespace vuprs
                                 this->tasks.pop();
                             }
 
-                            task();  /* Do task */
+                            try 
+                            {
+                                task();  /* Do task */
+                            } 
+                            catch (const std::exception& e) 
+                            {
+                                std::cout << "Task threw exception: " << e.what() << std::endl;
+                            } 
+                            catch (...)
+                            {
+                                std::cout << "Task threw unknown exception." << std::endl;
+                            }
                         }
                     });
                 }

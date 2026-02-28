@@ -6,6 +6,25 @@ vuprs::WidebandBeamformerTemplate::WidebandBeamformerTemplate()
     this->ResetAll();
 }
 
+void vuprs::WidebandBeamformerTemplate::ResetAll()
+{
+    this->fs = 0.0;
+    this->signalPoints = 0;
+
+    /* flags */
+
+    this->is_arrayConfigDone = false;
+    this->is_signalEmpty = true;
+    this->is_covMatrixEmpty = true;
+
+    this->firstSnapshot = true;
+    this->COVARIANCE_SNAP_WINDOW_SIZE = DEFAULT_COVARIANCE_SNAP_WINDOW_SIZE;
+    this->ADJACENT_FREQ_AVERAGE_INDEX = DEFAULT_ADJACENT_FREQ_AVERAGE_INDEX;
+
+    this->ResetCovarianceMatrices();
+    this->UpdateParameters();
+}
+
 bool vuprs::WidebandBeamformerTemplate::ConfigArrayFromJson(const std::string &arrayConfigJsonFilename)
 {
     if (this->array.LoadArrayFromJson(arrayConfigJsonFilename))
@@ -51,13 +70,18 @@ void vuprs::WidebandBeamformerTemplate::InputSignal(const vuprs::SignalData &sig
     }
 
     this->array.InputElementSignal(signal);
-    this->fs = signal.samplingFrequency;
     this->is_signalEmpty = false;
 
-    this->signalFrequencyList = vuprs::GenerateRealFrequencyList(signal.signalPoints, this->fs);
-    this->signalFrequencyList_complex = vuprs::GenerateComplexFrequencyList(signal.signalPoints, this->fs);
+    if (signal.signalPoints != this->signalPoints && abs(signal.samplingFrequency - this->fs) > 1e-3)
+    {
+        this->fs = signal.samplingFrequency;
+        this->signalPoints = signal.signalPoints;
 
-    this->array.GetSteeringVectorMatrix(&this->steeringVectors);  /* Get steering vectors */
+        this->signalFrequencyList = vuprs::GenerateRealFrequencyList(this->signalPoints, this->fs);
+        this->signalFrequencyList_complex = vuprs::GenerateComplexFrequencyList(this->signalPoints, this->fs);
+
+        this->array.GetSteeringVectorMatrix(&this->steeringVectors);  /* Get steering vectors */
+    }
 }
 
 void vuprs::WidebandBeamformerTemplate::SetTargetDirection(double alt, double az, double waveVelocity)
@@ -66,8 +90,11 @@ void vuprs::WidebandBeamformerTemplate::SetTargetDirection(double alt, double az
     {
         throw std::runtime_error("Config not complete.");
     }
-
     this->array.UpdateTimeDelay(alt, az, waveVelocity);  /* Update time delay */
+    if (this->fs > 0.0 && this->signalPoints > 0)
+    {
+        this->array.GetSteeringVectorMatrix(&this->steeringVectors);  /* Get steering vectors */
+    }
 }
 
 void vuprs::WidebandBeamformerTemplate::UpdateCovarianceMatrix()
@@ -316,22 +343,4 @@ void vuprs::WidebandBeamformerTemplate::CalculateBeamforming()
     {
         f.get();
     }
-}
-
-void vuprs::WidebandBeamformerTemplate::ResetAll()
-{
-    this->fs = 0.0;
-
-    /* flags */
-
-    this->is_arrayConfigDone = false;
-    this->is_signalEmpty = true;
-    this->is_covMatrixEmpty = true;
-
-    this->firstSnapshot = true;
-    this->COVARIANCE_SNAP_WINDOW_SIZE = DEFAULT_COVARIANCE_SNAP_WINDOW_SIZE;
-    this->ADJACENT_FREQ_AVERAGE_INDEX = DEFAULT_ADJACENT_FREQ_AVERAGE_INDEX;
-
-    this->ResetCovarianceMatrices();
-    this->UpdateParameters();
 }

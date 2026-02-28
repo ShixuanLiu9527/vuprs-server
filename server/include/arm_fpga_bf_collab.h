@@ -35,7 +35,7 @@ namespace vuprs
     };
 
     void Set_ARM_FPGA_BF_Config_ToDefault(vuprs::ARM_FPGA_BF_Config *config);
-    bool _Check_ARM_FPGA_BF_Config_Valid(const vuprs::ARM_FPGA_BF_Config &config);
+    bool _Check_ARM_FPGA_BF_Config_Valid(vuprs::FPGAController *controller, const vuprs::ARM_FPGA_BF_Config &config);
 
     class ARM_FPGA_CollaborationBeamfomer
     {
@@ -151,13 +151,27 @@ namespace vuprs
              */
             bool IS_RUN() const;
 
-            void RUN(const ARM_FPGA_BF_Config &config);
+            /**
+             * @brief Start beam former with configuration.
+             */
+            bool RUN(const ARM_FPGA_BF_Config &config);
 
-            void STOP();
+            /**
+             * @brief Change target direct of the beam former.
+             */
+            void ReDirect(double alt, double az, double waveVelocity);
 
             bool NewResultDataInput() const;
 
+            /**
+             * @brief Read result from result queue.
+             */
             bool ReadResultFromQueue(std::vector<double> *result);
+
+            /**
+             * @brief Stop & reset beam former.
+             */
+            void STOP();
 
             /**
              * @brief Indicate config done.

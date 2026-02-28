@@ -1,58 +1,33 @@
-#include "tcp_session.h"
+#include "linux_session.h"
 
-vuprs::TcpSession::TcpSession(int client_fd, const struct sockaddr_in& client_addr)
+vuprs::LinuxSession::LinuxSession(int client_fd, const struct sockaddr_in& client_addr, const std::string &frameHeader, const std::string &frameTailer)
 {
     this->client_fd = client_fd;
     this->client_addr = client_addr;
     this->running = false;
+    this->frameHeader = frameHeader;
+    this->frameTailer = frameTailer;
 }
 
-vuprs::TcpSession::~TcpSession()
+vuprs::LinuxSession::~LinuxSession()
 {
-    this->stop();
+    this->Stop();
 }
 
-vuprs::TcpSession::TcpSession(TcpSession&& other) noexcept
-{
-    this->client_fd = other.client_fd;
-    this->client_addr = other.client_addr;
-    this->running = other.running;
-    this->messageHandler = std::move(other.messageHandler);
-
-    other.client_fd = -1;
-    other.running = false;
-}
-
-vuprs::TcpSession& vuprs::TcpSession::operator=(TcpSession&& other) noexcept 
-{
-    if (this != &other)
-    {
-        this->stop();
-        this->client_fd = other.client_fd;
-        this->client_addr = other.client_addr;
-        this->running = other.running;
-        this->messageHandler = std::move(other.messageHandler);
-        
-        other.client_fd = -1;
-        other.running = false;
-    }
-    return *this;
-}
-
-bool vuprs::TcpSession::sendData(const std::string &message)
+bool vuprs::LinuxSession::SendData(const std::string &message)
 {
     return vuprs::SocketSendData(this->client_fd, message.c_str(), message.length(), nullptr, nullptr);
 }
 
-void vuprs::TcpSession::start() 
+void vuprs::LinuxSession::Start() 
 {
     this->running = true;
-    std::cout << "[session][" << this->getClientInfo() << "] start receive loop."   << std::endl;
-    this->sendData("[session] you are connected.");
-    this->receiveLoop();
+    std::cout << "[session][" << this->GetClientInfo() << "] start receive loop."   << std::endl;
+    this->SendData("[session] you are connected.");
+    this->ReceiveLoop();
 }
 
-void vuprs::TcpSession::stop()
+void vuprs::LinuxSession::Stop()
 {
     /* Close client file descriptor */
 
@@ -65,12 +40,12 @@ void vuprs::TcpSession::stop()
     this->running = false;
 }
 
-bool vuprs::TcpSession::isRunning() const 
+bool vuprs::LinuxSession::IsRun() const 
 {
     return this->running;
 }
 
-std::string vuprs::TcpSession::getClientInfo() const 
+std::string vuprs::LinuxSession::GetClientInfo() const 
 {
     char ip[INET_ADDRSTRLEN];
 
@@ -81,48 +56,41 @@ std::string vuprs::TcpSession::getClientInfo() const
     return std::string(ip) + ":" + std::to_string(ntohs(this->client_addr.sin_port));
 }
 
-void vuprs::TcpSession::setMessageHandler(SessionMessageHandler handler)
+void vuprs::LinuxSession::SetMessageHandler(vuprs::SessionMessageHandler handler)
 {
     this->messageHandler = std::move(handler);
 }
 
-void vuprs::TcpSession::receiveLoop() 
+void vuprs::LinuxSession::ReceiveLoop() 
 {
-    char buffer[__SOCKET_RECEIVE_BUFFER_SIZE_BYTES__];
-    uint64_t tryCount = 0, recvBytes = 0;
-    ssize_t recvReturn;
-    bool recvStatus = false;
+    vuprs::SocketReceiveData data;  /* received data */
     
     while (this->running && this->client_fd >= 0) 
     {
-        recvStatus = vuprs::SocketRecvData(this->client_fd, buffer, __SOCKET_RECEIVE_BUFFER_SIZE_BYTES__, &recvReturn, &recvBytes);
+        vuprs::SocketReceiveCommand(this->client_fd, this->frameTailer, &data);
         
-        if (recvStatus)
+        if (data.is_connect && data.receiveBytes > 0)
         {
-            /* Get message from client */
+            std::string message;
 
-            buffer[static_cast<uint64_t>(recvBytes)] = '\0';
-            std::string message(buffer);
+            if(vuprs::ParseMessageFromSocketData(data, this->frameHeader, this->frameTailer, &message))
+            {
+                /* Get message from client */
             
-            std::cout << "[session][" << this->getClientInfo() << "] received data from client: " << message << std::endl;
-            
-            if (this->messageHandler != nullptr)
-            {
-                this->messageHandler(this->client_fd, this->client_addr, message);  /* Call user function */
-            }
-            else
-            {
-                std::string response = this->DefaultMessageProcess(message);
-                this->sendData(response);
-            }
-            if (message == "quit" || message == "exit")
-            {
-                break;
+                if (this->messageHandler != nullptr)
+                {
+                    this->messageHandler(this->client_fd, this->client_addr, message);  /* Call user function */
+                }
+                else
+                {
+                    std::string response = this->DefaultMessageProcess(message);
+                    this->SendData(response);
+                }
             }
         }
-        else if (recvReturn == 0)  /* Connect shut down */
+        else if (!data.is_connect)  /* Connect shut down */
         {
-            std::cout << "[session][" << this->getClientInfo() << "] disconnected."  << std::endl;
+            std::cout << "[session][" << this->GetClientInfo() << "] disconnected."  << std::endl;
             break;
         }
 
@@ -131,10 +99,10 @@ void vuprs::TcpSession::receiveLoop()
     
     running = false;
 
-    std::cout << "[session][" << getClientInfo() << "] client service end." << std::endl;
+    std::cout << "[session][" << GetClientInfo() << "] client service end." << std::endl;
 }
 
-std::string vuprs::TcpSession::DefaultMessageProcess(const std::string& message) 
+std::string vuprs::LinuxSession::DefaultMessageProcess(const std::string& message) 
 {
     if (message == "hello") 
     {
@@ -210,77 +178,83 @@ bool vuprs::SocketSendData(int client_fd, const char *buf, const uint64_t &sendL
     return success;
 }
 
-bool waitSocketReadable(int fd, int timeout_ms) 
+void vuprs::SetSocketReceiveDataToDefault(vuprs::SocketReceiveData *data)
 {
-    fd_set readfds;
-    FD_ZERO(&readfds);
-    FD_SET(fd, &readfds);
-
-    struct timeval tv;
-    tv.tv_sec = timeout_ms / 1000;
-    tv.tv_usec = (timeout_ms % 1000) * 1000;
-
-    int ret = select(fd + 1, &readfds, NULL, NULL, &tv);
-    if (ret > 0 && FD_ISSET(fd, &readfds)) 
-    {
-        return true;
-    }
-    return false;
+    data->is_connect = true;
+    data->is_timeout = false;
+    data->is_error = false;
+    data->receiveBytes = 0;
+    memset(data->buf, 0, sizeof(data->buf));
 }
 
-bool vuprs::SocketRecvData(int client_fd, char* buf, const uint64_t &max_recvLength, ssize_t *origin_ret, uint64_t *recvBytes)
+void vuprs::SocketReceiveCommand(int client_fd, const std::string &tailer, vuprs::SocketReceiveData *data)
 {
-    uint64_t receivedBytes = 0;
     ssize_t recvReturn = 1;
-    const auto timeout = std::chrono::seconds(5);
+    const auto timeout = std::chrono::milliseconds(50);
     auto start = std::chrono::steady_clock::now();
-    bool timeoutFlag = false;
+
+    vuprs::SetSocketReceiveDataToDefault(data);
     
-    while (receivedBytes < max_recvLength) 
+    while (data->receiveBytes < __SOCKET_RECEIVE_BUFFER_SIZE_BYTES__) 
     {
         
         if (std::chrono::steady_clock::now() - start > timeout) 
         {
-            timeoutFlag = true;
+            data->is_timeout = true;
             break;
         }
         
-        if (!waitSocketReadable(client_fd, 100)) continue;
+        recvReturn = recv(client_fd, data->buf + data->receiveBytes, __SOCKET_RECEIVE_BUFFER_SIZE_BYTES__ - data->receiveBytes, 0);
         
-        recvReturn = recv(client_fd, buf + receivedBytes, max_recvLength - receivedBytes, 0);
-        
-        if (recvReturn > 0) 
+        if (recvReturn > 0)  /* Successfully received */
         {
-            receivedBytes += recvReturn;
+            data->receiveBytes += recvReturn;
+            std::string_view receivedData(data->buf, data->receiveBytes);
+            if (receivedData.find(tailer) != std::string_view::npos)
+            {
+                break;
+            }
         }
-        else if (recvReturn == 0) 
+        else if (recvReturn == 0)  /* Closed */
         {
+            data->is_connect = false;
             break;
         }
-        else 
+        else  /* Error occurred */
         {
             if (errno == EINTR) continue;
             if (errno == EWOULDBLOCK || errno == EAGAIN) continue;
+            data->is_error = true;
             break;
         }
+    }
+}
+
+bool vuprs::SocketSendBuffer(int client_fd, const vuprs::AlignedBufferDMA &buffer)
+{
+
+}
+
+bool vuprs::ParseMessageFromSocketData(const vuprs::SocketReceiveData &data, const std::string &header, const std::string &tailer, std::string *result)
+{
+    if (!result) return false;
+    if (header.empty() || tailer.empty()) return false;
+    
+    std::string dataString(data.buf, data.receiveBytes);
+    
+    size_t headerPos = dataString.find(header);
+    size_t tailerPos = dataString.find(tailer);
+    
+    if (headerPos != std::string::npos && tailerPos != std::string::npos && headerPos + header.length() < tailerPos)
+    {
+        size_t contentStart = headerPos + header.length();
+        size_t contentLength = tailerPos - contentStart;
         
-        if (receivedBytes > 0) 
-        {
-            break;
-        }
+        *result = dataString.substr(contentStart, contentLength);
+        return true;
     }
     
-    if (timeoutFlag)
-    {
-        if (origin_ret) *origin_ret = 1;  /* not disconnect when timeout */
-    }
-    else
-    {
-        if (origin_ret) *origin_ret = recvReturn;
-    }
-    if (recvBytes) *recvBytes = receivedBytes;
-    
-    return receivedBytes > 0;
+    return false;
 }
 
 bool vuprs::SocketSendFile(int client_fd, const std::string &filename)
