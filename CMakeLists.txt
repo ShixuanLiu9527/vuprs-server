@@ -39,6 +39,6 @@ file(GLOB_RECURSE LOGGER_SRC "${CMAKE_CURRENT_SOURCE_DIR}/logger/source/*.cpp")
 file(GLOB_RECURSE ALGORITHM_SRC "${CMAKE_CURRENT_SOURCE_DIR}/algorithm/source/*.cpp")
 file(GLOB_RECURSE SERVER_SRC "${CMAKE_CURRENT_SOURCE_DIR}/server/source/*.cpp")
 
-add_executable(vuprs_server main.cpp ${FPGA_SRC} ${SYS_TOOL_SRC} ${LOGGER_SRC} ${ALGORITHM_SRC} ${SERVER_SRC})
+add_executable(server main.cpp ${FPGA_SRC} ${SYS_TOOL_SRC} ${LOGGER_SRC} ${ALGORITHM_SRC} ${SERVER_SRC})
 
-target_link_libraries(vuprs_server PRIVATE Threads::Threads m fftw3)
+target_link_libraries(server PRIVATE Threads::Threads m fftw3)
