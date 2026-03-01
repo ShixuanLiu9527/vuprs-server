@@ -8,43 +8,68 @@
 
 ## Build
 
-在项目根目录输入以下指令:  
+为了正常编译, 请按照以下步骤设置相关参数:  
 
-```bash
-sudo mkdir build
-cd build
-sudo cmake .. -DCMAKE_TOOLCHAIN_FILE=../rk3568_toolchain.cmake
-sudo make
-```
-
-为了正常编译, 请在 `rk3568_toolchain.cmake` 指定交叉编译器路径:
+### Step 1: 在 `rk3568_toolchain.cmake` 指定交叉编译器路径:
 
     set(CMAKE_C_COMPILER "/usr/local/arm/gcc-linaro-7.5.0-2019.12-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-gcc")
     set(CMAKE_CXX_COMPILER "/usr/local/arm/gcc-linaro-7.5.0-2019.12-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-g++")
 
-在 `/build` 目录下将会出现如下可执行文件:  
+[[ 查看 `rk3568_toolchain.cmake` ]](./rk3568_toolchain.cmake)  
 
-    /build/vuprs_server  # 服务器
-    /build/fpga_tool/tool  # FPGA Tool 工具
+### Step 2: 在 `./xdma_driver/xdma/Makefile` 中指定相关参数:  
 
-    # FFTW3 动态库
+    export ARCH:=arm64  # 平台架构, ARM-64
+    export CROSS_COMPILE:=<交叉编译器路径>
+    BUILDSYSTEM_DIR:=<内核源代码根目录> # Linux kernel path
 
-    /build/fftw3/libfftw3.so
-    /build/fftw3/libfftw3.so.3
-    /build/fftw3/libfftw3.so.3.6.9
-    /build/fftw3/libfftw3_threads.so
-    /build/fftw3/libfftw3_threads.so.3
-    /build/fftw3/libfftw3_threads.so.3.6.9
+[[ 查看 `./xdma_driver/xdma/Makefile` ]](./xdma_driver/xdma/Makefile)  
+
+### Step 3: 编译:  
+
+在项目根目录输入以下指令:  
+
+```bash
+sudo sh ./build.sh all  # 编译全部 (XDMA 驱动, Server 和 FPGA-Tool)
+sudo sh ./build.sh xdma  # 仅编译 XDMA 驱动
+sudo sh ./build.sh server  # 仅编译 Server 和 FPGA-Tool 工具
+```
+
+或者查看帮助信息:  
+
+```bash
+sudo sh ./build.sh help
+```
+
+编译完成后, 在 `/build` 目录下将会出现如下可执行文件:  
+
+    build/
+        vuprs_server  # 服务器
+
+        fpga_tool/
+            tool  # FPGA Tool 工具
+
+        xdma/
+            xdma.ko  # XDMA 驱动
+
+        /fftw3  # FFTW 动态库
+            libfftw3.so
+            libfftw3.so.3
+            libfftw3.so.3.6.9
+            libfftw3_threads.so
+            libfftw3_threads.so.3
+            libfftw3_threads.so.3.6.9
 
 ## Run Server
 
 编译完成后, 按照如下方式组织文件: 
 
-    /run_dir
+    your/run_dir/
         system_run.sh    # 本仓库提供的脚本文件
         xdma.ko          # XDMA 驱动
         vuprs_server     # 编译得到的服务器可执行文件
-        /fftw3           # FFTW3 动态链接库
+
+        fftw3/           # FFTW3 动态链接库
             libfftw3.so
             libfftw3.so
             libfftw3.so.3
@@ -57,9 +82,10 @@ sudo make
 
 ```bash
 cd run_dir/
-chmod +x ./system_run.sh
-./system_run.sh
+sh ./system_run.sh
 ```
+
+注: 必须在 `root` 下运行上述指令.
 
 ## Usage
 
@@ -86,3 +112,6 @@ chmod +x ./system_run.sh
 ## 网络通信协议
 
 [网络通信协议V1.0](./docs/PROTOCOL.md)
+
+---
+_Shixuan Liu 2025_
