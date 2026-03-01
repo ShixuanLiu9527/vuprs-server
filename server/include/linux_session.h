@@ -90,7 +90,7 @@ namespace vuprs
              */
             bool IsRun() const;
 
-            void BindIOManager(std::shared_ptr<vuprs::SocketIOManager> ioManager);
+            bool BindIOManager(std::shared_ptr<vuprs::SocketIOManager> ioManager);
 
             void UnbindIOManager();
 

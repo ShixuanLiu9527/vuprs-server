@@ -78,6 +78,16 @@ vuprs::FPGA_IOManagerForDevice::FPGA_IOManagerForDevice()
     this->isMemoryMapped = false;
 }
 
+vuprs::FPGA_IOManagerForDevice::FPGA_IOManagerForDevice(const std::string &deviceFilename)
+{
+    this->isMemoryMapped = false;
+    this->fd = -1;
+    if (!this->Open(deviceFilename))
+    {
+        throw std::runtime_error("Cannot open device file: " + deviceFilename);
+    }
+}
+
 vuprs::FPGA_IOManagerForDevice::~FPGA_IOManagerForDevice()
 {
     {
@@ -209,6 +219,25 @@ bool vuprs::FPGA_IOManagerForDevice::RegisterListIO(std::vector<uint32_t> *ioVal
 
 /* --------------------------------- FPGA IO Manager For Memories --------------------------------- */
 
+vuprs::FPGA_IOManagerForMemory::FPGA_IOManagerForMemory()
+{
+    this->fd = -1;
+}
+
+vuprs::FPGA_IOManagerForMemory::FPGA_IOManagerForMemory(const std::string &deviceFilename)
+{
+    this->fd = -1;
+    if (!this->Open(deviceFilename))
+    {
+        throw std::runtime_error("Cannot open device file: " + deviceFilename);
+    }
+}
+
+vuprs::FPGA_IOManagerForMemory::~FPGA_IOManagerForMemory()
+{
+    this->fd = -1;
+}
+
 int vuprs::FPGA_IOManagerForMemory::OpenFlags()
 {
     return (O_RDWR);
@@ -256,6 +285,25 @@ bool vuprs::FPGA_IOManagerForMemory::BufferIO(void* source, uint32_t absoluteAdd
 }
 
 /* --------------------------------- FPGA IO Manager For Interrupt --------------------------------- */
+
+vuprs::FPGA_IOManagerForInterrput::FPGA_IOManagerForInterrput()
+{
+    this->fd = -1;
+}
+
+vuprs::FPGA_IOManagerForInterrput::FPGA_IOManagerForInterrput(const std::string &deviceFilename)
+{
+    this->fd = -1;
+    if (!this->Open(deviceFilename))
+    {
+        throw std::runtime_error("Cannot open device file: " + deviceFilename);
+    }
+}
+
+vuprs::FPGA_IOManagerForInterrput::~FPGA_IOManagerForInterrput()
+{
+    this->fd = -1;
+}
 
 int vuprs::FPGA_IOManagerForInterrput::OpenFlags()
 {

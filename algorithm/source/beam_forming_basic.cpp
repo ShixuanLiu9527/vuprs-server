@@ -244,9 +244,7 @@ void vuprs::BeamFormingArray::GetArraySignalMatrix(Eigen::Matrix<Eigen::dcomplex
     {
         for (uint64_t i = 0; i < elementSize; i++)
         {
-            futures.emplace_back(
-                [this, i](){this->elementArray[i].DoFFT();}
-            );
+            futures.emplace_back(this->threadPool->enqueue([this, i](){this->elementArray[i].DoFFT();}));
         }
         for (auto &f : futures)  /* wait complete */
         {

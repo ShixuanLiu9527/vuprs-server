@@ -19,12 +19,12 @@ endif()
 
 add_subdirectory(eigen)
 add_subdirectory(fftw3)
+add_subdirectory(fpga_tool)
 
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/fpga/include
     ${CMAKE_CURRENT_SOURCE_DIR}/server/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/network/include
     ${CMAKE_CURRENT_SOURCE_DIR}/logger/include
     ${CMAKE_CURRENT_SOURCE_DIR}/algorithm/include
     ${CMAKE_CURRENT_SOURCE_DIR}/system_tools/include
@@ -33,19 +33,12 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/fftw3/api
 )
 
-file(GLOB_RECURSE FPGA_SRC "fpga/source/*.cpp")
-file(GLOB_RECURSE NETWORK_SRC "network/source/*.cpp")
-file(GLOB_RECURSE SYS_TOOL_SRC "system_tools/source/*.cpp")
-file(GLOB_RECURSE LOGGER_SRC "logger/source/*.cpp")
-file(GLOB_RECURSE ALGORITHM_SRC "algorithm/source/*.cpp")
-file(GLOB_RECURSE SERVER_SRC "server/source/*.cpp")
+file(GLOB_RECURSE FPGA_SRC "${CMAKE_CURRENT_SOURCE_DIR}/fpga/source/*.cpp")
+file(GLOB_RECURSE SYS_TOOL_SRC "${CMAKE_CURRENT_SOURCE_DIR}/system_tools/source/*.cpp")
+file(GLOB_RECURSE LOGGER_SRC "${CMAKE_CURRENT_SOURCE_DIR}/logger/source/*.cpp")
+file(GLOB_RECURSE ALGORITHM_SRC "${CMAKE_CURRENT_SOURCE_DIR}/algorithm/source/*.cpp")
+file(GLOB_RECURSE SERVER_SRC "${CMAKE_CURRENT_SOURCE_DIR}/server/source/*.cpp")
 
-add_executable(fpga_tool fpga_tool.cpp ${FPGA_SRC} ${SYS_TOOL_SRC} ${LOGGER_SRC})
-add_executable(vuprs_server test_server.cpp ${NETWORK_SRC} ${SYS_TOOL_SRC} ${LOGGER_SRC})
-add_executable(sampling_test test_sampling.cpp ${FPGA_SRC} ${SYS_TOOL_SRC} ${LOGGER_SRC} ${ALGORITHM_SRC})
-add_executable(adc_data_parser adc_data_parser.cpp ${FPGA_SRC} ${SYS_TOOL_SRC} ${LOGGER_SRC} ${ALGORITHM_SRC})
+add_executable(vuprs_server main.cpp ${FPGA_SRC} ${SYS_TOOL_SRC} ${LOGGER_SRC} ${ALGORITHM_SRC} ${SERVER_SRC})
 
-target_link_libraries(fpga_tool PRIVATE m)
-target_link_libraries(vuprs_server PRIVATE Threads::Threads m)
-target_link_libraries(sampling_test PRIVATE m fftw3)
-target_link_libraries(adc_data_parser PRIVATE m fftw3)
+target_link_libraries(vuprs_server PRIVATE Threads::Threads m fftw3)

@@ -21,7 +21,7 @@ vuprs::LinuxServer::LinuxServer()
 
 vuprs::LinuxServer::~LinuxServer()
 {
-
+    this->Stop();
 }
 
 bool vuprs::LinuxServer::LoadServerConfigFromJson(const std::string& jsonFilename)
@@ -59,8 +59,6 @@ bool vuprs::LinuxServer::LoadServerConfigFromJson(const std::string& jsonFilenam
         vuprs::__JsonParseString(&this->server_config.protocol.commandTailer, protocol, "command-tailer", true);
     }
 
-    this->configdone = true;
-
     return true;
 }
 
@@ -84,11 +82,18 @@ void vuprs::LinuxServer::InitSystemConfigFiles(const vuprs::SystemConfigFiles &c
         {
             throw std::runtime_error("Config error.");
         }
+
+        this->configdone = true;
     }
     catch (const std::exception &e)
     {
         std::cout << "Error: " << e.what() << std::endl;
     }
+}
+
+bool vuprs::LinuxServer::ConfigDone() const
+{
+    return this->configdone;
 }
 
 bool vuprs::LinuxServer::InitServer()
@@ -178,14 +183,16 @@ void vuprs::LinuxServer::THREAD__AcceptClient()
 
     while (this->server_running)
     {
-        if (this->server_session && !this->server_session->IsRun()) 
+        if (this->server_session && !this->server_session->IsRun())  /* Close session */
         {
             std::cout << "[server][listening] client disconnected." << std::endl;
 
             this->ConnectCallback(false, "");
 
             this->server_session->Stop();
+
             this->server_session.reset();
+            this->socketIOManager.reset();
         }
         if (!this->server_session)  /* try to connect */
         {
@@ -234,10 +241,12 @@ void vuprs::LinuxServer::Run()
 
         if (!this->InitServer()) throw std::runtime_error("Failed to init server.");
 
-        this->threads.emplace_back([this]{this->THREAD__AcceptClient();});
+        this->server_running = true;
+
         this->threads.emplace_back([this]{this->THREAD__Control();});
         this->threads.emplace_back([this]{this->THREAD__GetResult();});
         this->threads.emplace_back([this]{this->THREAD__SendToMaster();});
+        this->threads.emplace_back([this]{this->THREAD__AcceptClient();});
 
         /* Start beam former */
 

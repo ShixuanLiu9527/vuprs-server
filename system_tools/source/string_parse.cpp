@@ -145,3 +145,16 @@ std::string vuprs::Number2HexString(const uint64_t &num)
     ss << "0x" << std::hex << std::uppercase << num;
     return ss.str();
 }
+
+void vuprs::__JsonParseString(std::string *target, const nlohmann::json &json, const std::string &item, bool required)
+{
+    if (target == nullptr) throw std::runtime_error("Target cannot be NULL.");
+    if (json.contains(item))
+    {
+        *target = json[item].get<std::string>();
+    }
+    else if (required)
+    {
+        throw std::runtime_error("Item: " + item + " not found.");
+    }
+}

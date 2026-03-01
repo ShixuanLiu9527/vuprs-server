@@ -10,6 +10,8 @@
 #include <sstream>
 #include <iomanip>
 
+#include "nlohmann/json.hpp"
+
 namespace vuprs
 {
     uint64_t ParseHexFromString(const std::string &dataString, bool *status);

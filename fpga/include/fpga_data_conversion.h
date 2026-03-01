@@ -180,7 +180,7 @@ namespace vuprs
     template<typename T>
     void RotateCircularBuffer(std::vector<T> *vec, uint32_t currentPointer) 
     {
-        if (vec.empty() || currentPointer >= vec.size() - 1) 
+        if (vec->empty() || currentPointer >= vec->size() - 1) 
         {
             return;
         }

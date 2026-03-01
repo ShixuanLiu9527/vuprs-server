@@ -334,7 +334,7 @@ void vuprs::WidebandBeamformerTemplate::CalculateBeamforming()
     
     for (int i = 0; i < numFreqs; i++)
     {
-        futures.emplace_back(threadPool->enqueue(
+        futures.emplace_back(this->threadPool->enqueue(
             [this, i]() {this->CalculateBeamformingForOneFreq(i);}
         ));
     }

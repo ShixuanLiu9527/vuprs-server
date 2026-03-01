@@ -18,6 +18,7 @@
 #endif
 
 #include <fcntl.h>
+#include <unistd.h>
 
 #if __BYTE_ORDER == __LITTLE_ENDIAN
     #define ltohl(x)               (x)
@@ -125,6 +126,7 @@ namespace vuprs
         public:
 
             FPGA_IOManagerForDevice();
+            FPGA_IOManagerForDevice(const std::string &deviceFilename);
             ~FPGA_IOManagerForDevice();
 
             /**
@@ -174,6 +176,10 @@ namespace vuprs
 
         public:
 
+            FPGA_IOManagerForMemory();
+            FPGA_IOManagerForMemory(const std::string &deviceFilename);
+            ~FPGA_IOManagerForMemory();
+
             /**
              * @brief Read/Write data from FPGA/buffer to buffer/FPGA.
              * 
@@ -205,6 +211,10 @@ namespace vuprs
             bool OperationAfterOpened() override;
 
         public:
+
+            FPGA_IOManagerForInterrput();
+            FPGA_IOManagerForInterrput(const std::string &deviceFilename);
+            ~FPGA_IOManagerForInterrput();
 
             bool ReadEvent(uint32_t *readValue);
     };

@@ -70,7 +70,7 @@ void vuprs::LinuxSession::Stop()
     this->running = false;
 }
 
-void vuprs::LinuxSession::BindIOManager(std::shared_ptr<vuprs::SocketIOManager> ioManager)
+bool vuprs::LinuxSession::BindIOManager(std::shared_ptr<vuprs::SocketIOManager> ioManager)
 {
     if (ioManager == nullptr)
     {
@@ -82,6 +82,7 @@ void vuprs::LinuxSession::BindIOManager(std::shared_ptr<vuprs::SocketIOManager> 
         this->socketIOManager = ioManager;
     }
     this->isIOManagerBind = true;
+    return true;
 }
 
 void vuprs::LinuxSession::UnbindIOManager()

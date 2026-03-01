@@ -50,7 +50,7 @@ namespace vuprs
     {
         private:
 
-            bool configdone;
+            bool configdone;  /* Indicate config done */
 
             std::vector<std::thread> threads;  /* Server threads */
 
@@ -58,11 +58,8 @@ namespace vuprs
 
             int server_fd;
             uint16_t server_port;
-            std::atomic<bool> server_running;
 
-            vuprs::ServerConfig server_config;  /* controlled by mut_config */
-
-            std::unique_ptr<vuprs::LinuxSession> server_session;
+            std::unique_ptr<vuprs::LinuxSession> server_session;  /* socket session */
             std::shared_ptr<vuprs::SocketIOManager> socketIOManager;  /* socket io manager */
 
             /* --- Algorithms --- */
@@ -70,17 +67,12 @@ namespace vuprs
             vuprs::ARM_FPGA_BF_Config beamFormerConfig;  /* Set by client or default value */
             vuprs::ARM_FPGA_CollaborationBeamfomer beamformer;  /* System beam former */
 
-            /* --- Tool functions --- */
-
-            bool LoadServerConfigFromJson(const std::string& jsonFilename);
-
-            bool InitServer();
-
-            void ConnectCallback(bool connect, const std::string &message);
-
             /* --- Thread data --- */
 
+            std::atomic<bool> server_running;  /* server running */
+
             std::mutex mut_config;
+            vuprs::ServerConfig server_config;  /* controlled by mut_config */
 
             std::mutex mut_readResult;
             std::condition_variable readResultCV;
@@ -120,6 +112,14 @@ namespace vuprs
              */
             void SessionCallback(std::weak_ptr<vuprs::SocketIOManager> manager, const std::string& message);
 
+            /* --- Tool functions --- */
+
+            bool LoadServerConfigFromJson(const std::string& jsonFilename);
+
+            bool InitServer();
+
+            void ConnectCallback(bool connect, const std::string &message);
+
         public:
 
             LinuxServer();
@@ -130,9 +130,17 @@ namespace vuprs
              */
             void InitSystemConfigFiles(const vuprs::SystemConfigFiles &config);
 
+            /**
+             * @brief Start server.
+             */
             void Run();
 
+            /**
+             * @brief Stop server.
+             */
             void Stop();
+
+            bool ConfigDone() const;
     };
 }
 

@@ -105,9 +105,9 @@ bool vuprs::FIRCalculator::SolveCoeffUseExpectedFrequencyResponse(const Eigen::M
     }
 
     Eigen::Matrix<Eigen::dcomplex, -1, -1> EH = this->matrixE.adjoint();
-    Eigen::Matrix<Eigen::dcomplex, -1, -1> W_E = this->matrixE.array().colwise() * W_vec.array();
+    Eigen::Matrix<Eigen::dcomplex, -1, -1> W_E = W_vec.asDiagonal() * this->matrixE;
     Eigen::Matrix<Eigen::dcomplex, -1, -1> EH_W_E = EH * W_E;  /* E.H * W * E */
-    Eigen::Matrix<Eigen::dcomplex, -1, -1> EH_W = EH.array().rowwise() * W_vec.array();  /* E.H * W */
+    Eigen::Matrix<Eigen::dcomplex, -1, -1> EH_W = EH * W_vec.asDiagonal();  /* E.H * W */
     Eigen::Matrix<Eigen::dcomplex, -1, 1> EH_W_Hd;  /* E.H * W * Hd */
     Eigen::Matrix<Eigen::dcomplex, -1, 1> Hd;
 

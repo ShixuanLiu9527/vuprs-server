@@ -44,10 +44,7 @@ namespace vuprs
 
             SocketIOManager(int client_fd, const sockaddr_in &client_addr);
 
-            std::string ClientInformation() const
-            {
-                return this->clientInformation;
-            }
+            std::string ClientInformation() const;
 
             /**
              * @brief Socket send message.
@@ -77,7 +74,7 @@ namespace vuprs
      * 
      * @retval "{ip}:{port}"
      */
-    std::string vuprs::ParseClientInformationFromSocketaddr(const sockaddr_in &client_addr);
+    std::string ParseClientInformationFromSocketaddr(const sockaddr_in &client_addr);
 
     /**
      * @brief Cut header & tailer.
