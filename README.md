@@ -10,15 +10,56 @@
 
 在项目根目录输入以下指令:  
 
-    sudo mkdir build
-    cd build
-    sudo cmake .. -DCMAKE_TOOLCHAIN_FILE=../rk3568_toolchain.cmake
-    sudo make
+```bash
+sudo mkdir build
+cd build
+sudo cmake .. -DCMAKE_TOOLCHAIN_FILE=../rk3568_toolchain.cmake
+sudo make
+```
+
+为了正常编译, 请在 `rk3568_toolchain.cmake` 指定交叉编译器路径:
+
+    set(CMAKE_C_COMPILER "/usr/local/arm/gcc-linaro-7.5.0-2019.12-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-gcc")
+    set(CMAKE_CXX_COMPILER "/usr/local/arm/gcc-linaro-7.5.0-2019.12-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-g++")
 
 在 `/build` 目录下将会出现如下可执行文件:  
 
-    /build/vuprs_server
-    /build/fpga_tool/tool
+    /build/vuprs_server  # 服务器
+    /build/fpga_tool/tool  # FPGA Tool 工具
+
+    # FFTW3 动态库
+
+    /build/fftw3/libfftw3.so
+    /build/fftw3/libfftw3.so.3
+    /build/fftw3/libfftw3.so.3.6.9
+    /build/fftw3/libfftw3_threads.so
+    /build/fftw3/libfftw3_threads.so.3
+    /build/fftw3/libfftw3_threads.so.3.6.9
+
+## Run Server
+
+编译完成后, 按照如下方式组织文件: 
+
+    /run_dir
+        system_run.sh    # 本仓库提供的脚本文件
+        xdma.ko          # XDMA 驱动
+        vuprs_server     # 编译得到的服务器可执行文件
+        /fftw3           # FFTW3 动态链接库
+            libfftw3.so
+            libfftw3.so
+            libfftw3.so.3
+            libfftw3.so.3.6.9
+            libfftw3_threads.so
+            libfftw3_threads.so.3
+            libfftw3_threads.so.3.6.9
+
+执行脚本文件以运行服务器:
+
+```bash
+cd run_dir/
+chmod +x ./system_run.sh
+./system_run.sh
+```
 
 ## Usage
 
