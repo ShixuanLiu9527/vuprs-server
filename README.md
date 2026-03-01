@@ -40,7 +40,7 @@
 
 为了方便调试, 设计了 `FPGA` 调试工具, 可以通过终端手动控制 `FPGA`.  
   
-[[ `FPGA-Tool`使用手册 ]](./ug-fpga-tool.md)  
+[[ `FPGA-Tool`使用手册 ]](./docs/ug-fpga-tool.md)  
 
 ## 网络通信协议
 
