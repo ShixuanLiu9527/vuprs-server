@@ -96,15 +96,28 @@ sudo sh ./make_run_dir.sh
 ### Step 2: 配置启动脚本文件
 
 设置脚本 `run_server.sh` 中的 `4` 个配置文件在板子系统中的位置:  
-
-    FPGA_CONFIG="./fpga_config.json"
-    SERVER_CONFIG="./server_config.json"
-    ARRAY_CONFIG="./array_config.json"
-    FIR_CONFIG="./fir_config.json"
-
+```bash
+FPGA_CONFIG="./fpga_config.json"
+SERVER_CONFIG="./server_config.json"
+ARRAY_CONFIG="./array_config.json"
+FIR_CONFIG="./fir_config.json"
+```
 [[ 查看 `run_server.sh` ]](./run_server.sh) 
 
-### Step 3: 启动服务器
+### Step 3: 配置以太网静态 `IP` 地址
+
+在 `config_eth0.sh` 中设置以太网: 
+```bash
+INTERFACE="eth0"
+STATIC_IP="192.168.1.100"
+NETMASK="255.255.255.0"
+GATEWAY="192.168.1.1"
+DNS="114.114.114.114"
+```
+[[ 查看 `config_eth0.sh` ]](./config_eth0.sh)  
+完成后, 在板端运行脚本文件 `config_eth0.sh`.
+
+### Step 4: 启动服务器
 
 将 `run_dir` 目录下载到板端任意位置, 进入目录, 执行脚本文件 `run_server.sh` 即可运行服务器:
 ```bash
