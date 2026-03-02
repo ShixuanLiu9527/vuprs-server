@@ -6,6 +6,24 @@
 
 [[ 回到主仓库: vuprs-support ]](https://github.com/ShixuanLiu9527/vuprs-support.git)
 
+## 项目结构
+
+本项目结构如下:  
+
+    root/
+    ├── algorithm      # 项目算法部分代码, 包括信号处理, 波束形成算法等.
+    ├── eigen          # Eigen 线性代数库
+    ├── fftw3          # FFTW 信号处理库
+    ├── nolhmann       # JSON 文件解析库
+    ├── fpga           # FPGA 控制相关代码
+    ├── fpga_tool      # FPGA 测试工具代码
+    ├── logger         # 系统日志管理代码
+    ├── server         # 系统服务器代码
+    ├── system_tools   # 系统其他函数工具代码
+    ├── xdma_driver    # XDMA 驱动源代码
+    ├── configs        # 项目配置文件模板.
+    └── docs           # 项目相关文档.
+
 ## Build
 
 为了正常编译, 请按照以下步骤设置相关参数:  
@@ -17,31 +35,25 @@
 
 [[ 查看 `rk3568_toolchain.cmake` ]](./rk3568_toolchain.cmake)  
 
-### Step 2: 在 `./xdma_driver/xdma/Makefile` 中指定相关参数:  
-
-    export ARCH:=arm64  # 平台架构, ARM-64
-    export CROSS_COMPILE:=<交叉编译器路径>
-    BUILDSYSTEM_DIR:=<内核源代码根目录> # Linux kernel path
-
-[[ 查看 `./xdma_driver/xdma/Makefile` ]](./xdma_driver/xdma/Makefile)  
+### Step 2: 在 `build.sh` 中指定 `XDMA` 交叉编译相关参数:  
+```bash
+    XDMA__ARCH="arm64"
+    XDMA__CROSS_COMPILE="/home/lsx/source/linux/rk356x_linux/prebuilts/gcc/linux-x86/aarch64/gcc-linaro-6.3.1-2017.05-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-"
+    XDMA__KERNEL_DIR="/home/lsx/source/linux/rk356x_linux/kernel"
+```
+[[ 查看 `build.sh` ]](./build.sh)  
 
 ### Step 3: 编译:  
 
-在项目根目录输入以下指令:  
-
+在项目根目录运行 `build.sh` 脚本:  
 ```bash
 sudo sh ./build.sh all  # 编译全部 (XDMA 驱动, Server 和 FPGA-Tool)
-sudo sh ./build.sh xdma  # 仅编译 XDMA 驱动
-sudo sh ./build.sh server  # 仅编译 Server 和 FPGA-Tool 工具
 ```
-
-或者查看帮助信息:  
-
+其他使用方法请查看 `build.sh` 的帮助信息:  
 ```bash
 sudo sh ./build.sh help
 ```
-
-编译完成后, 在 `/build` 目录下将会出现如下可执行文件:  
+编译完成后, 在 `./build` 目录下将会出现如下可执行文件:  
 
     build/
     ├── server                    # 服务器可执行文件
@@ -59,7 +71,9 @@ sudo sh ./build.sh help
 
 ## Run Server
 
-编译完成后, 按照如下方式组织文件: 
+### Step 1: 组织运行目录
+
+编译完成后, 需要按照如下方式组织文件: 
 
     your/run_dir/
     ├── system_run.sh           # 本仓库提供的脚本文件
@@ -67,29 +81,37 @@ sudo sh ./build.sh help
     ├── server                  # 编译得到的服务器可执行文件
     └── fftw3/                  # FFTW3 动态链接库
         ├── libfftw3.so
-        ├── libfftw3.so
         ├── libfftw3.so.3
         ├── libfftw3.so.3.6.9
         ├── libfftw3_threads.so
         ├── libfftw3_threads.so.3
         └── libfftw3_threads.so.3.6.9
 
-上述文件目录可以通过 `./make_run_dir.sh` 创建:  
-
+上述文件目录可以通过 `make_run_dir.sh` 创建:  
 ```bash
 sudo sh ./make_run_dir.sh
 ```
+运行脚本 `make_run_dir.sh` 后, 目录 `run_dir` 将会自动在项目根目录生成.  
 
-目录 `run_dir` 将会在项目根目录创建.  
+### Step 2: 配置启动脚本文件
 
-执行脚本文件以运行服务器:
+设置脚本 `run_server.sh` 中的 `4` 个配置文件在板子系统中的位置:  
 
+    FPGA_CONFIG="./fpga_config.json"
+    SERVER_CONFIG="./server_config.json"
+    ARRAY_CONFIG="./array_config.json"
+    FIR_CONFIG="./fir_config.json"
+
+[[ 查看 `run_server.sh` ]](./run_server.sh) 
+
+### Step 3: 启动服务器
+
+将 `run_dir` 目录下载到板端任意位置, 进入目录, 执行脚本文件 `run_server.sh` 即可运行服务器:
 ```bash
 cd run_dir/
-sh ./system_run.sh
+sh ./run_server.sh
 ```
-
-注: 必须在 `root` 下运行上述指令.
+注: 脚本文件 `run_server.sh` 的执行必须在 `root` 下.
 
 ## Usage
 

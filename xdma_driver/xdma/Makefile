@@ -1,7 +1,3 @@
-export ARCH:=arm64
-export CROSS_COMPILE:=/home/lsx/source/linux/rk356x_linux/prebuilts/gcc/linux-x86/aarch64/gcc-linaro-6.3.1-2017.05-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-
-BUILDSYSTEM_DIR:=/home/lsx/source/linux/rk356x_linux/kernel  # Linux kernel path
-
 SHELL = /bin/bash
 ifneq ($(xvc_bar_num),)
 	XVC_FLAGS += -D__XVC_BAR_NUM__=$(xvc_bar_num)
@@ -23,8 +19,10 @@ $(TARGET_MODULE)-objs := libxdma.o xdma_cdev.o cdev_ctrl.o cdev_events.o cdev_sg
 obj-m := $(TARGET_MODULE).o
 PWD:=$(shell pwd)
 
+export ARCH CROSS_COMPILE BUILDSYSTEM_DIR  # input export
+
 all :
-	$(MAKE) -C $(BUILDSYSTEM_DIR) M=$(PWD) modules
+	$(MAKE) -C $(BUILDSYSTEM_DIR) M=$(PWD) modules 
 
 clean:
 	$(MAKE) -C $(BUILDSYSTEM_DIR) M=$(PWD) clean
@@ -33,5 +31,3 @@ clean:
 install: all
 	$(MAKE) -C $(BUILDSYSTEM_DIR) M=$(PWD) modules_install
 	depmod -A
-
-# endif

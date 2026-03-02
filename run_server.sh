@@ -1,5 +1,14 @@
 #!/bin/bash
 
+# ------------------------------------ Config files -------------------------
+
+FPGA_CONFIG="./fpga_config.json"
+SERVER_CONFIG="./server_config.json"
+ARRAY_CONFIG="./array_config.json"
+FIR_CONFIG="./fir_config.json"
+
+# --------------------------- Security Check --------------------------------
+
 RED='\033[31m'
 GREEN='\033[32m'
 BLUE='\033[34m'
@@ -8,13 +17,6 @@ NC='\033[0m'  # No Color
 XDMA_DRIVER_NAME="./xdma.ko"
 SERVER_NAME="./vuprs_server"
 SHARED_LIB_DIR="./fftw3"
-
-FPGA_CONFIG="./fpga_config.json"
-SERVER_CONFIG="./server_config.json"
-ARRAY_CONFIG="./array_config.json"
-FIR_CONFIG="./fir_config.json"
-
-# --------------------------- Security Check --------------------------------
 
 # Make sure only root user can use this script.
 
@@ -98,6 +100,8 @@ echo "  FPGA: ${BLUE}${FPGA_CONFIG}${NC}"
 echo "  Beam Forming array: ${BLUE}${ARRAY_CONFIG}${NC}"
 echo "  FIR Filter Bank: ${BLUE}${FIR_CONFIG}${NC}"
 echo ""
+
+sleep 1
 
 exec "${SERVER_NAME}" \
     --server-config "${SERVER_CONFIG}" \
