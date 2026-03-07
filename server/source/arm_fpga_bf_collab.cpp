@@ -148,7 +148,7 @@ bool vuprs::ARM_FPGA_CollaborationBeamfomer::StartBeamformerWithConfiguration(co
 
         /* Get predelay */
 
-        this->bf_dcrcb.UpdateAndGetElementPredelay(this->fir.FIRLength(), this->hardwareSamplingFrequency, 
+        this->bf_dcrcb.UpdateAndGetElementPredelay(this->fir.FIRLength(), this->hardwareSamplingFrequency, true,
             &predelayCount, &predelayTime, &channelName);
 
          /* Set frequency range */

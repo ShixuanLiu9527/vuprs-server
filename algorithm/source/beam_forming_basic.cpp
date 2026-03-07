@@ -98,7 +98,7 @@ bool vuprs::BeamFormingArray::LoadArrayFromJson(const std::string &filename)
         if (beamFormingArray.contains("array"))
         {
             auto arrayData = beamFormingArray["array"];
-            if (beamFormingArray.is_array())
+            if (arrayData.is_array())
             {
                 int arraySize = arrayData.size();
                 this->elementArray.clear();

@@ -164,6 +164,23 @@ namespace vuprs
      * @param samplingFrequency sampling frequency, unit: Hz.
      */
     Eigen::Matrix<double, -1, 1> GenerateRealFrequencyList(int dataNumber, double samplingFrequency);
+
+    enum class WindowType 
+    {
+        SIG_WINDOW__HAMMING,
+        SIG_WINDOW__HANN,
+        SIG_WINDOW__BLACKMAN,
+        SIG_WINDOW__RECTANGULAR
+    };
+
+    /**
+     * @brief Add window for signal.
+     * 
+     * @param signal the given signal.
+     */
+    void AddWindow(Eigen::Matrix<double, -1, 1> *signal, vuprs::WindowType type = vuprs::WindowType::SIG_WINDOW__HAMMING);
+
+    Eigen::Matrix<double, -1, 1> GetWindow(vuprs::WindowType type = vuprs::WindowType::SIG_WINDOW__HAMMING, int signalLength);
 }
 
 #endif

@@ -380,7 +380,7 @@ bool vuprs::FPGA_API__FIR__ResetFIR(vuprs::FPGAController *controller)
         throw std::runtime_error("FPGA Controller not configured in advance.");
     }
 
-    bool operateStatus = false;
+    bool operateStatus = true;
 
     operateStatus &= controller->dev__FIR_Filter_Bank.WriteSingleRegister(vuprs::FIR_Filter_Bank__Registers::FIR_RST, 0);
     operateStatus &= controller->dev__FIR_Filter_Bank.WriteSingleRegisterBIT(vuprs::FIR_Filter_Bank__Registers::FIR_RSC, 0, false);
@@ -395,7 +395,7 @@ bool vuprs::FPGA_API__FIR__RuningControl(vuprs::FPGAController *controller, bool
         throw std::runtime_error("FPGA Controller not configured in advance.");
     }
 
-    bool operateStatus = false;
+    bool operateStatus = true;
 
     operateStatus &= controller->dev__FIR_Filter_Bank.WriteSingleRegisterBIT(vuprs::FIR_Filter_Bank__Registers::FIR_RSC, 0, runEnable);
 
@@ -435,7 +435,7 @@ bool vuprs::FPGA_API__DMA__StartScatterGatherDMA_S2MM(vuprs::FPGAController *con
     {
         throw std::runtime_error("Descriptor is empty.");
     }
-    if (isCyclicMode && descriptors[descriptorSize - 1].NXTDESC != 0)
+    if (isCyclicMode && descriptors[descriptorSize - 1].NXTDESC != descriptors[0].ALIGNMENT_0_CURRENT_ADDR)
     {
         throw std::runtime_error("Invalid cyclic DMA descriptor.");
     }

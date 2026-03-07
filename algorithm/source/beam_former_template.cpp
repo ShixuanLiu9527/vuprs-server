@@ -298,7 +298,7 @@ void vuprs::WidebandBeamformerTemplate::UpdateAndGetElementPredelay(
     std::vector<double> *elementPredelayTime, 
     std::vector<std::string> *channelName)
 {
-    if (this->is_signalEmpty || !this->ConfigDone())
+    if (!this->ConfigDone())
     {
         throw std::runtime_error("Signal is empty.");
     }

@@ -146,11 +146,6 @@ namespace vuprs
         {
             throw std::runtime_error("Input FIR coefficient is empty.");
         }
-        if (maxAbsCoef <= 0)
-        {
-            throw std::runtime_error("Max absolute coefficient <= 0.");
-        }
-
         output->resize(coefficientSize);
         for (uint64_t i = 0; i < coefficientSize; i++)
         {

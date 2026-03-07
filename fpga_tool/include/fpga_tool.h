@@ -49,7 +49,7 @@
 
 /* Command parsing: argc = 5 */
 
-#define IS_LIST_DEVICE_REGISTERS(ARGS, _MODULE) (ARGS[1] == "-P" && (ARGS[2] == "L" && ARGS[2] == "R") && ARGS[3] == "-M" && IS_DEVICE_NAME(ARGS[4]) && ARGS[4] == _MODULE)
+#define IS_LIST_DEVICE_REGISTERS(ARGS, _MODULE) (ARGS[1] == "-P" && (ARGS[2] == "L" || ARGS[2] == "R") && ARGS[3] == "-M" && IS_DEVICE_NAME(ARGS[4]) && ARGS[4] == _MODULE)
 
 /* Command parsing: argc = 7 */
 

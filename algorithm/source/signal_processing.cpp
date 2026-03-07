@@ -243,3 +243,55 @@ Eigen::Matrix<double, -1, 1> vuprs::GenerateRealFrequencyList(int dataNumber, do
     retVector *= samplingFrequency;  /* f * j */
     return retVector;
 }
+
+Eigen::Matrix<double, -1, 1> vuprs::GetWindow(vuprs::WindowType type, int signalLength)
+{
+    Eigen::Matrix<double, -1, 1> w(signalLength);
+    
+    switch (type)
+    {
+        case WindowType::SIG_WINDOW__HAMMING: 
+        {
+            double alpha0 = 25.0 / 46.0;
+            double alpha1 = 1.0 - alpha0;
+            for (int i = 0; i < signalLength; i++) 
+            {
+                w(i) = alpha0 - alpha1 * cos(2 * M_PI * i / (signalLength - 1));
+            }
+            break;
+        }
+        case WindowType::SIG_WINDOW__HANN: 
+        {
+            for (int i = 0; i < signalLength; i++) 
+            {
+                w(i) = 0.5 * (1 - cos(2 * M_PI * i / (signalLength - 1)));
+            }
+            break;
+        }
+        case WindowType::SIG_WINDOW__BLACKMAN: 
+        {
+            double a0 = 0.42;
+            double a1 = 0.5;
+            double a2 = 0.08;
+            for (int i = 0; i < signalLength; i++) 
+            {
+                w(i) = a0 - a1 * cos(2 * M_PI * i / (signalLength - 1)) + a2 * cos(4 * M_PI * i / (signalLength - 1));
+            }
+            break;
+        }
+        default:
+        {
+            throw std::runtime_error("Invalid widnow type.");
+        }
+    }
+    return w;
+}
+
+void vuprs::AddWindow(Eigen::Matrix<double, -1, 1> *signal, vuprs::WindowType type)
+{
+    if (signal == nullptr || signal->size() == 0) 
+    {
+        return;
+    }
+    *signal = signal->cwiseProduct(vuprs::GetWindow(type, signal->rows()));
+}

@@ -68,7 +68,7 @@ void tool::FPGA_TOOL_PrintHelp()
 
 void tool::FPGA_TOOL_PrintErrorInfo()
 {
-    printf("   \033[31mCommand error.\033[0m See help: controller -h");
+    printf("   \033[31mCommand error.\033[0m See help: controller -h\n");
 }
 
 void tool::FPGA_TOOL_PrintValue(uint32_t offset, uint32_t val)

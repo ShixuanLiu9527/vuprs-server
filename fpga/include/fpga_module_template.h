@@ -812,10 +812,9 @@ namespace vuprs
                 
                 uint32_t targetOffset = offset + this->fpgaAddress;
 
-                buffer->malloc(transferByteSize);
-
                 if (isRead)
                 {
+                    buffer->malloc(transferByteSize);
                     std::shared_ptr<vuprs::FPGA_IOManagerForMemory> c2h_manager;
                     {
                         std::unique_lock<std::mutex> lock(this->mut_c2h);  /* LOCK */
