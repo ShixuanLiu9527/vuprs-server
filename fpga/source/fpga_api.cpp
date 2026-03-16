@@ -460,7 +460,7 @@ bool vuprs::FPGA_API__DMA__StartScatterGatherDMA_S2MM(vuprs::FPGAController *con
 
     /* STEP 2: Write descriptor address to current descriptor pointer */
 
-    operateStatus &= controller->dev__AXI_DMA.WriteSingleRegister(vuprs::AXI_DMA__Registers::S2MM_CURDESC, 0x00);  /* write with 0x00 */
+    operateStatus &= controller->dev__AXI_DMA.WriteSingleRegister(vuprs::AXI_DMA__Registers::S2MM_CURDESC, descriptors[0].ALIGNMENT_0_CURRENT_ADDR);
 
     /* (STEP 2): Enable IOC interrupt */
 
@@ -585,7 +585,7 @@ bool vuprs::FPGA_API__DMA__GetCurrentDescriptor(vuprs::FPGAController *controlle
     uint32_t r_val = INVALID_SG_DESCRIPTOR_POINTER + 1;
     uint32_t nextAddr, previousAddr;
 
-    operateStatus &= controller->dev__AXI_DMA.ReadSingleRegisterBITRegion(vuprs::AXI_DMA__Registers::S2MM_CURDESC, 6, 31, &r_val);
+    operateStatus &= controller->dev__AXI_DMA.ReadSingleRegister(vuprs::AXI_DMA__Registers::S2MM_CURDESC, &r_val);
 
     /* Match */
 

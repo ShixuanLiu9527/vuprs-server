@@ -170,7 +170,7 @@ void tool::FPGA_TOOL_PrintDeviceRegisters(const std::vector<std::string> &name, 
 
 void tool::FPGA_TOOL_ParseCommand(const std::vector<std::string> &args, const std::vector<std::string> &argsLower, _FPGA_TOOL_CommandParseResult *result)
 {
-    bool offset_parseStatus = false, value_parseStatus = false, transfersize_parseStatus = false;
+    bool offset_parseStatus = false, value_parseStatus = false, transfersize_parseStatus = true;
 
     tool::_FPGA_TOOL_CommandParseResult_ToDefault(result);
 
@@ -220,8 +220,9 @@ void tool::FPGA_TOOL_ParseCommand(const std::vector<std::string> &args, const st
         else if (_IS_MEM_OPERATION(args, MEMORY_NAME__SG_BRAM)) result->operation = _FPGA_OPERATION::MEMORY_OPERATION__SG_BRAM;
         else if (_IS_MEM_OPERATION(args, MEMORY_NAME__CIRCULAR_BUFFER_BRAM)) result->operation = _FPGA_OPERATION::MEMORY_OPERATION__CBUF_BRAM;
 
-        if (IS_READ_OPERATION(args[2])) result->isread = true;
-        else if (IS_WRITE_OPERATION(args[2])) result->isread = false;
+        if (IS_READ_OPERATION(args[2]) && args[9] == "-O") result->isread = true;
+        else if (IS_WRITE_OPERATION(args[2]) && args[9] == "-I") result->isread = false;
+        else result->operation = _FPGA_OPERATION::OPERATION_ERR;
 
         result->offset = vuprs::ParseNumberFromString(args[6], &offset_parseStatus);
 
@@ -229,6 +230,7 @@ void tool::FPGA_TOOL_ParseCommand(const std::vector<std::string> &args, const st
         {
             result->transfersize = 0;
             result->transferSizeIfFilesize = true;
+            transfersize_parseStatus = true;
         }
         else 
         {

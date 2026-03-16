@@ -54,7 +54,7 @@ namespace vuprs
     {
         if (target == nullptr) throw std::runtime_error("Target cannot be NULL.");
         bool status = false;
-        uint64_t value;
+        double value;
         if (json.contains(item))
         {
             value = vuprs::ParseDoubleFromString(json[item].get<std::string>(), &status);

@@ -61,10 +61,10 @@
 
 /* Command parsing: argc = 11 */
 
-#define IS_READ_DATA_FROM_MEM(ARGS, _MODULE) (ARGS[1] == "-P" && ARGS[2] == "R" && ARGS[3] == "-M" && IS_MEMORY_NAME(ARGS[4]) && ARGS[4] == _MODULE && ARGS[5] == "-F" && ARGS[7] == "-S" && ARGS[9] == "-O")
-#define IS_WRITE_DATA_TO_MEM(ARGS, _MODULE) (ARGS[1] == "-P" && ARGS[2] == "W" && ARGS[3] == "-M" && IS_MEMORY_NAME(ARGS[4]) && ARGS[4] == _MODULE && ARGS[5] == "-F" && ARGS[7] == "-S" && ARGS[9] == "-I")
+#define _IS_MEM_OPERATION(ARGS, _MODULE) (ARGS[1] == "-P" && ARGS[3] == "-M" && IS_MEMORY_NAME(ARGS[4]) && ARGS[4] == _MODULE && ARGS[5] == "-F" && ARGS[7] == "-S")
 
-#define _IS_MEM_OPERATION(ARGS, _MODULE) (ARGS[1] == "-P" && ARGS[3] == "-M" && IS_MEMORY_NAME(ARGS[4]) && ARGS[4] == _MODULE && ARGS[5] == "-F" && ARGS[7] == "-S" && ARGS[9] == "-O")
+#define IS_READ_DATA_FROM_MEM(ARGS, _MODULE) (_IS_MEM_OPERATION(ARGS, _MODULE) && ARGS[9] == "-O")
+#define IS_WRITE_DATA_TO_MEM(ARGS, _MODULE) (_IS_MEM_OPERATION(ARGS, _MODULE) && ARGS[9] == "-I")
 
 /* Simplify command parsing */
 
