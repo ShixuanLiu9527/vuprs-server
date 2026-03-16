@@ -10,7 +10,7 @@ BUILD_OUTPUT="${SCRIPT_DIR}/build"
 
 XDMA_DRIVER="${BUILD_OUTPUT}/xdma/xdma.ko"
 SERVER="${BUILD_OUTPUT}/server"
-RUN_SHELL="${SCRIPT_DIR}/system_run.sh"
+RUN_SHELL="${SCRIPT_DIR}/run_server.sh"
 
 FFTW_OUTPUT_DIR="${BUILD_OUTPUT}/fftw3"
 
@@ -33,9 +33,10 @@ OUTPUT_DIR="${SCRIPT_DIR}/run_dir/"
 
 mkdir -p "${OUTPUT_DIR}"
 mkdir -p "${OUTPUT_DIR}/fftw3"
+mkdir -p "${OUTPUT_DIR}/configs"
 
 cp "${XDMA_DRIVER}" "${OUTPUT_DIR}/xdma.ko"
-cp "${RUN_SHELL}" "${OUTPUT_DIR}/system_run.sh"
+cp "${RUN_SHELL}" "${OUTPUT_DIR}/run_server.sh"
 cp "${SERVER}" "${OUTPUT_DIR}/server"
 
 cp "${FFTW_OUTPUT_DIR}/libfftw3.so" "${OUTPUT_DIR}/fftw3/libfftw3.so"

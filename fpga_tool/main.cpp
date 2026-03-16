@@ -2,7 +2,7 @@
 
 int main(int argc, char *argv[])
 {
-    std::vector<std::string> args, registerNameList;
+    std::vector<std::string> args, argsLower, registerNameList;
     std::vector<uint32_t> registerOffsetList, registerValueList;
     vuprs::FPGAController controller;
     vuprs::AlignedBufferDMA buffer;
@@ -12,10 +12,12 @@ int main(int argc, char *argv[])
     uint32_t memoryTransferSize = 0;
 
     args.resize(argc);
+    argsLower.resize(argc);
 
     for (int i = 0; i < argc; i++)
     {
         args[i] = std::string(argv[i]);
+        argsLower[i] = args[i];
         std::transform(args[i].begin(), args[i].end(), args[i].begin(), ::toupper);  /* to upper */
     }
     
@@ -25,7 +27,7 @@ int main(int argc, char *argv[])
 
     /* Parse command */
 
-    tool::FPGA_TOOL_ParseCommand(args, &cmd);
+    tool::FPGA_TOOL_ParseCommand(args, argsLower, &cmd);
 
     if (cmd.operation == tool::_FPGA_OPERATION::OPERATION_HELP)
     {

@@ -168,7 +168,7 @@ void tool::FPGA_TOOL_PrintDeviceRegisters(const std::vector<std::string> &name, 
     printf(" | --------------------------------------------------------------------- |\n");
 }
 
-void tool::FPGA_TOOL_ParseCommand(const std::vector<std::string> &args, _FPGA_TOOL_CommandParseResult *result)
+void tool::FPGA_TOOL_ParseCommand(const std::vector<std::string> &args, const std::vector<std::string> &argsLower, _FPGA_TOOL_CommandParseResult *result)
 {
     bool offset_parseStatus = false, value_parseStatus = false, transfersize_parseStatus = false;
 
@@ -236,7 +236,7 @@ void tool::FPGA_TOOL_ParseCommand(const std::vector<std::string> &args, _FPGA_TO
             result->transferSizeIfFilesize = false;
         }
 
-        result->file = args[10];
+        result->file = argsLower[10];
 
         if (!offset_parseStatus || !transfersize_parseStatus) result->operation = _FPGA_OPERATION::OPERATION_ERR;
     }

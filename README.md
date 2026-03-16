@@ -87,11 +87,11 @@ sudo sh ./build.sh help
         ├── libfftw3_threads.so.3
         └── libfftw3_threads.so.3.6.9
 
-上述文件目录可以通过 `make_run_dir.sh` 创建:  
+上述文件目录可以通过 `create_run_dir.sh` 创建:  
 ```bash
-sudo sh ./make_run_dir.sh
+sudo sh ./create_run_dir.sh
 ```
-运行脚本 `make_run_dir.sh` 后, 目录 `run_dir` 将会自动在项目根目录生成.  
+运行脚本 `create_run_dir.sh` 后, 目录 `run_dir` 将会自动在项目根目录生成.  
 
 ### Step 2: 配置启动脚本文件
 
@@ -126,7 +126,7 @@ sh ./run_server.sh
 ```
 注: 脚本文件 `run_server.sh` 的执行必须在 `root` 下.
 
-## Usage
+## 其他信息
 
 ### 相关配置文件
 
@@ -142,13 +142,15 @@ sh ./run_server.sh
 `fir_config.json` 用于配置 `FIR` 滤波器模块参数.  
 `server_config.json` 用于配置服务器信息, 包括服务器端口号, 命令流数据头数据尾等.  
 
-## FPGA 读写测试工具 `FPGA-Tool`  
+### FPGA 读写测试工具 `FPGA-Tool`  
 
-为了方便调试, 设计了 `FPGA` 调试工具, 可以通过终端手动控制 `FPGA`.  
+为了方便调试, 设计了 `FPGA` 调试工具, 可以通过终端控制 `FPGA` 中的寄存器.  
+为了正确使用 `FPGA-Tool` 请先使用脚本 `load_xdma_driver.sh` 挂载 `xdma` 驱动, 挂载之前请检查脚本同级目录下是否有驱动文件 `xdma.ko`.  
   
+[[ 查看 `load_xdma_driver.sh` ]](./load_xdma_driver.sh)  
 [[ `FPGA-Tool`使用手册 ]](./docs/ug-fpga-tool.md)  
 
-## 网络通信协议
+### 网络通信协议
 
 [网络通信协议V1.0](./docs/PROTOCOL.md)
 

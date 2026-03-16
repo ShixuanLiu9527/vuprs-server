@@ -2,10 +2,10 @@
 
 # ------------------------------------ Config files -------------------------
 
-FPGA_CONFIG="./fpga_config.json"
-SERVER_CONFIG="./server_config.json"
-ARRAY_CONFIG="./array_config.json"
-FIR_CONFIG="./fir_config.json"
+FPGA_CONFIG="./configs/fpga_config.json"
+SERVER_CONFIG="./configs/server_config.json"
+ARRAY_CONFIG="./configs/array_config.json"
+FIR_CONFIG="./configs/fir_config.json"
 
 # --------------------------- Security Check --------------------------------
 

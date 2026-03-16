@@ -18,16 +18,6 @@ static void ParseConfigFIlesFromARGV(const std::vector<std::string> &args, vuprs
     configs->firFilterBankConfigJsonFile = args[8];
 }
 
-static std::condition_variable system_cv;
-static std::mutex system_mut;
-static std::atomic<bool> g_stop = false;
-
-static void SystemSignalHandler(int) 
-{
-    g_stop = true;
-    system_cv.notify_one();
-}
-
 /**
  * @note Command (argc = 9): server --server-config {JSON} --fpga-config {JSON} --array-config {JSON} --fir-config {JSON}
  */
@@ -46,11 +36,6 @@ int main(int argc, char *argv[])
     vuprs::SystemConfigFiles configs;
     ParseConfigFIlesFromARGV(args, &configs);
 
-    /* Set signal */
-
-    signal(SIGINT, SystemSignalHandler);  /* enable Ctrl+C interrupt */
-    signal(SIGTERM, SystemSignalHandler);  /* enable kill */
-
     /* Start server */
 
     vuprs::LinuxServer server;
@@ -64,10 +49,8 @@ int main(int argc, char *argv[])
 
     server.Run();  /* Start */
 
-    {
-        std::unique_lock<std::mutex> lock(system_mut);  /* LOCK */
-        system_cv.wait(lock, []{return g_stop.load();});
-    }
+    int val;
+    std::cin >> val;
 
     server.Stop();
 

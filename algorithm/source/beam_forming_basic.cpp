@@ -20,7 +20,17 @@ void vuprs::BeamFormingElement::DoFFT()
         throw std::runtime_error("Signal is empty.");
     }
     
-    vuprs::FFT(this->elementSignalTimeDomain, &this->elementSignalFrequencyDomain_std);
+    /* Add window */
+
+    Eigen::Matrix<Eigen::dcomplex, -1, 1> windowedSignal;
+    std::vector<std::complex<double>> windowedSignal_std;
+    vuprs::stdVector2eigenVector<Eigen::dcomplex>(this->elementSignalTimeDomain, &windowedSignal);
+    vuprs::AddWindow<Eigen::dcomplex>(&windowedSignal, vuprs::WindowType::SIG_WINDOW__HAMMING);
+    vuprs::eigenVector2stdVector<std::complex<double>>(windowedSignal, &windowedSignal_std);
+
+    /* FFT */
+
+    vuprs::FFT(windowedSignal_std, &this->elementSignalFrequencyDomain_std);
     vuprs::CutTheFirstHalf(&this->elementSignalFrequencyDomain_std);
     vuprs::stdVector2eigenVector<std::complex<double>>(this->elementSignalFrequencyDomain_std, &this->elementSignalFrequencyDomain_eigen);
 }

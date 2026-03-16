@@ -142,7 +142,7 @@ namespace vuprs
              * 
              * @param fpgaConfigJson FPGA config JSON file.
              * @param bfArrayConfigJson Beam forming array config JSON file.
-             * @param firConfigJon FIR filter config JSON file.
+             * @param firConfigJson FIR filter config JSON file.
              */
             bool InitCollaborationBeamfomer(const std::string &fpgaConfigJson, const std::string &bfArrayConfigJson, const std::string &firConfigJon);
 

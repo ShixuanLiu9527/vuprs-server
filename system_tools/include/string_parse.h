@@ -67,18 +67,7 @@ namespace vuprs
         }
     }
 
-    void __JsonParseString(std::string *target, const nlohmann::json &json, const std::string &item, bool required = true)
-    {
-        if (target == nullptr) throw std::runtime_error("Target cannot be NULL.");
-        if (json.contains(item))
-        {
-            *target = json[item].get<std::string>();
-        }
-        else if (required)
-        {
-            throw std::runtime_error("Item: " + item + " not found.");
-        }
-    }
+    void __JsonParseString(std::string *target, const nlohmann::json &json, const std::string &item, bool required = true);
 } 
 
 #endif

@@ -125,7 +125,7 @@ namespace tool
     void FPGA_TOOL_PrintValue(uint32_t offset, uint32_t val);
     void FPGA_TOOL_PrintDeviceRegisters(const std::vector<std::string> &name, const std::vector<uint32_t> &offset, const std::vector<uint32_t> &val);
 
-    void FPGA_TOOL_ParseCommand(const std::vector<std::string> &args, _FPGA_TOOL_CommandParseResult *result);
+    void FPGA_TOOL_ParseCommand(const std::vector<std::string> &args, const std::vector<std::string> &argsLower, _FPGA_TOOL_CommandParseResult *result);
     void FPGA_TOOL_RestoreCommand(std::vector<std::string> *args);
 }
 

@@ -169,18 +169,42 @@ namespace vuprs
     {
         SIG_WINDOW__HAMMING,
         SIG_WINDOW__HANN,
-        SIG_WINDOW__BLACKMAN,
-        SIG_WINDOW__RECTANGULAR
+        SIG_WINDOW__BLACKMAN
     };
+
+    Eigen::Matrix<double, -1, 1> GetWindow(vuprs::WindowType type, int signalLength);
 
     /**
      * @brief Add window for signal.
      * 
      * @param signal the given signal.
      */
-    void AddWindow(Eigen::Matrix<double, -1, 1> *signal, vuprs::WindowType type = vuprs::WindowType::SIG_WINDOW__HAMMING);
+    template <typename T>
+    void AddWindow(Eigen::Matrix<T, -1, 1> *signal, vuprs::WindowType type = vuprs::WindowType::SIG_WINDOW__HAMMING)
+    {
+        if (signal == nullptr || signal->size() == 0)
+        {
+            return;
+        }
+        *signal = signal->cwiseProduct(vuprs::GetWindow(type, signal->rows()));
+    }
 
-    Eigen::Matrix<double, -1, 1> GetWindow(vuprs::WindowType type = vuprs::WindowType::SIG_WINDOW__HAMMING, int signalLength);
+    /**
+     * @brief Add window for signal.
+     * 
+     * @note T: double, std::complex<double>
+     * 
+     * @param signal the given signal.
+     */
+    template <typename T>
+    Eigen::Matrix<T, -1, 1> AddWindow(const Eigen::Matrix<T, -1, 1> &signal, vuprs::WindowType type = vuprs::WindowType::SIG_WINDOW__HAMMING)
+    {
+        if (signal.size() == 0)
+        {
+            throw std::runtime_error("Empty signal for window.");
+        }
+        return signal.cwiseProduct(vuprs::GetWindow(type, signal.rows()));
+    }
 }
 
 #endif

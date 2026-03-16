@@ -286,12 +286,3 @@ Eigen::Matrix<double, -1, 1> vuprs::GetWindow(vuprs::WindowType type, int signal
     }
     return w;
 }
-
-void vuprs::AddWindow(Eigen::Matrix<double, -1, 1> *signal, vuprs::WindowType type)
-{
-    if (signal == nullptr || signal->size() == 0) 
-    {
-        return;
-    }
-    *signal = signal->cwiseProduct(vuprs::GetWindow(type, signal->rows()));
-}
