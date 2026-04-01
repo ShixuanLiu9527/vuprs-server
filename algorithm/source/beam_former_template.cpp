@@ -187,8 +187,12 @@ void vuprs::WidebandBeamformerTemplate::ResetCovarianceMatrices()
     this->firstSnapshot = true;
     this->is_signalEmpty = true;
     this->is_covMatrixEmpty = true;
+
     this->mean_covMatrix.clear();
+    this->mean_covMatrix.shrink_to_fit();
+
     this->estimate_covMatrix.clear();
+    this->estimate_covMatrix.shrink_to_fit();
 }
 
 void vuprs::WidebandBeamformerTemplate::GetWeightVectorValues(Eigen::Matrix<Eigen::dcomplex, -1, -1> *dst) const
@@ -207,7 +211,7 @@ void vuprs::WidebandBeamformerTemplate::GetFIRExpectedFrequencyResponse(Eigen::M
         throw std::runtime_error("in [WidebandBeamformerTemplate::GetFIRExpectedFrequencyResponse] No signal input.");
     }
     
-    if (!considerPredelay) 
+    if (!considerPredelay)
     {
         *dst = this->resultWeightVectors;
         return;

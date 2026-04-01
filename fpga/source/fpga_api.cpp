@@ -84,7 +84,7 @@ bool vuprs::FPGA_API__CBUF__ReadCircularBuffer(vuprs::FPGAController *controller
 
     /* STEP 2: Freeze */
 
-    operateStatus &= controller->dev__Circular_Buffer.WriteSingleRegister(vuprs::Circular_Buffer__Registers::CBUF_FREEZE, 0x00000001);
+    operateStatus &= controller->dev__Circular_Buffer.WriteSingleRegisterBIT(vuprs::Circular_Buffer__Registers::CBUF_FREEZE, 0, true);
 
     /* STEP 3: Wait for freezed */
 
@@ -105,7 +105,11 @@ bool vuprs::FPGA_API__CBUF__ReadCircularBuffer(vuprs::FPGAController *controller
     /* STEP 4: Read current BRAM pointer & convert */
 
     operateStatus &= controller->dev__Circular_Buffer.ReadSingleRegister(vuprs::Circular_Buffer__Registers::CBUF_CBP, &CBF);
-    operateStatus &= vuprs::FPGACircularBuffer2Frames(&buffer, signal, fs, voltageScale, CBF);
+
+    uint32_t pointPos = (CBF + sizeof(uint32_t)) / (sizeof(uint32_t) * ADC_FRAME_WORD_SIZE) - 1;  /* rotate points = (CBF + 4) / 40 - 1 */
+    if (pointPos < 0) pointPos = 0;
+
+    operateStatus &= vuprs::FPGACircularBuffer2Frames(&buffer, signal, fs, voltageScale, pointPos);
 
     /* STEP 5: Reset */
 
@@ -242,8 +246,6 @@ bool vuprs::FPGA_API__FIR__SetCoefficients(vuprs::FPGAController *controller,
     vuprs::AlignedBufferDMA buffer;
 
     /* Clear buffer */
-
-    buffer.release();
 
     std::vector<uint32_t> coefficientsToWrite, oneBankCoefficients;
     uint32_t totalCoefficientsCount = 0;

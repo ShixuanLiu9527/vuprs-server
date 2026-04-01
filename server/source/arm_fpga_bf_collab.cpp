@@ -8,7 +8,7 @@ void vuprs::Set_ARM_FPGA_BF_Config_ToDefault(vuprs::ARM_FPGA_BF_Config *config)
     config->bf_waveVelocity = 346.0;
     config->bf_freq__lower = 100.0;  /* lower boundary of beam former work frequency (unit: Hz) */
     config->bf_freq__upper = 5000.0;  /* upper boundary of beam former work frequency (unit: Hz) */
-    config->bf_cov_snapshotsWindowSize = 100;  /* Snapshots window size (to fit covariance matrix) */
+    config->bf_cov_snapshotsWindowSize = 50;  /* Snapshots window size (to fit covariance matrix) */
     config->bf_cov_freqAverageIndex = 0.8;  /* frequency average index (to fit covariance matrix) */
     config->dma__bufferSize = 32768;  /* AXI DMA descriptor buffer size */
     config->dma__bufferCount = 10;  /* AXI DMA descriptor buffer count */
@@ -81,7 +81,7 @@ bool vuprs::ARM_FPGA_CollaborationBeamfomer::ResetHardwareBeamformer()
 
     {
         std::unique_lock<std::mutex> lock(this->mut_alg);
-        this->bf_dcrcb.ResetAll();
+        this->bf_dcrcb.ResetCovarianceMatrices();
     }
 
     this->system_run = false;

@@ -85,7 +85,7 @@ bool vuprs::FIRCalculator::SolveCoeffUseExpectedFrequencyResponse(const Eigen::M
 
     W_vec.resize(N_2_plus_1, 1);   /* length = N / 2 + 1 */
     W_vec.setOnes();
-
+    
     W_vec *= 0.01;
     
     for (int i = 0; i < N_2_plus_1; i++)  /* for positive frequency */

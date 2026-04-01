@@ -16,6 +16,13 @@ vuprs::Beamformer_DCRCB::~Beamformer_DCRCB()
 
 void vuprs::Beamformer_DCRCB::CalculateBeamformingForOneFreq(int freqIndex)
 {
+    if (freqIndex == 0)
+    {
+        std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
+        this->resultWeightVectors.col(freqIndex) *= 0;
+        return;
+    }
+
     Eigen::Matrix<Eigen::dcomplex, -1, 1> ps;  /* ps */
     Eigen::Matrix<Eigen::dcomplex, -1, -1> covMatrix;  /* cov matrix */
     double signalFreq;
@@ -121,6 +128,11 @@ vuprs::Beamformer_CBF::~Beamformer_CBF()
 void vuprs::Beamformer_CBF::CalculateBeamformingForOneFreq(int freqIndex)
 {
     std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
+    if (freqIndex == 0)
+    {
+        this->resultWeightVectors.col(freqIndex) *= 0;
+        return;
+    }
     Eigen::Matrix<Eigen::dcomplex, -1, 1> ps = this->steeringVectors.col(freqIndex);  /* ps */
     double M = this->array.elementArray.size();  /* M */
     this->resultWeightVectors.col(freqIndex) = ps / M;

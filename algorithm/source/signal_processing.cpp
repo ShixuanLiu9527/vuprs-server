@@ -174,46 +174,44 @@ void vuprs::CompleteConjugateSymmetric(std::vector<std::complex<double>> *inputD
     /* insert */
 
     inputData->insert(inputData->end(), backHalf.begin(), backHalf.end());
+
+    (*inputData)[originSize - 1].imag(0.0);
+    (*inputData)[0].imag(0.0);
 }
 
 void vuprs::CompleteConjugateSymmetric(Eigen::Matrix<Eigen::dcomplex, -1, 1> *inputData)
 {
-    int halfSize = inputData->rows();
-    
+    int halfSize = inputData->rows();  /* N / 2 + 1 */ 
     if (halfSize <= 2) return;
     
     int fullSize = 2 * (halfSize - 1);
-    int backHalfSize = halfSize - 2;
-    
-    Eigen::Matrix<Eigen::dcomplex, -1, 1> negativeFreq(backHalfSize);
-
-    for (int i = 0; i < backHalfSize; i++)
-    {
-        negativeFreq(i) = std::conj((*inputData)(halfSize - 2 - i));
-    }
     
     inputData->conservativeResize(fullSize);
-    inputData->tail(backHalfSize) = negativeFreq;
+    
+    for (int i = 1; i < halfSize - 1; i++)
+    {
+        (*inputData)(fullSize - i) = std::conj((*inputData)(i));
+    }
+
+    (*inputData)(halfSize - 1).imag(0.0);  /* x(N/2).imag = 0 */
+    (*inputData)(0).imag(0.0);  /* x(0).imag = 0 */
 }
 
 void vuprs::CompleteSymmetric(Eigen::Matrix<double, -1, 1> *inputData)
 {
-    int halfSize = inputData->rows();
-    
+    int halfSize = inputData->rows();  /* N / 2 + 1 */
     if (halfSize <= 2) return;
     
     int fullSize = 2 * (halfSize - 1);
-    int backHalfSize = halfSize - 2;
     
-    Eigen::Matrix<double, -1, 1> negativeFreq(backHalfSize);
-
-    for (int i = 0; i < backHalfSize; i++)
-    {
-        negativeFreq(i) = (*inputData)(halfSize - 2 - i);
-    }
+    Eigen::Matrix<double, -1, 1> original = *inputData;
     
     inputData->conservativeResize(fullSize);
-    inputData->tail(backHalfSize) = negativeFreq;
+
+    for (int i = 1; i < halfSize - 1; i++)
+    {
+        (*inputData)(fullSize - i) = original(i);
+    }
 }
 
 Eigen::Matrix<Eigen::dcomplex, -1, 1> vuprs::GenerateComplexFrequencyList(int dataNumber, double samplingFrequency)

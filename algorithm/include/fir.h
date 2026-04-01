@@ -76,6 +76,8 @@ namespace vuprs
              * @brief Get maximum absolute coefficient of FIR filter bank.
              */
             double MaxAbsoluteFIRCoefficient() const;
+
+            EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };
 }
 

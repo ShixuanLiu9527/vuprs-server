@@ -16,6 +16,8 @@ namespace vuprs
             Beamformer_DCRCB();
 
             ~Beamformer_DCRCB();
+
+            EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };
 
     class Beamformer_CBF: public vuprs::WidebandBeamformerTemplate
@@ -29,6 +31,8 @@ namespace vuprs
             Beamformer_CBF();
 
             ~Beamformer_CBF();
+
+            EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };
 }
 

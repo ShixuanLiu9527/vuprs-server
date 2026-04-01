@@ -247,18 +247,11 @@ void vuprs::BeamFormingArray::GetArraySignalMatrix(Eigen::Matrix<Eigen::dcomplex
     if (frequencyDomain) signalMatrix->resize(this->elementArray.size(), dataSize / 2 + 1);  /* M x (N/2 + 1) */
     else signalMatrix->resize(elementSize, dataSize);  /* M x N */
 
-    std::vector<std::future<void>> futures;
-    futures.reserve(elementSize);
-
     if (frequencyDomain)
     {
         for (uint64_t i = 0; i < elementSize; i++)
         {
-            futures.emplace_back(this->threadPool->enqueue([this, i](){this->elementArray[i].DoFFT();}));
-        }
-        for (auto &f : futures)  /* wait complete */
-        {
-            f.get();
+            this->elementArray[i].DoFFT();
         }
         for (uint64_t i = 0; i < elementSize; i++)
         {

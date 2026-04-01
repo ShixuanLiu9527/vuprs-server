@@ -214,6 +214,8 @@ namespace vuprs
              * @brief Beam forming element count.
              */
             int ElementCount() const;
+
+            EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };
 }
 

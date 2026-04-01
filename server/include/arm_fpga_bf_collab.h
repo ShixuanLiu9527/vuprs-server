@@ -177,6 +177,8 @@ namespace vuprs
              * @brief Indicate config done.
              */
             bool ConfigDone() const;
+
+            EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };
 }
 

@@ -585,7 +585,7 @@ namespace vuprs
                 }
                 while (r_val != waitForValue);
 
-                return operateStatus & (waitTime <= timeout_us);
+                return operateStatus & (r_val == waitForValue);
             }
 
             /**
