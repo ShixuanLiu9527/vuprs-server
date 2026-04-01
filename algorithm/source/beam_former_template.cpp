@@ -57,7 +57,7 @@ int vuprs::WidebandBeamformerTemplate::ElementCount() const
 {
     if (!this->ConfigDone())
     {
-        throw std::runtime_error("Config not complete.");
+        throw std::runtime_error("in [WidebandBeamformerTemplate::ElementCount] Config not complete.");
     }
     return this->array.elementArray.size();
 }
@@ -66,7 +66,7 @@ void vuprs::WidebandBeamformerTemplate::InputSignal(const vuprs::SignalData &sig
 {
     if (!this->ConfigDone())
     {
-        throw std::runtime_error("Config not complete.");
+        throw std::runtime_error("in [WidebandBeamformerTemplate::InputSignal] Config not complete.");
     }
 
     this->array.InputElementSignal(signal);
@@ -88,7 +88,7 @@ void vuprs::WidebandBeamformerTemplate::SetTargetDirection(double alt, double az
 {
     if (!this->ConfigDone())
     {
-        throw std::runtime_error("Config not complete.");
+        throw std::runtime_error("in [WidebandBeamformerTemplate::SetTargetDirection] Config not complete.");
     }
     this->array.UpdateTimeDelay(alt, az, waveVelocity);  /* Update time delay */
     if (this->fs > 0.0 && this->signalPoints > 0)
@@ -101,11 +101,11 @@ void vuprs::WidebandBeamformerTemplate::UpdateCovarianceMatrix()
 {
     if (!this->ConfigDone())
     {
-        throw std::runtime_error("Config not complete.");
+        throw std::runtime_error("in [WidebandBeamformerTemplate::UpdateCovarianceMatrix] Config not complete.");
     }
     if (this->is_signalEmpty)
     {
-        throw std::runtime_error("Signal is empty.");
+        throw std::runtime_error("in [WidebandBeamformerTemplate::UpdateCovarianceMatrix] Signal is empty.");
     }
 
     this->array.GetArraySignalMatrix(&this->snap_signalMatrix_freqDomain, nullptr, true);  /* Get array signal */
@@ -118,7 +118,7 @@ void vuprs::WidebandBeamformerTemplate::UpdateCovarianceMatrix()
     }
     else if (this->estimate_covMatrix.size() != dataPoints)
     {
-        throw std::runtime_error("Data points in snapshot != latest");
+        throw std::runtime_error("in [WidebandBeamformerTemplate::UpdateCovarianceMatrix] Data points in snapshot != latest");
     }
 
     if (this->mean_covMatrix.size() <= 0)
@@ -127,7 +127,7 @@ void vuprs::WidebandBeamformerTemplate::UpdateCovarianceMatrix()
     }
     else if (this->mean_covMatrix.size() != dataPoints)
     {
-        throw std::runtime_error("Data points in snapshot != latest");
+        throw std::runtime_error("in [WidebandBeamformerTemplate::UpdateCovarianceMatrix] Data points in snapshot != latest");
     }
 
     Eigen::Matrix<Eigen::dcomplex, -1, 1> snapshotFreqSignal;
@@ -200,11 +200,11 @@ void vuprs::WidebandBeamformerTemplate::GetFIRExpectedFrequencyResponse(Eigen::M
 {
     if (dst == nullptr)
     {
-        throw std::runtime_error("Destination cannot be NULL.");
+        throw std::runtime_error("in [WidebandBeamformerTemplate::GetFIRExpectedFrequencyResponse] Destination cannot be NULL.");
     }
     if (this->is_signalEmpty)
     {
-        throw std::runtime_error("No signal input.");
+        throw std::runtime_error("in [WidebandBeamformerTemplate::GetFIRExpectedFrequencyResponse] No signal input.");
     }
     
     if (!considerPredelay) 
@@ -243,11 +243,11 @@ void vuprs::WidebandBeamformerTemplate::UpdateElementPredelay_externalFS(
 {
     if (!this->ConfigDone())
     {
-        throw std::runtime_error("No signal input.");
+        throw std::runtime_error("in [WidebandBeamformerTemplate::UpdateElementPredelay_externalFS] No signal input.");
     }
     if (elementPredelayTime == nullptr || elementPredelayCount == nullptr || channelName == nullptr)
     {
-        throw std::runtime_error("Predelay pointer is NULL.");
+        throw std::runtime_error("in [WidebandBeamformerTemplate::UpdateElementPredelay_externalFS] Predelay pointer is NULL.");
     }
 
     /* Calculate predelay */
@@ -300,7 +300,7 @@ void vuprs::WidebandBeamformerTemplate::UpdateAndGetElementPredelay(
 {
     if (!this->ConfigDone())
     {
-        throw std::runtime_error("Signal is empty.");
+        throw std::runtime_error("in [vuprs::WidebandBeamformerTemplate::UpdateAndGetElementPredelay] Signal is empty.");
     }
     this->UpdateElementPredelay_externalFS(firLength, this->fs, includeFIRGroupDelay, 
         elementPredelayCount, elementPredelayTime, channelName);
@@ -320,7 +320,7 @@ void vuprs::WidebandBeamformerTemplate::CalculateBeamforming()
 {
     if (!this->CalculateEnable())
     {
-        throw std::runtime_error("Cannot calculate beam forming at that time.");
+        throw std::runtime_error("in [WidebandBeamformerTemplate::CalculateBeamforming] Cannot calculate beam forming at that time.");
     }
 
     int numFreqs = this->estimate_covMatrix.size();

@@ -22,7 +22,7 @@ bool vuprs::LinuxSession::SendMessage(const std::string &message)
     }
     if (manager == nullptr)
     {
-        throw std::runtime_error("IO Manager is NULL.");
+        throw std::runtime_error("in [LinuxSession::SendMessage] IO Manager is NULL.");
     }
     return manager->SendMessage(message);
 }
@@ -36,7 +36,7 @@ void vuprs::LinuxSession::ReceiveMessage(const std::string &tailer, vuprs::Socke
     }
     if (manager == nullptr)
     {
-        throw std::runtime_error("IO Manager is NULL.");
+        throw std::runtime_error("in [LinuxSession::ReceiveMessage] IO Manager is NULL.");
     }
     manager->ReceiveMessage(tailer, data);
 }
@@ -50,7 +50,7 @@ std::string vuprs::LinuxSession::ClientInformation() const
     }
     if (manager == nullptr)
     {
-        throw std::runtime_error("IO Manager is NULL.");
+        throw std::runtime_error("in [LinuxSession::ClientInformation] IO Manager is NULL.");
     }
     return manager->ClientInformation();
 }
@@ -74,7 +74,7 @@ bool vuprs::LinuxSession::BindIOManager(std::shared_ptr<vuprs::SocketIOManager> 
 {
     if (ioManager == nullptr)
     {
-        throw std::runtime_error("Socket IO Manager is NULL.");
+        throw std::runtime_error("in [LinuxSession::BindIOManager] Socket IO Manager is NULL.");
     }
     this->UnbindIOManager();
     {

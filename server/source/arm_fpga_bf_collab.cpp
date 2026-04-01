@@ -59,7 +59,7 @@ bool vuprs::ARM_FPGA_CollaborationBeamfomer::InitCollaborationBeamfomer(const st
     }
     catch(const std::exception& e)
     {
-        throw std::runtime_error("Error occurred in initialization.");
+        throw std::runtime_error("in [ARM_FPGA_CollaborationBeamfomer::InitCollaborationBeamfomer] Error occurred in initialization.");
     }
 
     this->configdone = operateStatus;
@@ -93,7 +93,7 @@ bool vuprs::ARM_FPGA_CollaborationBeamfomer::StartBeamformerWithConfiguration(co
 {
     if (!this->ConfigDone())
     {
-        throw std::runtime_error("Config not complete.");
+        throw std::runtime_error("in [ARM_FPGA_CollaborationBeamfomer::StartBeamformerWithConfiguration] Config not complete.");
     }
 
     Eigen::Matrix<Eigen::dcomplex, -1, -1> firExpectedFrequencyResponse;  /* Expected frequency response of FIR filter bank */
@@ -184,7 +184,7 @@ bool vuprs::ARM_FPGA_CollaborationBeamfomer::StartBeamformerWithConfiguration(co
 
     if (!retval)
     {
-        throw std::runtime_error("Cannot start beam former with config");
+        throw std::runtime_error("in [ARM_FPGA_CollaborationBeamfomer::StartBeamformerWithConfiguration] Cannot start beam former with config");
     }
     
     return retval;
@@ -276,7 +276,7 @@ void vuprs::ARM_FPGA_CollaborationBeamfomer::THREAD__ListenDMAInterrupt()
         }
         catch(const std::exception& e)
         {
-            std::cout << "Error: " << e.what() << std::endl;
+            std::cout << "Error in [ARM_FPGA_CollaborationBeamfomer::THREAD__ListenDMAInterrupt] Error: " << e.what() << std::endl;
         }
         if (r_val == 0x01)
         {
@@ -348,7 +348,7 @@ void vuprs::ARM_FPGA_CollaborationBeamfomer::THREAD__ReadResult()
         }
         catch(const std::exception& e)
         {
-            std::cout << "Error: " << e.what() << std::endl;
+            std::cout << "Error in [ARM_FPGA_CollaborationBeamfomer::THREAD__ReadResult] " << e.what() << std::endl;
         }
     }
 }
@@ -368,7 +368,7 @@ void vuprs::ARM_FPGA_CollaborationBeamfomer::THREAD__ReadCircularBuffer()
         }
         catch(const std::exception& e)
         {
-            std::cout << "Error: " << e.what() << std::endl;
+            std::cout << "Error in [ARM_FPGA_CollaborationBeamfomer::THREAD__ReadCircularBuffer] " << e.what() << std::endl;
         }
 
         if (r_val == 0x01)
@@ -391,12 +391,12 @@ void vuprs::ARM_FPGA_CollaborationBeamfomer::THREAD__ReadCircularBuffer()
                 }
                 else
                 {
-                    throw std::runtime_error("Cannot read circular buffer.");
+                    throw std::runtime_error("in [ARM_FPGA_CollaborationBeamfomer::THREAD__ReadCircularBuffer] Cannot read circular buffer.");
                 }
             }
             catch(const std::exception& e)
             {
-                std::cout << "Error: " << e.what() << std::endl;
+                std::cout << "Error in [ARM_FPGA_CollaborationBeamfomer::THREAD__ReadCircularBuffer]" << e.what() << std::endl;
             }
         }
 
@@ -448,7 +448,7 @@ void vuprs::ARM_FPGA_CollaborationBeamfomer::THREAD__AlgorithmCalculation()
 
             if (!this->bf_dcrcb.CalculateEnable())
             {
-                throw std::runtime_error("Beam forming algorithm cannot calculate.");
+                throw std::runtime_error("in [ARM_FPGA_CollaborationBeamfomer::THREAD__AlgorithmCalculation] Beam forming algorithm cannot calculate.");
             }
 
             this->bf_dcrcb.CalculateBeamforming();  /* Calculate beam forming */
@@ -470,12 +470,12 @@ void vuprs::ARM_FPGA_CollaborationBeamfomer::THREAD__AlgorithmCalculation()
                 &firCoefficients, this->fir.MaxAbsoluteFIRCoefficient());
             if (!fpgaOperationStatus)
             {
-                throw std::runtime_error("FPGA operation failed.");
+                throw std::runtime_error("in [ARM_FPGA_CollaborationBeamfomer::THREAD__AlgorithmCalculation] FPGA operation failed.");
             }
         }
         catch(const std::exception& e)
         {
-            std::cout << "Error: " << e.what() << std::endl;
+            std::cout << "Error in [ARM_FPGA_CollaborationBeamfomer::THREAD__AlgorithmCalculation] " << e.what() << std::endl;
         }
     }
 }

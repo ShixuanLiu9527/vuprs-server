@@ -16,9 +16,9 @@
 
 #define __LINUX_DMA_MAX_TRANSFER_BYTES__          0x7ffff000  /* Maximum transfer size in Linux-32bit & Linux-64bit */
 
-#define FPGA_REG_BIT(REG, BIT) ((REG) & (uint32_t)((uint32_t)0x00000001 << (BIT)))
-#define FPGA_CLEAR_REG_BIT(REG, BIT) (uint32_t)((REG) & ~(uint32_t)((uint32_t)1U << (BIT)))
-#define FPGA_SET_REG_BIT(REG, BIT) (uint32_t)((REG) | (uint32_t)((uint32_t)1U << (BIT)))
+#define FPGA_REG_BIT(REG, BIT) (((REG) >> (BIT)) & 1U)
+#define FPGA_CLEAR_REG_BIT(REG, BIT) ((uint32_t)((REG) & ~(1U << (BIT))))
+#define FPGA_SET_REG_BIT(REG, BIT) ((uint32_t)((REG) | (1U << (BIT))))
 
 namespace vuprs
 {
@@ -84,7 +84,7 @@ namespace vuprs
 
                 if (!this->isIOManagerBind) 
                 {
-                    throw std::runtime_error("FPGA file manager is NULL.");
+                    throw std::runtime_error("in [FPGADeviceTemplate::RegisterIO] FPGA file manager is NULL.");
                 }
 
                 std::shared_ptr<vuprs::FPGA_IOManagerForDevice> manager;
@@ -107,15 +107,15 @@ namespace vuprs
 
                 if (!this->isIOManagerBind) 
                 {
-                    throw std::runtime_error("FPGA file manager is NULL."); 
+                    throw std::runtime_error("in [FPGADeviceTemplate::RegisterIO] FPGA file manager is NULL."); 
                 }
                 if (registerNumber <= 0)
                 {
-                    throw std::runtime_error("No registers read or written."); 
+                    throw std::runtime_error("in [FPGADeviceTemplate::RegisterIO] No registers read or written."); 
                 }
                 if (!isRead && ioValue->size() != registerNumber) 
                 {
-                    throw std::runtime_error("mulReadValue.size() != register count to read.");
+                    throw std::runtime_error("in [FPGADeviceTemplate::RegisterIO] mulReadValue.size() != register count to read.");
                 }
 
                 std::shared_ptr<vuprs::FPGA_IOManagerForDevice> manager;
@@ -145,7 +145,7 @@ namespace vuprs
             {
                 if (!this->isIOManagerBind_Interrupt) 
                 {
-                    throw std::runtime_error("FPGA event file manager is NULL.");
+                    throw std::runtime_error("in [FPGADeviceTemplate::EventIO] FPGA event file manager is NULL.");
                 }
 
                 std::shared_ptr<vuprs::FPGA_IOManagerForInterrput> manager;
@@ -198,7 +198,7 @@ namespace vuprs
 
                 if (!obj.contains("register-offset")) 
                 {
-                    throw std::runtime_error("register-offset not found.");
+                    throw std::runtime_error("in [FPGADeviceTemplate::LoadMainInfoFromJsonObj] register-offset not found.");
                 }
                 
                 /* Operation */
@@ -374,7 +374,7 @@ namespace vuprs
 
                 if (!this->configdone) 
                 {
-                    throw std::runtime_error("Config not complete.");
+                    throw std::runtime_error("in [FPGADeviceTemplate::GetRegisterAbsoluteAddress] Config not complete.");
                 }
 
                 /* Operation */
@@ -400,7 +400,7 @@ namespace vuprs
 
                 if (!registerFound) 
                 {
-                    throw std::runtime_error("Invalid register selection.");
+                    throw std::runtime_error("in [FPGADeviceTemplate::GetRegisterAbsoluteAddress] Invalid register selection.");
                 }
 
                 return registerOffset + this->barOffset;
@@ -434,7 +434,7 @@ namespace vuprs
             {
                 if (offset % sizeof(uint32_t) != 0)
                 {
-                    throw std::runtime_error("Offset must aligned to 4 bytes.");
+                    throw std::runtime_error("in [FPGADeviceTemplate::ReadSingleRegister] Offset must aligned to 4 bytes.");
                 }
                 uint32_t registerAddress = offset + this->barOffset;
                 return this->RegisterIO(registerAddress, readValue, true);
@@ -466,7 +466,7 @@ namespace vuprs
             {
                 if (offset % sizeof(uint32_t) != 0)
                 {
-                    throw std::runtime_error("Offset must aligned to 4 bytes.");
+                    throw std::runtime_error("in [FPGADeviceTemplate::WriteSingleRegister] Offset must aligned to 4 bytes.");
                 }
                 uint32_t registerAddress = offset + this->barOffset;
                 return this->RegisterIO(registerAddress, &writeValue, false);
@@ -500,7 +500,7 @@ namespace vuprs
             {
                 if (bit > 31)
                 {
-                    throw std::runtime_error("Invalid Bit position (valid <= 31).");
+                    throw std::runtime_error("in [FPGADeviceTemplate::ReadSingleRegisterBIT] Invalid Bit position (valid <= 31).");
                 }
 
                 bool operateStatus = true;
@@ -526,7 +526,7 @@ namespace vuprs
             {
                 if (bit > 31)
                 {
-                    throw std::runtime_error("Invalid Bit position (valid <= 31).");
+                    throw std::runtime_error("in [FPGADeviceTemplate::WriteSingleRegisterBIT] Invalid Bit position (valid <= 31).");
                 }
 
                 bool operateStatus = true;
@@ -563,7 +563,7 @@ namespace vuprs
             {
                 if (bit > 31)
                 {
-                    throw std::runtime_error("Invalid Bit position (valid <= 31).");
+                    throw std::runtime_error("in [FPGADeviceTemplate::WaitForRegisterBIT] Invalid Bit position (valid <= 31).");
                 }
 
                 uint32_t waitTime = 0;
@@ -607,7 +607,7 @@ namespace vuprs
             {
                 if (lower > 31 || upper > 31)
                 {
-                    throw std::runtime_error("Invalid Bit position (valid <= 31).");
+                    throw std::runtime_error("in [FPGADeviceTemplate::ReadSingleRegisterBITRegion] Invalid Bit position (valid <= 31).");
                 }
                 if (lower == upper)
                 {
@@ -647,7 +647,7 @@ namespace vuprs
             {
                 if (lower > 31 || upper > 31)
                 {
-                    throw std::runtime_error("Invalid Bit position (valid <= 31).");
+                    throw std::runtime_error("in [FPGADeviceTemplate::WriteSingleRegisterBITRegion] Invalid Bit position (valid <= 31).");
                 }
                 if (lower == upper)
                 {
@@ -789,15 +789,15 @@ namespace vuprs
 
                 if (!this->isIOManagerBind) 
                 {
-                    throw std::runtime_error("FPGA file manager is NULL.");
+                    throw std::runtime_error("in [FPGAMemoryTemplate::BufferIO] FPGA file manager is NULL.");
                 }
                 if (transferByteSize > __LINUX_DMA_MAX_TRANSFER_BYTES__) 
                 {
-                    throw std::runtime_error("Too big transfer size.");
+                    throw std::runtime_error("in [FPGAMemoryTemplate::BufferIO] Too big transfer size.");
                 }
                 if ((transferByteSize + offset) > static_cast<uint32_t>(this->maxCapacityKB * __KILOBYTES__ - 1))
                 {
-                    throw std::runtime_error("Invalid transfer size (valid: <= " + std::to_string(this->maxCapacityKB * __KILOBYTES__ - offset) + ")");
+                    throw std::runtime_error("in [FPGAMemoryTemplate::BufferIO] Invalid transfer size (valid: <= " + std::to_string(this->maxCapacityKB * __KILOBYTES__ - offset) + ")");
                 }
                 if (transferByteSize <= 0) 
                 {
@@ -805,7 +805,7 @@ namespace vuprs
                 }
                 if (buffer == nullptr) 
                 {
-                    throw std::runtime_error("*Buffer is nullptr.");
+                    throw std::runtime_error("in [FPGAMemoryTemplate::BufferIO] *Buffer is nullptr.");
                 }
 
                 /* Operation */
@@ -839,15 +839,15 @@ namespace vuprs
 
                 if (!this->isIOManagerBind) 
                 {
-                    throw std::runtime_error("FPGA file manager is NULL.");
+                    throw std::runtime_error("in [FPGAMemoryTemplate::WordIO] FPGA file manager is NULL.");
                 }
                 if (offset > static_cast<uint32_t>(this->maxCapacityKB * __KILOBYTES__ - 1)) 
                 {
-                    throw std::runtime_error("Invalid offset (valid: <= " + std::to_string(this->maxCapacityKB * __KILOBYTES__ - 1) + ")");
+                    throw std::runtime_error("in [FPGAMemoryTemplate::WordIO] Invalid offset (valid: <= " + std::to_string(this->maxCapacityKB * __KILOBYTES__ - 1) + ")");
                 }
                 if (ioValue == nullptr) 
                 {
-                    throw std::runtime_error("*readValue is nullptr.");
+                    throw std::runtime_error("in [FPGAMemoryTemplate::WordIO] *readValue is nullptr.");
                 }
 
                 /* Operation */

@@ -14,18 +14,18 @@ bool vuprs::SecantIteration1D(const vuprs::IterationConfig &config, double *resu
 {
     if (config.func == nullptr)
     {
-        throw std::runtime_error("Original function = NULL.");
+        throw std::runtime_error("in [SecantIteration1D] Original function = NULL.");
     }
     if (result == nullptr)
     {
-        throw std::runtime_error("result = NULL.");
+        throw std::runtime_error("in [SecantIteration1D] result = NULL.");
     }
     
     double f_lower = config.func(config.lowerRegion);
     double f_upper = config.func(config.upperRegion);
     if (f_lower * f_upper > 0.0)
     {
-        throw std::runtime_error("No zeros within the specified range.");
+        throw std::runtime_error("in [SecantIteration1D] No zeros within the specified range.");
     }
     
     double x0 = config.lowerRegion;
@@ -96,7 +96,7 @@ bool vuprs::NewtonIteration1D(const vuprs::IterationConfig &config, double *resu
 {
     if (config.func == nullptr)
     {
-        throw std::runtime_error("Original function = NULL.");
+        throw std::runtime_error("in [vuprs::NewtonIteration1D] Original function = NULL.");
     }
     if (config.func != nullptr && config.diff == nullptr)
     {
@@ -104,11 +104,11 @@ bool vuprs::NewtonIteration1D(const vuprs::IterationConfig &config, double *resu
     }
     if (result == nullptr)
     {
-        throw std::runtime_error("result = NULL.");
+        throw std::runtime_error("in [vuprs::NewtonIteration1D] result = NULL.");
     }
     if (config.func(config.lowerRegion) * config.func(config.upperRegion) > 0.0)
     {
-        throw std::runtime_error("No zeros within the specified range.");
+        throw std::runtime_error("in [vuprs::NewtonIteration1D] No zeros within the specified range.");
     }
 
     double x = 0.5 * (config.lowerRegion + config.upperRegion), xp1 = x;
@@ -157,7 +157,7 @@ bool vuprs::RobustNewtonIteration1D(const vuprs::IterationConfig &config, double
 {
     if (config.func == nullptr)
     {
-        throw std::runtime_error("Original function = NULL.");
+        throw std::runtime_error("in [vuprs::RobustNewtonIteration1D] Original function = NULL.");
     }
     if (config.func != nullptr && config.diff == nullptr)
     {
@@ -165,11 +165,11 @@ bool vuprs::RobustNewtonIteration1D(const vuprs::IterationConfig &config, double
     }
     if (result == nullptr)
     {
-        throw std::runtime_error("result = NULL.");
+        throw std::runtime_error("in [vuprs::RobustNewtonIteration1D] result = NULL.");
     }
     if (config.func(config.lowerRegion) * config.func(config.upperRegion) > 0.0)
     {
-        throw std::runtime_error("No zeros within the specified range.");
+        throw std::runtime_error("in [vuprs::RobustNewtonIteration1D] No zeros within the specified range.");
     }
 
     double x = 0.5 * (config.lowerRegion + config.upperRegion), xp1 = x, increase = 0.0;
@@ -229,11 +229,11 @@ bool vuprs::BisectionIteration1D(const vuprs::IterationConfig &config, double *r
 {
     if (config.func == nullptr)
     {
-        throw std::runtime_error("Original function = NULL.");
+        throw std::runtime_error("in [vuprs::BisectionIteration1D] Original function = NULL.");
     }
     if (result == nullptr)
     {
-        throw std::runtime_error("result = NULL.");
+        throw std::runtime_error("in [vuprs::BisectionIteration1D] result = NULL.");
     }
 
     double left = config.lowerRegion, right = config.upperRegion, mid = 0.5 * (left + right);
@@ -252,7 +252,7 @@ bool vuprs::BisectionIteration1D(const vuprs::IterationConfig &config, double *r
             *result = right;
             return true;
         }
-        throw std::runtime_error("No zeros within the specified range.");
+        throw std::runtime_error("in [vuprs::BisectionIteration1D] No zeros within the specified range.");
     }
 
     *result = mid;
@@ -305,12 +305,12 @@ void vuprs::EigenvalueDecomposition(
 {
     if (covMatrix.rows() != covMatrix.cols()) 
     {
-        throw std::invalid_argument("Covariance matrix must be square");
+        throw std::invalid_argument("in [vuprs::EigenvalueDecomposition] Covariance matrix must be square");
     }
     
     if (eigenvalues == nullptr || eigenvectors == nullptr) 
     {
-        throw std::invalid_argument("Output pointers cannot be null");
+        throw std::invalid_argument("in [vuprs::EigenvalueDecomposition] Output pointers cannot be null");
     }
     
     Eigen::MatrixXcd H = (covMatrix + covMatrix.adjoint()) / 2.0;
@@ -320,7 +320,7 @@ void vuprs::EigenvalueDecomposition(
     
     if (solver.info() != Eigen::Success) 
     {
-        throw std::runtime_error("Failed to solving eigenvalues.");
+        throw std::runtime_error("in [vuprs::EigenvalueDecomposition] Failed to solving eigenvalues.");
     }
     
     *eigenvalues = solver.eigenvalues().real();

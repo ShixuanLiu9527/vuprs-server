@@ -119,7 +119,7 @@ namespace vuprs
         
         if (coefficientSize == 0)
         {
-            throw std::runtime_error("Input FIR coefficient is empty.");
+            throw std::runtime_error("in [ScaledFIRCoefficient_DOUBLE_TO_Q31_UINT32] Input FIR coefficient is empty.");
         }
 
         output->resize(coefficientSize);
@@ -144,7 +144,7 @@ namespace vuprs
 
         if (coefficientSize == 0)
         {
-            throw std::runtime_error("Input FIR coefficient is empty.");
+            throw std::runtime_error("in [FIRCoefficient_DOUBLE_TO_Q31_UINT32] Input FIR coefficient is empty.");
         }
         output->resize(coefficientSize);
         for (uint64_t i = 0; i < coefficientSize; i++)

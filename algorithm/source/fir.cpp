@@ -26,7 +26,7 @@ bool vuprs::FIRCalculator::ConfigFIRFromJsonFile(const std::string &jsonFilename
     arrayConfigJsonFile.open(jsonFilename);
     if (!arrayConfigJsonFile.is_open())
     {
-        throw std::runtime_error("Cannot open file: " + jsonFilename);
+        throw std::runtime_error("in [FIRCalculator::ConfigFIRFromJsonFile] Cannot open file: " + jsonFilename);
     }
 
     nlohmann::json configJsonData;
@@ -37,7 +37,7 @@ bool vuprs::FIRCalculator::ConfigFIRFromJsonFile(const std::string &jsonFilename
     }
     catch(const std::exception& e)
     {
-        throw std::runtime_error("Failed to load array data from: " + jsonFilename);
+        throw std::runtime_error("in [FIRCalculator::ConfigFIRFromJsonFile] Failed to load array data from: " + jsonFilename);
     }
 
     vuprs::__JsonStringParseINT<uint32_t>(&this->firLength, configJsonData, "length", true);
@@ -50,7 +50,7 @@ void vuprs::FIRCalculator::SetFrequencyRange(double lower, double upper)
 {
     if (lower >= upper)
     {
-        throw std::runtime_error("Lower >= Upper.");
+        throw std::runtime_error("in [FIRCalculator::SetFrequencyRange] Lower >= Upper.");
     }
     this->freqRange_l = lower;
     this->freqRange_u = upper;
@@ -60,7 +60,7 @@ bool vuprs::FIRCalculator::SolveCoeffUseExpectedFrequencyResponse(const Eigen::M
 {
     if (!this->configdone)
     {
-        throw std::runtime_error("Config not complete.");
+        throw std::runtime_error("in [FIRCalculator::SolveCoeffUseExpectedFrequencyResponse] Config not complete.");
     }
 
     int M = response.rows();  /* M */
@@ -69,7 +69,7 @@ bool vuprs::FIRCalculator::SolveCoeffUseExpectedFrequencyResponse(const Eigen::M
     
     if (N_2_plus_1 < this->firLength)
     {
-        throw std::runtime_error("Too little response for solving.");
+        throw std::runtime_error("in [FIRCalculator::SolveCoeffUseExpectedFrequencyResponse] Too little response for solving.");
     }
 
     if (this->lastSignalPoints != N)
@@ -101,7 +101,7 @@ bool vuprs::FIRCalculator::SolveCoeffUseExpectedFrequencyResponse(const Eigen::M
 
     if (W_vec.rows() != N)
     {
-        throw std::runtime_error("Internal error.");
+        throw std::runtime_error("in [FIRCalculator::SolveCoeffUseExpectedFrequencyResponse] Internal error.");
     }
 
     Eigen::Matrix<Eigen::dcomplex, -1, -1> EH = this->matrixE.adjoint();
@@ -150,11 +150,11 @@ void vuprs::FIRCalculator::GetZeroFIRBankCoefficient(std::vector<std::vector<dou
 {
     if (!this->configdone)
     {
-        throw std::runtime_error("Config not complete.");
+        throw std::runtime_error("in [FIRCalculator::GetZeroFIRBankCoefficient] Config not complete.");
     }
     if (this->firLength == 0)
     {
-        throw std::runtime_error("FIR length = 0");
+        throw std::runtime_error("in [FIRCalculator::GetZeroFIRBankCoefficient] FIR length = 0");
     }
     dst->resize(channelNumber, std::vector<double>(this->firLength, 0.0));
 }

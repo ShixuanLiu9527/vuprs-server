@@ -139,7 +139,7 @@ bool vuprs::AlignedBuffer::to_file(const std::string &fileName, const uint64_t &
     }
     if (fileName.empty())
     {
-        throw std::runtime_error("Empty filename.");
+        throw std::runtime_error("in [AlignedBuffer::to_file] Empty filename.");
     }
 
     int file_fd = -1;
@@ -206,7 +206,7 @@ bool vuprs::AlignedBuffer::from_file(const std::string &fileName, const uint64_t
 {
     if (fileName.empty())
     {
-        throw std::runtime_error("Empty filename.");
+        throw std::runtime_error("in [AlignedBuffer::from_file] Empty filename.");
     }
     if (loadBytes == 0)
     {

@@ -199,7 +199,7 @@ namespace vuprs
             {
                 if (elementCounts * sizeof(T) > this->byteSize)
                 {
-                    throw std::out_of_range("Requested size exceeds buffer capacity");
+                    throw std::out_of_range("in [AlignedBuffer::to_vector] Requested size exceeds buffer capacity");
                 }
 
                 T* data_ptr = reinterpret_cast<T*>(this->allocated);
@@ -218,7 +218,7 @@ namespace vuprs
             {
                 if (this->byteSize == 0)
                 {
-                    throw std::out_of_range("Buffer size is 0.");
+                    throw std::out_of_range("in [AlignedBuffer::to_vector] Buffer size is 0.");
                 }
 
                 uint64_t elementCounts = this->byteSize / sizeof(T);
@@ -232,7 +232,7 @@ namespace vuprs
             {
                 if (vec.empty())
                 {
-                    throw std::out_of_range("No data to convert.");
+                    throw std::out_of_range("in [AlignedBuffer::from_vector] No data to convert.");
                 }
 
                 uint64_t required_bytes = vec.size() * sizeof(T);

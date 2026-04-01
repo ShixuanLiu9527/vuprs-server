@@ -33,7 +33,7 @@ bool vuprs::LinuxServer::LoadServerConfigFromJson(const std::string& jsonFilenam
     configJsonFile.open(jsonFilename);
     if (!configJsonFile.is_open())
     {
-        throw std::runtime_error("Cannot open file: " + jsonFilename);
+        throw std::runtime_error("in [LinuxServer::LoadServerConfigFromJson] Cannot open file: " + jsonFilename);
     }
 
     nlohmann::json configJsonData;
@@ -80,14 +80,14 @@ void vuprs::LinuxServer::InitSystemConfigFiles(const vuprs::SystemConfigFiles &c
 
         if (!configResult)
         {
-            throw std::runtime_error("Config error.");
+            throw std::runtime_error("in [LinuxServer::InitSystemConfigFiles] Config error.");
         }
 
         this->configdone = true;
     }
     catch (const std::exception &e)
     {
-        std::cout << "Error: " << e.what() << std::endl;
+        std::cout << "Error in [LinuxServer::InitSystemConfigFiles] " << e.what() << std::endl;
     }
 }
 
@@ -239,7 +239,7 @@ void vuprs::LinuxServer::Run()
     {
         /* Start server */
 
-        if (!this->InitServer()) throw std::runtime_error("Failed to init server.");
+        if (!this->InitServer()) throw std::runtime_error("in [LinuxServer::Run] Failed to init server.");
 
         this->server_running = true;
 
@@ -254,7 +254,7 @@ void vuprs::LinuxServer::Run()
     }
     else
     {
-        throw std::runtime_error("Initialize not complete.");
+        throw std::runtime_error("in [LinuxServer::Run] Initialize not complete.");
     }
 }
 

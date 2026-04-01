@@ -8,7 +8,7 @@ bool vuprs::FPGA_API__ADC__StartADC(vuprs::FPGAController *controller, double fs
 {
     if (!controller->ConfigDown())
     {
-        throw std::runtime_error("FPGA Controller not configured in advance.");
+        throw std::runtime_error("in [vuprs::FPGA_API__ADC__StartADC] FPGA Controller not configured in advance.");
     }
 
     uint32_t r_val, w_val;
@@ -43,7 +43,7 @@ bool vuprs::FPGA_API__ADC__ResetADC(vuprs::FPGAController *controller)
 {
     if (!controller->ConfigDown())
     {
-        throw std::runtime_error("FPGA Controller not configured in advance.");
+        throw std::runtime_error("in [vuprs::FPGA_API__ADC__ResetADC] FPGA Controller not configured in advance.");
     }
 
     bool operateStatus = true;
@@ -68,11 +68,11 @@ bool vuprs::FPGA_API__CBUF__ReadCircularBuffer(vuprs::FPGAController *controller
 {
     if (!controller->ConfigDown())
     {
-        throw std::runtime_error("FPGA Controller not configured in advance.");
+        throw std::runtime_error("in [vuprs::FPGA_API__CBUF__ReadCircularBuffer] FPGA Controller not configured in advance.");
     }
     if (!controller->dev__Circular_Buffer.Refreshed())
     {
-        throw std::runtime_error("Circular buffer not refreshed.");
+        throw std::runtime_error("in [vuprs::FPGA_API__CBUF__ReadCircularBuffer] Circular buffer not refreshed.");
     }
 
     uint32_t r_val, w_val, CBF;
@@ -118,7 +118,7 @@ bool vuprs::FPGA_API__CBUF__ResetCircularBuffer(vuprs::FPGAController *controlle
 {
     if (!controller->ConfigDown())
     {
-        throw std::runtime_error("FPGA Controller not configured in advance.");
+        throw std::runtime_error("in [vuprs::FPGA_API__CBUF__ResetCircularBuffer] FPGA Controller not configured in advance.");
     }
 
     return controller->dev__Circular_Buffer.WriteSingleRegister(vuprs::Circular_Buffer__Registers::CBUF_RST, 0);
@@ -133,15 +133,15 @@ bool vuprs::FPGA_API__PDLY__SetPredelay(vuprs::FPGAController *controller,
 {
     if (!controller->ConfigDown())
     {
-        throw std::runtime_error("FPGA Controller not configured in advance.");
+        throw std::runtime_error("in [vuprs::FPGA_API__PDLY__SetPredelay] FPGA Controller not configured in advance.");
     }
     if (channelName.size() != channelPredelay.size())
     {
-        throw std::runtime_error("Channel name list & channel predelay list not the same size.");
+        throw std::runtime_error("in [vuprs::FPGA_API__PDLY__SetPredelay] Channel name list & channel predelay list not the same size.");
     }
     if (channelPredelay.size() != ADC_CHANNEL_NUMBER)
     {
-        throw std::runtime_error("Invalid channel predelay size.");
+        throw std::runtime_error("in [vuprs::FPGA_API__PDLY__SetPredelay] Invalid channel predelay size.");
     }
     
     uint32_t r_val, w_val;
@@ -168,7 +168,7 @@ bool vuprs::FPGA_API__PDLY__SetPredelay(vuprs::FPGAController *controller,
         }
         else
         {
-            throw std::runtime_error("Missing channel: " + ADC_CHANNEL_ADDR_MAP[i]);
+            throw std::runtime_error("in [vuprs::FPGA_API__PDLY__SetPredelay] Missing channel: " + ADC_CHANNEL_ADDR_MAP[i]);
         }
     }
     for (int i = 0; i < ADC_CHANNEL_NUMBER / 2; i++)
@@ -183,7 +183,7 @@ bool vuprs::FPGA_API__PDLY__ResetPredelay(vuprs::FPGAController *controller)
 {
     if (!controller->ConfigDown())
     {
-        throw std::runtime_error("FPGA Controller not configured in advance.");
+        throw std::runtime_error("in [vuprs::FPGA_API__PDLY__ResetPredelay] FPGA Controller not configured in advance.");
     }
 
     return controller->dev__PreDelay_Unit.WriteSingleRegister(vuprs::PreDelay_Unit__Registers::PREDLY_RST, 0);
@@ -198,11 +198,11 @@ bool vuprs::FPGA_API__FIR__SetCoefficients(vuprs::FPGAController *controller,
 {
     if (!controller->ConfigDown())
     {
-        throw std::runtime_error("FPGA Controller not configured in advance.");
+        throw std::runtime_error("in [vuprs::FPGA_API__FIR__SetCoefficients] FPGA Controller not configured in advance.");
     }
     if (coefficients->empty())
     {
-        throw std::runtime_error("Coefficients empty.");
+        throw std::runtime_error("in [vuprs::FPGA_API__FIR__SetCoefficients] Coefficients empty.");
     }
 
     uint64_t banks = coefficients->size();
@@ -212,7 +212,7 @@ bool vuprs::FPGA_API__FIR__SetCoefficients(vuprs::FPGAController *controller,
     {
         if ((*coefficients)[i].empty())
         {
-            throw std::runtime_error("Coefficients bank [" + std::to_string(i) + "] empty.");
+            throw std::runtime_error("in [vuprs::FPGA_API__FIR__SetCoefficients] Coefficients bank [" + std::to_string(i) + "] empty.");
         }
         if (checkCoefficientsCount < 0) 
         {
@@ -222,7 +222,7 @@ bool vuprs::FPGA_API__FIR__SetCoefficients(vuprs::FPGAController *controller,
         {
             if ((*coefficients)[i].size() != checkCoefficientsCount)
             {
-                throw std::runtime_error("Inconsistent length of coefficients.");
+                throw std::runtime_error("in [vuprs::FPGA_API__FIR__SetCoefficients] Inconsistent length of coefficients.");
             }
         }
     }
@@ -236,7 +236,7 @@ bool vuprs::FPGA_API__FIR__SetCoefficients(vuprs::FPGAController *controller,
 
     if (r_val != static_cast<uint32_t>(checkCoefficientsCount))
     {
-        throw std::runtime_error("len(FIR) != len(coef[0])");
+        throw std::runtime_error("in [vuprs::FPGA_API__FIR__SetCoefficients] len(FIR) != len(coef[0])");
     }
 
     vuprs::AlignedBufferDMA buffer;
@@ -284,11 +284,11 @@ bool vuprs::FPGA_API__FIR__SetLengthAndCoefficients(vuprs::FPGAController *contr
 {
     if (!controller->ConfigDown())
     {
-        throw std::runtime_error("FPGA Controller not configured in advance.");
+        throw std::runtime_error("in [vuprs::FPGA_API__FIR__SetLengthAndCoefficients] FPGA Controller not configured in advance.");
     }
     if (coefficients->empty())
     {
-        throw std::runtime_error("Coefficients empty.");
+        throw std::runtime_error("in [vuprs::FPGA_API__FIR__SetLengthAndCoefficients] Coefficients empty.");
     }
 
     uint64_t banks = coefficients->size();
@@ -298,7 +298,7 @@ bool vuprs::FPGA_API__FIR__SetLengthAndCoefficients(vuprs::FPGAController *contr
     {
         if ((*coefficients)[i].empty())
         {
-            throw std::runtime_error("Coefficients bank [" + std::to_string(i) + "] empty.");
+            throw std::runtime_error("in [vuprs::FPGA_API__FIR__SetLengthAndCoefficients] Coefficients bank [" + std::to_string(i) + "] empty.");
         }
         if (checkCoefficientsCount < 0) 
         {
@@ -308,14 +308,14 @@ bool vuprs::FPGA_API__FIR__SetLengthAndCoefficients(vuprs::FPGAController *contr
         {
             if ((*coefficients)[i].size() != checkCoefficientsCount)
             {
-                throw std::runtime_error("Inconsistent length of coefficients.");
+                throw std::runtime_error("in [vuprs::FPGA_API__FIR__SetLengthAndCoefficients] Inconsistent length of coefficients.");
             }
         }
     }
 
     if (len != static_cast<uint32_t>(checkCoefficientsCount))
     {
-        throw std::runtime_error("len(FIR) != len(coef[0])");
+        throw std::runtime_error("in [vuprs::FPGA_API__FIR__SetLengthAndCoefficients] len(FIR) != len(coef[0])");
     }
 
     /* Check length valid */
@@ -327,7 +327,7 @@ bool vuprs::FPGA_API__FIR__SetLengthAndCoefficients(vuprs::FPGAController *contr
 
     if (len > r_val)
     {
-        throw std::runtime_error("Invalid FIR length (valid: <= " + std::to_string(r_val) + ").");
+        throw std::runtime_error("in [vuprs::FPGA_API__FIR__SetLengthAndCoefficients] Invalid FIR length (valid: <= " + std::to_string(r_val) + ").");
     }
 
     /* Clear buffer */
@@ -377,7 +377,7 @@ bool vuprs::FPGA_API__FIR__ResetFIR(vuprs::FPGAController *controller)
 {
     if (!controller->ConfigDown())
     {
-        throw std::runtime_error("FPGA Controller not configured in advance.");
+        throw std::runtime_error("in [vuprs::FPGA_API__FIR__ResetFIR] FPGA Controller not configured in advance.");
     }
 
     bool operateStatus = true;
@@ -392,7 +392,7 @@ bool vuprs::FPGA_API__FIR__RuningControl(vuprs::FPGAController *controller, bool
 {
     if (!controller->ConfigDown())
     {
-        throw std::runtime_error("FPGA Controller not configured in advance.");
+        throw std::runtime_error("in [vuprs::FPGA_API__FIR__RuningControl] FPGA Controller not configured in advance.");
     }
 
     bool operateStatus = true;
@@ -411,7 +411,7 @@ bool vuprs::FPGA_API__DDR__ReadDDR(vuprs::FPGAController *controller,
 {
     if (!controller->ConfigDown())
     {
-        throw std::runtime_error("FPGA Controller not configured in advance.");
+        throw std::runtime_error("in [vuprs::FPGA_API__DDR__ReadDDR] FPGA Controller not configured in advance.");
     }
 
     return controller->mem__DDR.ReadMemory(buffer, ddrOffset, transferSize);
@@ -426,18 +426,18 @@ bool vuprs::FPGA_API__DMA__StartScatterGatherDMA_S2MM(vuprs::FPGAController *con
 {
     if (!controller->ConfigDown())
     {
-        throw std::runtime_error("FPGA Controller not configured in advance.");
+        throw std::runtime_error("in [vuprs::FPGA_API__DMA__StartScatterGatherDMA_S2MM] FPGA Controller not configured in advance.");
     }
 
     uint32_t descriptorSize = descriptors.size();
 
     if (descriptorSize == 0)
     {
-        throw std::runtime_error("Descriptor is empty.");
+        throw std::runtime_error("in [vuprs::FPGA_API__DMA__StartScatterGatherDMA_S2MM] Descriptor is empty.");
     }
     if (isCyclicMode && descriptors[descriptorSize - 1].NXTDESC != descriptors[0].ALIGNMENT_0_CURRENT_ADDR)
     {
-        throw std::runtime_error("Invalid cyclic DMA descriptor.");
+        throw std::runtime_error("in [vuprs::FPGA_API__DMA__StartScatterGatherDMA_S2MM] Invalid cyclic DMA descriptor.");
     }
 
     uint32_t r_val, w_val;
@@ -519,11 +519,11 @@ bool vuprs::FPGA_API__DMA__GetAndClearInterruptFlag(vuprs::FPGAController *contr
 {
     if (!controller->ConfigDown())
     {
-        throw std::runtime_error("FPGA Controller not configured in advance.");
+        throw std::runtime_error("in [vuprs::FPGA_API__DMA__GetAndClearInterruptFlag] FPGA Controller not configured in advance.");
     }
     if (flag == nullptr)
     {
-        throw std::runtime_error("FLAG is NULL.");
+        throw std::runtime_error("in [vuprs::FPGA_API__DMA__GetAndClearInterruptFlag] FLAG is NULL.");
     }
 
     uint32_t r_val;
@@ -550,7 +550,7 @@ bool vuprs::FPGA_API__DMA__ResetDMA(vuprs::FPGAController *controller)
 {
     if (!controller->ConfigDown())
     {
-        throw std::runtime_error("FPGA Controller not configured in advance.");
+        throw std::runtime_error("in [vuprs::FPGA_API__DMA__ResetDMA] FPGA Controller not configured in advance.");
     }
 
     bool operateStatus = true;
@@ -578,7 +578,7 @@ bool vuprs::FPGA_API__DMA__GetCurrentDescriptor(vuprs::FPGAController *controlle
 {
     if (!controller->ConfigDown())
     {
-        throw std::runtime_error("FPGA Controller not configured in advance.");
+        throw std::runtime_error("in [vuprs::FPGA_API__DMA__GetCurrentDescriptor] FPGA Controller not configured in advance.");
     }
 
     bool operateStatus = true, found = false;;
@@ -613,7 +613,7 @@ bool vuprs::FPGA_API__DMA__GetCurrentDescriptor(vuprs::FPGAController *controlle
 
     if (!found)
     {
-        throw std::runtime_error("Cannot found current descriptor with address: " + std::to_string(r_val));
+        throw std::runtime_error("in [vuprs::FPGA_API__DMA__GetCurrentDescriptor] Cannot found current descriptor with address: " + std::to_string(r_val));
     }
 
     return operateStatus;

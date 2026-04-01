@@ -6,7 +6,7 @@ void vuprs::FFT(const Eigen::Matrix<Eigen::dcomplex, -1, 1> &inputData, Eigen::M
 
     if (dataSize <= 0)
     {
-        throw std::runtime_error("The input data is empty.");
+        throw std::runtime_error("in [vuprs::FFT] The input data is empty.");
     }
     
     fftw_complex *input, *output;
@@ -19,7 +19,7 @@ void vuprs::FFT(const Eigen::Matrix<Eigen::dcomplex, -1, 1> &inputData, Eigen::M
     {
         fftw_free(input);
         fftw_free(output);
-        throw std::runtime_error("Failed to allocate FFTW memory.");
+        throw std::runtime_error("in [vuprs::FFT] Failed to allocate FFTW memory.");
     }
 
     if (!inverse)
@@ -35,7 +35,7 @@ void vuprs::FFT(const Eigen::Matrix<Eigen::dcomplex, -1, 1> &inputData, Eigen::M
     {
         fftw_free(input);
         fftw_free(output);
-        throw std::runtime_error("Failed to allocate FFTW plan.");
+        throw std::runtime_error("in [vuprs::FFT] Failed to allocate FFTW plan.");
     }
 
     try
@@ -61,7 +61,7 @@ void vuprs::FFT(const Eigen::Matrix<Eigen::dcomplex, -1, 1> &inputData, Eigen::M
         fftw_destroy_plan(plan);
         fftw_free(input);
         fftw_free(output);
-        throw std::runtime_error("Error occurred in FFT. (" + std::string(e.what()) + ")");
+        throw std::runtime_error("in [vuprs::FFT] Error occurred in FFT. (" + std::string(e.what()) + ")");
     }
 
     fftw_destroy_plan(plan);
@@ -75,7 +75,7 @@ void vuprs::FFT(const std::vector<std::complex<double>> &inputData, std::vector<
 
     if (dataSize <= 0)
     {
-        throw std::runtime_error("The input data is empty.");
+        throw std::runtime_error("in [vuprs::FFT] The input data is empty.");
     }
 
     fftw_complex *input, *output;
@@ -88,7 +88,7 @@ void vuprs::FFT(const std::vector<std::complex<double>> &inputData, std::vector<
     {
         fftw_free(input);
         fftw_free(output);
-        throw std::runtime_error("Failed to allocate FFTW memory.");
+        throw std::runtime_error("in [vuprs::FFT] Failed to allocate FFTW memory.");
     }
 
     if (!inverse)
@@ -104,7 +104,7 @@ void vuprs::FFT(const std::vector<std::complex<double>> &inputData, std::vector<
     {
         fftw_free(input);
         fftw_free(output);
-        throw std::runtime_error("Failed to allocate FFTW plan.");
+        throw std::runtime_error("in [vuprs::FFT] Failed to allocate FFTW plan.");
     }
 
     try
@@ -133,7 +133,7 @@ void vuprs::FFT(const std::vector<std::complex<double>> &inputData, std::vector<
         fftw_destroy_plan(plan);
         fftw_free(input);
         fftw_free(output);
-        throw std::runtime_error("Error occurred in FFT. (" + std::string(e.what()) + ")");
+        throw std::runtime_error("in [vuprs::FFT] Error occurred in FFT. (" + std::string(e.what()) + ")");
     }
 
     fftw_destroy_plan(plan);
@@ -281,7 +281,7 @@ Eigen::Matrix<double, -1, 1> vuprs::GetWindow(vuprs::WindowType type, int signal
         }
         default:
         {
-            throw std::runtime_error("Invalid widnow type.");
+            throw std::runtime_error("in [vuprs::GetWindow] Invalid widnow type.");
         }
     }
     return w;

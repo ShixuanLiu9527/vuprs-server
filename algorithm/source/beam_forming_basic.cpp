@@ -13,11 +13,11 @@ void vuprs::BeamFormingElement::DoFFT()
 {
     if (this->adcChannel.empty())
     {
-        throw std::runtime_error("Cannot do FFT in an empty element.");
+        throw std::runtime_error("in [BeamFormingElement::DoFFT] Cannot do FFT in an empty element.");
     }
     if (this->elementSignalTimeDomain.size() <= 0)
     {
-        throw std::runtime_error("Signal is empty.");
+        throw std::runtime_error("in [BeamFormingElement::DoFFT] Signal is empty.");
     }
     
     /* Add window */
@@ -63,7 +63,7 @@ double vuprs::BeamFormingArray::CalculateSteeringVectorErrorRadius(double signal
 {
     if (this->empty())
     {
-        throw std::runtime_error("Array is empty.");
+        throw std::runtime_error("in [BeamFormingArray::CalculateSteeringVectorErrorRadius] Array is empty.");
     }
 
     /* Calculate time delay error */
@@ -88,7 +88,7 @@ bool vuprs::BeamFormingArray::LoadArrayFromJson(const std::string &filename)
     arrayConfigJsonFile.open(filename);
     if (!arrayConfigJsonFile.is_open())
     {
-        throw std::runtime_error("Cannot open file: " + filename);
+        throw std::runtime_error("in [BeamFormingArray::LoadArrayFromJson] Cannot open file: " + filename);
     }
 
     nlohmann::json configJsonData;
@@ -99,7 +99,7 @@ bool vuprs::BeamFormingArray::LoadArrayFromJson(const std::string &filename)
     }
     catch(const std::exception& e)
     {
-        throw std::runtime_error("Failed to load array data from: " + filename);
+        throw std::runtime_error("in [BeamFormingArray::LoadArrayFromJson] Failed to load array data from: " + filename);
     }
 
     if (configJsonData.contains("beam_forming_array"))
@@ -143,23 +143,23 @@ bool vuprs::BeamFormingArray::LoadArrayFromJson(const std::string &filename)
                         }
                         else
                         {
-                            throw std::runtime_error("Invalid ADC channel name in file: " + filename);
+                            throw std::runtime_error("in [BeamFormingArray::LoadArrayFromJson] Invalid ADC channel name in file: " + filename);
                         }
                     }
                     else
                     {
-                        throw std::runtime_error("Missing element at index: " + std::to_string(i));
+                        throw std::runtime_error("in [BeamFormingArray::LoadArrayFromJson] Missing element at index: " + std::to_string(i));
                     }
                 }
             }
             else
             {
-                throw std::runtime_error("Cannot find array in file: " + filename);
+                throw std::runtime_error("in [BeamFormingArray::LoadArrayFromJson] Cannot find array in file: " + filename);
             }
         }
         else
         {
-            throw std::runtime_error("Missing element [array]");
+            throw std::runtime_error("in [BeamFormingArray::LoadArrayFromJson] Missing element [array]");
         }
         if (beamFormingArray.contains("info"))
         {
@@ -168,12 +168,12 @@ bool vuprs::BeamFormingArray::LoadArrayFromJson(const std::string &filename)
         }
         else
         {
-            throw std::runtime_error("Missing element [info]");
+            throw std::runtime_error("in [BeamFormingArray::LoadArrayFromJson] Missing element [info]");
         }
     }
     else
     {
-        throw std::runtime_error("Missing element [beam_forming_array]");
+        throw std::runtime_error("in [BeamFormingArray::LoadArrayFromJson] Missing element [beam_forming_array]");
     }
 
     return true;
@@ -194,7 +194,7 @@ void vuprs::BeamFormingArray::InputElementSignal(const vuprs::SignalData &adcDat
 {
     if (this->elementArray.size() <= 0)
     {
-        throw std::runtime_error("Cannot input signal to an empty array.");
+        throw std::runtime_error("in [BeamFormingArray::InputElementSignal] Cannot input signal to an empty array.");
     }
 
     int arraySize = this->elementArray.size();
@@ -237,11 +237,11 @@ void vuprs::BeamFormingArray::GetArraySignalMatrix(Eigen::Matrix<Eigen::dcomplex
 
     if (dataSize <= 0)
     {
-        throw std::runtime_error("Cannot get array signal matrix (no data input in advance).");
+        throw std::runtime_error("in [BeamFormingArray::GetArraySignalMatrix] Cannot get array signal matrix (no data input in advance).");
     }
     if (elementSize <= 0)
     {
-        throw std::runtime_error("Cannot get array signal matrix from an empty array.");
+        throw std::runtime_error("in [BeamFormingArray::GetArraySignalMatrix] Cannot get array signal matrix from an empty array.");
     }
 
     if (frequencyDomain) signalMatrix->resize(this->elementArray.size(), dataSize / 2 + 1);  /* M x (N/2 + 1) */

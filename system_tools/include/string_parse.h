@@ -34,36 +34,36 @@ namespace vuprs
     template<typename T>
     void __JsonStringParseINT(T *target, const nlohmann::json &json, const std::string &item, bool required = true)
     {
-        if (target == nullptr) throw std::runtime_error("Target cannot be NULL.");
+        if (target == nullptr) throw std::runtime_error("in [__JsonStringParseINT] Target cannot be NULL.");
         bool status = false;
         uint64_t value;
         if (json.contains(item))
         {
             value = vuprs::ParseNumberFromString(json[item].get<std::string>(), &status);
             if (status) *target = static_cast<T>(value);
-            else if (required) throw std::runtime_error("Cannot parse: " + item + " from json.");
+            else if (required) throw std::runtime_error("in [__JsonStringParseINT] Cannot parse: " + item + " from json.");
         }
         else if (required)
         {
-            throw std::runtime_error("Item: " + item + " not found.");
+            throw std::runtime_error("in [__JsonStringParseINT] Item: " + item + " not found.");
         }
     }
 
     template<typename T>
     void __JsonStringParseFLOAT(T *target, const nlohmann::json &json, const std::string &item, bool required = true)
     {
-        if (target == nullptr) throw std::runtime_error("Target cannot be NULL.");
+        if (target == nullptr) throw std::runtime_error("in [__JsonStringParseFLOAT] Target cannot be NULL.");
         bool status = false;
         double value;
         if (json.contains(item))
         {
             value = vuprs::ParseDoubleFromString(json[item].get<std::string>(), &status);
             if (status) *target = static_cast<T>(value);
-            else if (required) throw std::runtime_error("Cannot parse: " + item + " from json.");
+            else if (required) throw std::runtime_error("in [__JsonStringParseFLOAT] Cannot parse: " + item + " from json.");
         }
         else if (required)
         {
-            throw std::runtime_error("Item: " + item + " not found.");
+            throw std::runtime_error("in [__JsonStringParseFLOAT] Item: " + item + " not found.");
         }
     }
 

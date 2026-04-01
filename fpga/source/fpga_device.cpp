@@ -65,15 +65,15 @@ void vuprs::CreateDMAScatterGatherDescriptorChain(std::vector<vuprs::AXI_DMA_Sca
 {
     if (config.bufferSize == 0 || config.bufferCount == 0)
     {
-        throw std::runtime_error("Buffer size or buffer count should not be 0.");
+        throw std::runtime_error("in [vuprs::CreateDMAScatterGatherDescriptorChain] Buffer size or buffer count should not be 0.");
     }
     if (config.bufferSize % vuprs::DMA_BUFFER_ALIGNMENT_1_WORD != 0)
     {
-        throw std::runtime_error("Buffer size must aligned to 1 word");
+        throw std::runtime_error("in [vuprs::CreateDMAScatterGatherDescriptorChain] Buffer size must aligned to 1 word");
     }
     if (config.bufferSize > vuprs::DMA_MAX_BUFFER_LENGTH)
     {
-        throw std::runtime_error("Buffer size must be smaller than " + std::to_string(vuprs::DMA_MAX_BUFFER_LENGTH) + " bytes.");
+        throw std::runtime_error("in [vuprs::CreateDMAScatterGatherDescriptorChain] Buffer size must be smaller than " + std::to_string(vuprs::DMA_MAX_BUFFER_LENGTH) + " bytes.");
     }
 
     descriptorList->resize(config.bufferCount);
@@ -171,7 +171,7 @@ uint32_t vuprs::FPGA_Device__ADCController::GetSCIValueForSamplingFrequency(doub
 {
     if (!this->configdone)
     {
-        throw std::runtime_error("Config not complete.");
+        throw std::runtime_error("in [vuprs::FPGA_Device__ADCController] Config not complete.");
     }
     if (fs > this->maxSamplingFrequencyHz || fs <= 1e-2)
     {
@@ -278,7 +278,7 @@ bool vuprs::FPGA_Device__CircularBuffer::Refreshed()
     operationStatus = this->ReadSingleRegisterBIT(vuprs::Circular_Buffer__Registers::CBUF_RS, 1, &r_val);
     if (!operationStatus)
     {
-        throw std::runtime_error("Cannot read circular buffer.");
+        throw std::runtime_error("in [FPGA_Device__CircularBuffer::Refreshed] Cannot read circular buffer.");
     }
     return r_val == 1;
 }

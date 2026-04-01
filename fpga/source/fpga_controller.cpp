@@ -44,7 +44,7 @@ bool vuprs::FPGAController::ConfigFPGAFromJson(const std::string &configJsonFile
     configJsonFile.open(configJsonFilename);
     if (!configJsonFile.is_open())
     {
-        throw std::runtime_error("Cannot open file: " + configJsonFilename);
+        throw std::runtime_error("in [FPGAController::ConfigFPGAFromJson] Cannot open file: " + configJsonFilename);
     }
 
     nlohmann::json configJsonData;
@@ -55,7 +55,7 @@ bool vuprs::FPGAController::ConfigFPGAFromJson(const std::string &configJsonFile
     }
     catch(const std::exception &e)
     {
-        throw std::runtime_error("Error occurred when parsing JSON file." + std::string(e.what()));
+        throw std::runtime_error("in [FPGAController::ConfigFPGAFromJson] Error occurred when parsing JSON file." + std::string(e.what()));
     }
 
     bool configStatus = true;
@@ -85,12 +85,12 @@ bool vuprs::FPGAController::ConfigFPGAFromJson(const std::string &configJsonFile
     }
     catch(const std::exception& e)
     {
-        throw std::runtime_error("Error occurred in parsing: " + std::string(e.what()));
+        throw std::runtime_error("in [FPGAController::ConfigFPGAFromJson] Error occurred in parsing: " + std::string(e.what()));
     }
 
     if (!configStatus)
     {
-        throw std::runtime_error("Config failed.");
+        throw std::runtime_error("in [FPGAController::ConfigFPGAFromJson] Config failed.");
     }
 
     this->configdone = true;
@@ -101,7 +101,7 @@ void vuprs::FPGAController::GetOrCreateInterruptIOManagerIndex(const std::string
 {
     if (index == nullptr)
     {
-        throw std::runtime_error("Index is NULL.");
+        throw std::runtime_error("in [FPGAController::GetOrCreateInterruptIOManagerIndex] Index is NULL.");
     }
 
     int len;
@@ -132,7 +132,7 @@ void vuprs::FPGAController::GetOrCreateNormalIOManagerIndex(const std::string &d
 {
     if (index == nullptr)
     {
-        throw std::runtime_error("Index is NULL.");
+        throw std::runtime_error("in [FPGAController::GetOrCreateNormalIOManagerIndex] Index is NULL.");
     }
 
     int len;

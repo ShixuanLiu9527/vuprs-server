@@ -17,7 +17,7 @@ void vuprs::SignalData::GetChannelData(const std::string &channelName, std::vect
     }
     else
     {
-        throw std::runtime_error("Invalid channel name: " + channelName);
+        throw std::runtime_error("in [SignalData::GetChannelData] Invalid channel name: " + channelName);
     }
 }
 
@@ -25,7 +25,7 @@ void vuprs::SignalData::_UpdataHashMap()
 {
     if (this->_channelData.size() != this->_channelName.size()) 
     {
-        throw std::runtime_error("Unmatch channel & name size.");
+        throw std::runtime_error("in [SignalData::_UpdataHashMap] Unmatch channel & name size.");
     }
     int dataChannels = this->_channelData.size();
     this->CHANNEL_NAME__TO__CHANNEL_INDEX.clear();
@@ -46,13 +46,13 @@ void vuprs::SignalData::ToCSV(const std::string &outputFile)
     
     if (this->_channelData.empty() || this->_channelName.empty()) 
     {
-        throw std::runtime_error("No channel data to export.");
+        throw std::runtime_error("in [SignalData::ToCSV] No channel data to export.");
     }
     
     std::ofstream file(outputFile);
     if (!file.is_open())
     {
-        throw std::runtime_error("Cannot open output file: " + outputFile);
+        throw std::runtime_error("in [SignalData::ToCSV] Cannot open output file: " + outputFile);
     }
 
     uint64_t channelNumber = this->_channelData.size();
@@ -93,7 +93,7 @@ bool vuprs::FPGACircularBuffer2Frames(vuprs::AlignedBufferDMA *buffer, vuprs::Si
 {
     if (!buffer->is_allocated())
     {
-        throw std::runtime_error("Buffer is empty.");
+        throw std::runtime_error("in [vuprs::FPGACircularBuffer2Frames] Buffer is empty.");
     }
 
     std::vector<uint16_t> rawBufferDataVector = buffer->to_vector<uint16_t>();
@@ -134,7 +134,7 @@ bool vuprs::FPGACircularBuffer2Frames(vuprs::AlignedBufferDMA *buffer, vuprs::Si
             }
             else
             {
-                throw std::runtime_error("Error memory data.");
+                throw std::runtime_error("in [vuprs::FPGACircularBuffer2Frames] Error memory data.");
             }
         }
         headerPointer += ADC_FRAME_HALF_WORD_SIZE;
@@ -159,7 +159,7 @@ bool vuprs::FPGAMemoryBuffer2Frames(vuprs::AlignedBufferDMA *buffer, std::vector
 {
     if(!buffer->is_allocated())
     {
-        throw std::runtime_error("Buffer is empty.");
+        throw std::runtime_error("in [vuprs::FPGAMemoryBuffer2Frames] Buffer is empty.");
     }
 
     std::vector<uint32_t> rawBufferDataVector = buffer->to_vector<uint32_t>();
