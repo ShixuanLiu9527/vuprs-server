@@ -25,6 +25,8 @@ constexpr uint16_t ADC_FRAME_HEADER__L = (uint16_t)(ADC_FRAME_HEADER & 0xFFFF);
 constexpr uint16_t ADC_FRAME_TAILER__H = (uint16_t)((ADC_FRAME_TAILER >> 16) & 0xFFFF);
 constexpr uint16_t ADC_FRAME_TAILER__L = (uint16_t)(ADC_FRAME_TAILER & 0xFFFF);
 
+#define FPGA_CBF_TO_DATA_POSITION(CBF) (int)(((int)(CBF) + sizeof(uint32_t)) / (sizeof(uint32_t) * ADC_FRAME_WORD_SIZE) - 1)
+
 #define IS_FRAME_HEADER(VAL_L, VAL_H) (VAL_L == ADC_FRAME_HEADER__L && VAL_H == ADC_FRAME_HEADER__H)
 #define IS_FRAME_TAILER(VAL_L, VAL_H) (VAL_L == ADC_FRAME_TAILER__L && VAL_H == ADC_FRAME_TAILER__H)
 
@@ -194,12 +196,12 @@ namespace vuprs
      * @param adcData Output ADC data (ch1: adcData[0], ch2: adcData[1], ...).
      * @param fs sampling frequency.
      * @param v_scale ADC voltage scale (5.0 or 10.0 for AD7606)
-     * @param currentBramPointer current BRAM pointer (point to newest data).
+     * @param pointPosCBF current data pointer (= (CBF + sizeof(uint32_t)) / (sizeof(uint32_t) * ADC_FRAME_WORD_SIZE) - 1).
      * 
      * @retval true: success.
      * @retval false: failed.
      */
-    bool FPGACircularBuffer2Frames(vuprs::AlignedBufferDMA *buffer, vuprs::SignalData *adcData, double fs, double v_scale, uint32_t currentBramPointer);
+    bool FPGACircularBuffer2Frames(vuprs::AlignedBufferDMA *buffer, vuprs::SignalData *adcData, double fs, double v_scale, uint32_t pointPosCBF);
 
     /**
      * @brief Convert memory data to signed float.

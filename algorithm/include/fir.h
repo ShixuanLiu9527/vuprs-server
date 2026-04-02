@@ -11,10 +11,13 @@ namespace vuprs
         private:
 
             bool configdone;
+            std::mutex mtx;
 
             uint32_t firLength;
             uint32_t lastSignalPoints;  /* last N */
             double freqRange_l, freqRange_u;
+
+            std::unique_ptr<vuprs::ThreadPool> threadPool;
 
             std::vector<std::vector<double>> firCoefficient;
             double maxAbsCoefficient;

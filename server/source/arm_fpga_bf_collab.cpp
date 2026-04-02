@@ -2,7 +2,7 @@
 
 void vuprs::Set_ARM_FPGA_BF_Config_ToDefault(vuprs::ARM_FPGA_BF_Config *config)
 {
-    config->fs = 1000.0;  /* sampling frequency (unit: Hz) */
+    config->fs = 10000.0;  /* sampling frequency (unit: Hz) */
     config->bf_target__alt = 90.0;  /* altitude (unit: degree) beam former pointing target */
     config->bf_target__az = 0.0;  /* azimuth (unit: degree) beam former pointing target */
     config->bf_waveVelocity = 346.0;

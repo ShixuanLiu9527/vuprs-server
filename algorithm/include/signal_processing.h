@@ -8,11 +8,57 @@
 #include <complex>
 #include <cstring>
 #include <Eigen/Dense>
+#include <atomic>
+#include <mutex>
 
 #include "fftw3.h"  /* Use FFTW for processing */
 
 namespace vuprs
 {
+    class FFTWManagerComplex
+    {
+        private:
+
+            static std::mutex fftw_mtx;  /* global lock */
+
+            std::atomic<bool> fft_forward;  /* true: DFT backward, false: DFT forward */
+            std::atomic<uint64_t> fft_points;  /* data size = N */
+            fftw_complex *fft_input, *fft_output;  /* input & output memory */
+            fftw_plan fft_plan;  /* FFT plan */
+
+            void SetDFTDirection(bool forward = true);
+
+            void SetDFTPoints(uint64_t N);
+
+        public:
+
+            FFTWManagerComplex();
+
+            ~FFTWManagerComplex();
+
+            FFTWManagerComplex(const FFTWManagerComplex& other) = delete;
+            FFTWManagerComplex& operator=(const FFTWManagerComplex& other) = delete;
+        
+            FFTWManagerComplex(FFTWManagerComplex&& other) noexcept;
+            FFTWManagerComplex& operator=(FFTWManagerComplex&& other) noexcept;
+
+            /**
+             * @brief Set DFT manager parameters.
+             * 
+             * @param points signal points for DFT.
+             * @param forward true: time domain --> frequency domain, false: frequency domain --> time domain.
+             */
+            void SetParameters(uint64_t points, bool forward);
+
+            /**
+             * @brief Run DFT.
+             * 
+             * @param input input data buffer.
+             * @param output output data buffer.
+             */
+            void DoDFT(const void* input, void *output);
+    };
+
     /**
      * @brief Convert Eigen column vector to std::vector.
      */
@@ -111,6 +157,14 @@ namespace vuprs
      * @note output: [1, 2, 3, 4]
      */
     void CutTheFirstHalf(std::vector<std::complex<double>> *inputData);
+
+    /**
+     * @brief Cut half size (return size = N / 2 + 1).
+     * 
+     * @note input: [1, 2, 3, 4, 5, 6]
+     * @note output: [1, 2, 3, 4]
+     */
+    void CutTheFirstHalf(Eigen::Matrix<Eigen::dcomplex, -1, 1> *inputData);
 
     /**
      * @brief In-place conjugate symmetric completion (for IDFT).

@@ -338,13 +338,14 @@ void vuprs::WidebandBeamformerTemplate::CalculateBeamforming()
     
     for (int i = 0; i < numFreqs; i++)
     {
+        if (i == 0 || i == numFreqs - 1)  /* X(0) & X(N/2) */
+        {
+            this->resultWeightVectors.col(i) *= 0;
+            continue;
+        }
         futures.emplace_back(this->threadPool->enqueue(
             [this, i]() {this->CalculateBeamformingForOneFreq(i);}
         ));
     }
-    
-    for (auto &f : futures) 
-    {
-        f.get();
-    }
+    for (auto &f : futures) f.get();
 }

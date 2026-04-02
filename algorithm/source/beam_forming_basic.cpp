@@ -4,12 +4,17 @@
 /* ------------------------------------------- Beam Forming Element ---------------------------------------------- */
 /* --------------------------------------------------------------------------------------------------------------- */
 
+vuprs::BeamFormingElement::BeamFormingElement()
+{
+
+}
+
 void vuprs::BeamFormingElement::UpdataTimeDelay(double targetAlt, double targetAz, double waveVelocity)
 {
     this->timeDelay = -vuprs::AltAz2PointingVector(targetAlt, targetAz).dot(this->positionVector) / waveVelocity;
 }
 
-void vuprs::BeamFormingElement::DoFFT()
+void vuprs::BeamFormingElement::AddWindowForSignal()
 {
     if (this->adcChannel.empty())
     {
@@ -22,17 +27,29 @@ void vuprs::BeamFormingElement::DoFFT()
     
     /* Add window */
 
-    Eigen::Matrix<Eigen::dcomplex, -1, 1> windowedSignal;
-    std::vector<std::complex<double>> windowedSignal_std;
-    vuprs::stdVector2eigenVector<Eigen::dcomplex>(this->elementSignalTimeDomain, &windowedSignal);
-    vuprs::AddWindow<Eigen::dcomplex>(&windowedSignal, vuprs::WindowType::SIG_WINDOW__HAMMING);
-    vuprs::eigenVector2stdVector<std::complex<double>>(windowedSignal, &windowedSignal_std);
+    vuprs::stdVector2eigenVector<Eigen::dcomplex>(this->elementSignalTimeDomain, &this->windowedSignal_eigen);
+    vuprs::AddWindow<Eigen::dcomplex>(&this->windowedSignal_eigen, vuprs::WindowType::SIG_WINDOW__HAMMING);
+}
 
-    /* FFT */
+bool vuprs::BeamFormingElement::RunDFT()
+{
+    this->AddWindowForSignal();
 
-    vuprs::FFT(windowedSignal_std, &this->elementSignalFrequencyDomain_std);
-    vuprs::CutTheFirstHalf(&this->elementSignalFrequencyDomain_std);
-    vuprs::stdVector2eigenVector<std::complex<double>>(this->elementSignalFrequencyDomain_std, &this->elementSignalFrequencyDomain_eigen);
+    int currentSize = this->windowedSignal_eigen.rows();
+    if (currentSize == 0)
+    {
+        throw std::runtime_error("in [BeamFormingElement::PrepareForDFT] Failed to allocate FFTW memory (data size = 0).");
+    }
+
+    this->fftManager.SetParameters(currentSize, true);
+    if (this->elementSignalFrequencyDomain_eigen.rows() != currentSize)
+    {
+        this->elementSignalFrequencyDomain_eigen.resize(currentSize, 1);
+    }
+    this->fftManager.DoDFT(this->windowedSignal_eigen.data(), this->elementSignalFrequencyDomain_eigen.data());
+    vuprs::CutTheFirstHalf(&this->elementSignalFrequencyDomain_eigen);
+
+    return true;
 }
 
 bool vuprs::BeamFormingElement::empty() const
@@ -139,7 +156,7 @@ bool vuprs::BeamFormingArray::LoadArrayFromJson(const std::string &filename)
 
                         if (IS_ADC_CHANNEL_NAME(adcChannel))
                         {
-                            this->elementArray.push_back(oneBeamFormingElement);
+                            this->elementArray.push_back(std::move(oneBeamFormingElement));
                         }
                         else
                         {
@@ -249,14 +266,18 @@ void vuprs::BeamFormingArray::GetArraySignalMatrix(Eigen::Matrix<Eigen::dcomplex
 
     if (frequencyDomain)
     {
-        for (uint64_t i = 0; i < elementSize; i++)
+        std::vector<std::future<void>> futures;
+        futures.reserve(elementSize);
+        for (int i = 0; i < elementSize; i++)
         {
-            this->elementArray[i].DoFFT();
+            futures.emplace_back(this->threadPool->enqueue(
+                [this, i, &signalMatrix]() {
+                    this->elementArray[i].RunDFT();
+                    signalMatrix->row(i) = this->elementArray[i].elementSignalFrequencyDomain_eigen.transpose();
+                }
+            ));
         }
-        for (uint64_t i = 0; i < elementSize; i++)
-        {
-            signalMatrix->row(i) = this->elementArray[i].elementSignalFrequencyDomain_eigen.transpose();
-        }
+        for (auto &f : futures) f.get();
     }
     else
     {

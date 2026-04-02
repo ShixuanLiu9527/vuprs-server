@@ -7,6 +7,8 @@ vuprs::FIRCalculator::FIRCalculator()
     this->freqRange_u = 1000000.0;
     this->lastSignalPoints = 0;
     this->configdone = false;
+
+    this->threadPool = std::make_unique<vuprs::ThreadPool>(std::thread::hardware_concurrency());
 }
 
 vuprs::FIRCalculator::~FIRCalculator()
@@ -78,10 +80,7 @@ bool vuprs::FIRCalculator::SolveCoeffUseExpectedFrequencyResponse(const Eigen::M
         this->lastSignalPoints = N;
     }
 
-    Eigen::Matrix<Eigen::dcomplex, -1, 1> h;
     Eigen::Matrix<double, -1, 1> W_vec;
-
-    Eigen::Matrix<double, -1, 1> h_real;
 
     W_vec.resize(N_2_plus_1, 1);   /* length = N / 2 + 1 */
     W_vec.setOnes();
@@ -108,40 +107,39 @@ bool vuprs::FIRCalculator::SolveCoeffUseExpectedFrequencyResponse(const Eigen::M
     Eigen::Matrix<Eigen::dcomplex, -1, -1> W_E = W_vec.asDiagonal() * this->matrixE;
     Eigen::Matrix<Eigen::dcomplex, -1, -1> EH_W_E = EH * W_E;  /* E.H * W * E */
     Eigen::Matrix<Eigen::dcomplex, -1, -1> EH_W = EH * W_vec.asDiagonal();  /* E.H * W */
-    Eigen::Matrix<Eigen::dcomplex, -1, 1> EH_W_Hd;  /* E.H * W * Hd */
-    Eigen::Matrix<Eigen::dcomplex, -1, 1> Hd;
-
+    
     this->firCoefficient.resize(M);
     this->maxAbsCoefficient = 0;
-    double channelMaxCoefficient = 0.0;
+    
+    std::vector<std::future<void>> futures;
+    futures.reserve(M);
 
     for (int i = 0; i < M; i++)
     {
-        this->firCoefficient[i].resize(this->firLength);
+        futures.emplace_back(this->threadPool->enqueue([this, i, &response, &EH_W, &EH_W_E](){
 
-        Hd = response.row(i).transpose();
-        
-        vuprs::CompleteConjugateSymmetric(&Hd);
+            this->firCoefficient[i].resize(this->firLength);
 
-        EH_W_Hd = EH_W * Hd;
+            Eigen::Matrix<Eigen::dcomplex, -1, 1> Hd = response.row(i).transpose();
+            vuprs::CompleteConjugateSymmetric(&Hd);
 
-        h = EH_W_E.ldlt().solve(EH_W_Hd);
+            Eigen::Matrix<Eigen::dcomplex, -1, 1> EH_W_Hd = EH_W * Hd;
+            Eigen::Matrix<Eigen::dcomplex, -1, 1> h = EH_W_E.ldlt().solve(EH_W_Hd);
 
-        if (h.imag().norm() > 1e-5)
-        {
-            return false;
-        }
+            Eigen::Matrix<double, -1, 1> h_real = h.real();
+            vuprs::eigenVector2stdVector<double>(h_real, &this->firCoefficient[i]);
 
-        h_real = h.real();
-
-        channelMaxCoefficient = h_real.array().abs().maxCoeff();
-        if (channelMaxCoefficient > this->maxAbsCoefficient)
-        {
-            this->maxAbsCoefficient = channelMaxCoefficient;
-        }
-
-        vuprs::eigenVector2stdVector<double>(h_real, &this->firCoefficient[i]);
+            double channelMaxCoefficient = h_real.array().abs().maxCoeff();
+            {
+                std::unique_lock<std::mutex> lock(this->mtx);  /* LOCK */
+                if (channelMaxCoefficient > this->maxAbsCoefficient)
+                {
+                    this->maxAbsCoefficient = channelMaxCoefficient;
+                }
+            }
+        }));
     }
+    for (auto &f : futures) f.get();
 
     return true;
 }

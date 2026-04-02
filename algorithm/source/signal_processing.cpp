@@ -1,5 +1,198 @@
 #include "signal_processing.h"
 
+std::mutex vuprs::FFTWManagerComplex::fftw_mtx;
+
+vuprs::FFTWManagerComplex::FFTWManagerComplex()
+{
+    this->fft_points = 0;
+    this->fft_forward = true;  /* true: DFT backward, false: DFT forward */
+    this->fft_input = nullptr;
+    this->fft_output = nullptr;  /* input & output memory */
+    this->fft_plan = nullptr;  /* FFT plan */
+}
+
+vuprs::FFTWManagerComplex::~FFTWManagerComplex()
+{
+    std::unique_lock<std::mutex> lock(this->fftw_mtx);  /* LOCK */
+    if (this->fft_plan != nullptr)
+    {
+        fftw_destroy_plan(this->fft_plan);
+        this->fft_plan = nullptr;
+    }
+    if (this->fft_input != nullptr)
+    {
+        fftw_free(this->fft_input);
+        this->fft_input = nullptr;
+    }
+    if (this->fft_output != nullptr)
+    {
+        fftw_free(this->fft_output);
+        this->fft_output = nullptr;
+    }
+}
+
+vuprs::FFTWManagerComplex::FFTWManagerComplex(vuprs::FFTWManagerComplex&& other) noexcept
+{
+    this->fft_points = other.fft_points.load();
+    this->fft_forward = other.fft_forward.load();
+    this->fft_input = other.fft_input;
+    this->fft_output = other.fft_output;  /* input & output memory */
+    this->fft_plan = other.fft_plan;  /* FFT plan */
+
+    other.fft_points = 0;
+    other.fft_forward = true;
+    other.fft_input = nullptr;
+    other.fft_output = nullptr;
+    other.fft_plan = nullptr;
+}
+
+vuprs::FFTWManagerComplex& vuprs::FFTWManagerComplex::operator=(vuprs::FFTWManagerComplex&& other) noexcept
+{
+    if (this != &other)
+    {
+        std::unique_lock<std::mutex> lock(this->fftw_mtx);  /* LOCK */
+        
+        if (this->fft_plan != nullptr)
+        {
+            fftw_destroy_plan(this->fft_plan);
+        }
+        if (this->fft_input != nullptr)
+        {
+            fftw_free(this->fft_input);
+        }
+        if (this->fft_output != nullptr)
+        {
+            fftw_free(this->fft_output);
+        }
+        
+        this->fft_points = other.fft_points.load();
+        this->fft_forward = other.fft_forward.load();
+        this->fft_input = other.fft_input;
+        this->fft_output = other.fft_output;
+        this->fft_plan = other.fft_plan;
+        
+        other.fft_points = 0;
+        other.fft_forward = true;
+        other.fft_input = nullptr;
+        other.fft_output = nullptr;
+        other.fft_plan = nullptr;
+    }
+    return *this;
+}
+
+void vuprs::FFTWManagerComplex::SetDFTDirection(bool forward)
+{
+    if (this->fft_forward != forward)
+    {
+        std::unique_lock<std::mutex> lock(this->fftw_mtx);  /* LOCK */
+
+        if (this->fft_input == nullptr || this->fft_output == nullptr)
+        {
+            throw std::runtime_error("in [FFTWManagerComplex::SetDFTDirection] fftw_input or fftw_output is NULL.");
+        }
+
+        /* destroy */
+
+        if (this->fft_plan != nullptr)
+        {
+            fftw_destroy_plan(this->fft_plan);
+            this->fft_plan = nullptr;
+        }
+
+        /* generate plan */
+
+        if (forward)
+        {
+            this->fft_plan = fftw_plan_dft_1d(this->fft_points, this->fft_input, this->fft_output, FFTW_FORWARD, FFTW_ESTIMATE);
+        }
+        else
+        {
+            this->fft_plan = fftw_plan_dft_1d(this->fft_points, this->fft_input, this->fft_output, FFTW_BACKWARD, FFTW_ESTIMATE);
+        }
+
+        if (this->fft_plan == nullptr)
+        {
+            throw std::runtime_error("in [FFTWManagerComplex::SetDFTDirection] fft_plan is NULL.");
+        }
+
+        this->fft_forward = forward;
+    }
+}
+
+void vuprs::FFTWManagerComplex::SetDFTPoints(uint64_t N)
+{
+    if (this->fft_points != N && N > 0)
+    {
+        std::unique_lock<std::mutex> lock(this->fftw_mtx);  /* LOCK */
+
+        /* free plan */
+
+        if (this->fft_plan != nullptr)
+        {
+            fftw_destroy_plan(this->fft_plan);
+            this->fft_plan = nullptr;
+        }
+
+        /* Free buffer */
+
+        if (this->fft_input != nullptr)
+        {
+            fftw_free(this->fft_input);
+            this->fft_input = nullptr;
+        }
+        if (this->fft_output != nullptr)
+        {
+            fftw_free(this->fft_output);
+            this->fft_output = nullptr;
+        }
+
+        /* malloc */
+
+        this->fft_input = reinterpret_cast<fftw_complex*>(fftw_malloc(sizeof(fftw_complex) * N));
+        this->fft_output = reinterpret_cast<fftw_complex*>(fftw_malloc(sizeof(fftw_complex) * N));
+
+        if (this->fft_input == nullptr || this->fft_output == nullptr)
+        {
+            throw std::runtime_error("in [FFTWManagerComplex::SetDFTPoints] Failed to allocate FFTW memory.");
+        }
+
+        /* plan */
+
+        if (this->fft_forward) 
+        {
+            this->fft_plan = fftw_plan_dft_1d(N, this->fft_input, this->fft_output, FFTW_FORWARD, FFTW_ESTIMATE);
+        }
+        else 
+        {
+            this->fft_plan = fftw_plan_dft_1d(N, this->fft_input, this->fft_output, FFTW_BACKWARD, FFTW_ESTIMATE);
+        }
+
+        if (this->fft_plan == nullptr)
+        {
+            throw std::runtime_error("in [FFTWManagerComplex::SetDFTPoints] Failed to allocate FFTW plan.");
+        }
+
+        this->fft_points = N;
+    }
+}
+
+void vuprs::FFTWManagerComplex::SetParameters(uint64_t points, bool forward)
+{
+    this->SetDFTPoints(points);
+    this->SetDFTDirection(forward);
+}
+
+void vuprs::FFTWManagerComplex::DoDFT(const void* input, void *output)
+{
+    if (this->fft_plan == nullptr || this->fft_input == nullptr || this->fft_output == nullptr)
+    {
+        throw std::runtime_error("in [FFTWManagerComplex::DoDFT] fft_plan or fft_input or fft_output is NULL.");
+    }
+    std::memcpy(this->fft_input, input, this->fft_points * sizeof(std::complex<double>));
+    fftw_execute(this->fft_plan);
+    std::memcpy(output, this->fft_output, this->fft_points * sizeof(std::complex<double>));
+}
+
 void vuprs::FFT(const Eigen::Matrix<Eigen::dcomplex, -1, 1> &inputData, Eigen::Matrix<Eigen::dcomplex, -1, 1> *outputData, bool inverse)
 {
     uint64_t dataSize = inputData.rows();
@@ -84,7 +277,7 @@ void vuprs::FFT(const std::vector<std::complex<double>> &inputData, std::vector<
     input = reinterpret_cast<fftw_complex*>(fftw_malloc(sizeof(fftw_complex) * dataSize));
     output = reinterpret_cast<fftw_complex*>(fftw_malloc(sizeof(fftw_complex) * dataSize));
 
-    if (input == nullptr || output == nullptr) 
+    if (input == nullptr || output == nullptr)
     {
         fftw_free(input);
         fftw_free(output);
@@ -144,6 +337,20 @@ void vuprs::FFT(const std::vector<std::complex<double>> &inputData, std::vector<
 void vuprs::CutTheFirstHalf(std::vector<std::complex<double>> *inputData)
 {
     int size = inputData->size();
+    inputData->resize(size / 2 + 1);
+}
+
+void vuprs::CutTheFirstHalf(Eigen::Matrix<Eigen::dcomplex, -1, 1> *inputData)
+{
+    if (inputData == nullptr)
+    {
+        throw std::runtime_error("in [vuprs::CutTheFirstHalf] Input data is null.");
+    }
+    
+    int size = inputData->rows();
+
+    if (size <= 0) return;
+    
     inputData->resize(size / 2 + 1);
 }
 

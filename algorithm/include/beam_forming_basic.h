@@ -14,6 +14,8 @@
 #include <fstream>
 #include <stdio.h>
 #include <math.h>
+#include <mutex>
+#include <atomic>
 
 #include "nlohmann/json.hpp"
 
@@ -36,6 +38,12 @@ namespace vuprs
      */
     class BeamFormingElement
     {
+        private:
+
+            vuprs::FFTWManagerComplex fftManager;
+
+            void AddWindowForSignal();
+
         public:
             
             Eigen::Matrix<double, 3, 1> positionVector;  /* [x; y; z], relative to the reference point, unit: m */
@@ -46,9 +54,10 @@ namespace vuprs
             double samplingTime = 0.0; /* sampling time for this signal, unit: sec */
 
             std::vector<std::complex<double>> elementSignalTimeDomain;  /* raw data */
-            std::vector<std::complex<double>> elementSignalFrequencyDomain_std;  /* fft data */
+            Eigen::Matrix<Eigen::dcomplex, -1, 1> windowedSignal_eigen;  /* windowed raw data */
             Eigen::Matrix<Eigen::dcomplex, -1, 1> elementSignalFrequencyDomain_eigen;  /* First half in frequency domain */
-            Eigen::Matrix<Eigen::dcomplex, -1, 1> phasedElementSignalFrequencyDomain_eigen;  /* Total data in frequency domain */
+            
+            BeamFormingElement();
 
             /**
              * @brief Calculate time delay for this element.
@@ -64,11 +73,9 @@ namespace vuprs
             /**
              * @brief FFT for the signal: this->elementSignalTimeDomain
              * 
-             * @note STEP 1: this->elementSignalTimeDomain ---> FFT ---> this->elementSignalFrequencyDomain_std;
-             * @note STEP 2: this->elementSignalFrequencyDomain_std ---> Cut First Half ---> this->elementSignalFrequencyDomain_std;
-             * @note STEP 3: this->elementSignalFrequencyDomain_eigen ---> Eigen::Map ---> this->elementSignalFrequencyDomain_eigen.
+             * @note this->elementSignalTimeDomain (Size: N) ---> DFT ---> this->elementSignalFrequencyDomain_eigen (size: (N/2+1, 1)).
              */
-            void DoFFT();
+            bool RunDFT();
 
             bool empty() const;
 
