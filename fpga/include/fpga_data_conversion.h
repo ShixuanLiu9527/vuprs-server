@@ -10,6 +10,7 @@
 
 #include "aligned_buffer.h"
 #include "fpga_data_conv.h"
+#include "file_processing.h"
 
 #define ADC_CHANNEL_NUMBER               16U
 #define ADC_FRAME_WORD_SIZE              10U  /* 10 words */
@@ -110,6 +111,8 @@ namespace vuprs
             std::unordered_map<std::string, uint8_t> CHANNEL_NAME__TO__CHANNEL_INDEX;
 
         public:
+
+            SignalData();
 
             std::vector<std::vector<std::complex<double>>> _channelData;
             std::vector<std::string> _channelName;

@@ -58,7 +58,8 @@ void vuprs::FIRCalculator::SetFrequencyRange(double lower, double upper)
     this->freqRange_u = upper;
 }
 
-bool vuprs::FIRCalculator::SolveCoeffUseExpectedFrequencyResponse(const Eigen::Matrix<Eigen::dcomplex, -1, -1> &response, double fs)
+bool vuprs::FIRCalculator::SolveCoeffUseExpectedFrequencyResponse(const Eigen::Matrix<Eigen::dcomplex, -1, -1> &response, 
+                const std::vector<std::string> &channelName, double fs)
 {
     if (!this->configdone)
     {
@@ -103,12 +104,18 @@ bool vuprs::FIRCalculator::SolveCoeffUseExpectedFrequencyResponse(const Eigen::M
         throw std::runtime_error("in [FIRCalculator::SolveCoeffUseExpectedFrequencyResponse] Internal error.");
     }
 
-    Eigen::Matrix<Eigen::dcomplex, -1, -1> EH = this->matrixE.adjoint();
-    Eigen::Matrix<Eigen::dcomplex, -1, -1> W_E = W_vec.asDiagonal() * this->matrixE;
+    Eigen::Matrix<Eigen::dcomplex, -1, -1> EH = this->matrixE.adjoint();  /* E.H */
+    Eigen::Matrix<Eigen::dcomplex, -1, -1> W_E = W_vec.asDiagonal() * this->matrixE;  /* W * E */
     Eigen::Matrix<Eigen::dcomplex, -1, -1> EH_W_E = EH * W_E;  /* E.H * W * E */
     Eigen::Matrix<Eigen::dcomplex, -1, -1> EH_W = EH * W_vec.asDiagonal();  /* E.H * W */
     
     this->firCoefficient.resize(M);
+
+    for (auto &val: this->firCoefficient)
+    {
+        val.resize(this->firLength);
+    }
+
     this->maxAbsCoefficient = 0;
     
     std::vector<std::future<void>> futures;
@@ -116,9 +123,7 @@ bool vuprs::FIRCalculator::SolveCoeffUseExpectedFrequencyResponse(const Eigen::M
 
     for (int i = 0; i < M; i++)
     {
-        futures.emplace_back(this->threadPool->enqueue([this, i, &response, &EH_W, &EH_W_E](){
-
-            this->firCoefficient[i].resize(this->firLength);
+        futures.emplace_back(this->threadPool->enqueue([this, i, &response, &channelName, &EH_W, &EH_W_E](){
 
             Eigen::Matrix<Eigen::dcomplex, -1, 1> Hd = response.row(i).transpose();
             vuprs::CompleteConjugateSymmetric(&Hd);
@@ -127,7 +132,10 @@ bool vuprs::FIRCalculator::SolveCoeffUseExpectedFrequencyResponse(const Eigen::M
             Eigen::Matrix<Eigen::dcomplex, -1, 1> h = EH_W_E.ldlt().solve(EH_W_Hd);
 
             Eigen::Matrix<double, -1, 1> h_real = h.real();
-            vuprs::eigenVector2stdVector<double>(h_real, &this->firCoefficient[i]);
+
+            int dstIndex = vuprs::FindValueInVec(vuprs::ADC_CHANNEL_ADDR_MAP, channelName[i]);
+            
+            vuprs::eigenVector2stdVector<double>(h_real, &this->firCoefficient[dstIndex]);
 
             double channelMaxCoefficient = h_real.array().abs().maxCoeff();
             {

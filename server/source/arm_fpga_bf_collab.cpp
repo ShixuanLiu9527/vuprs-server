@@ -1,5 +1,8 @@
 #include "arm_fpga_bf_collab.h"
 
+#define ARM_FPGA_BF_COLLAB_CPP__DEBUG_PRINT false  /* print something @ debug mode */
+#define ARM_FPGA_BF_COLLAB_CPP__DEBUG_SAVE false  /* save data @ debug mode */
+
 void vuprs::Set_ARM_FPGA_BF_Config_ToDefault(vuprs::ARM_FPGA_BF_Config *config)
 {
     config->fs = 10000.0;  /* sampling frequency (unit: Hz) */
@@ -54,7 +57,7 @@ bool vuprs::ARM_FPGA_CollaborationBeamfomer::InitCollaborationBeamfomer(const st
     try
     {
         operateStatus &= this->controller.ConfigFPGAFromJson(fpgaConfigJson);
-        operateStatus &= this->bf_dcrcb.ConfigArrayFromJson(bfArrayConfigJson);
+        operateStatus &= this->bf.ConfigArrayFromJson(bfArrayConfigJson);
         operateStatus &= this->fir.ConfigFIRFromJsonFile(firConfigJon);
     }
     catch(const std::exception& e)
@@ -81,7 +84,7 @@ bool vuprs::ARM_FPGA_CollaborationBeamfomer::ResetHardwareBeamformer()
 
     {
         std::unique_lock<std::mutex> lock(this->mut_alg);
-        this->bf_dcrcb.ResetCovarianceMatrices();
+        this->bf.ResetCovarianceMatrices();
     }
 
     this->system_run = false;
@@ -142,19 +145,19 @@ bool vuprs::ARM_FPGA_CollaborationBeamfomer::StartBeamformerWithConfiguration(co
         std::unique_lock<std::mutex> lock(this->mut_alg);  /* LOCK */
         this->hardwareSamplingFrequency = this->controller.dev__ADC_Controller.SCI2FS(SCI);
 
-        this->bf_dcrcb.ResetCovarianceMatrices();
-        this->bf_dcrcb.SetCovarianceMatrixFittingParam(config.bf_cov_snapshotsWindowSize, config.bf_cov_freqAverageIndex);
-        this->bf_dcrcb.SetTargetDirection(config.bf_target__alt, config.bf_target__az, config.bf_waveVelocity);
+        this->bf.ResetCovarianceMatrices();
+        this->bf.SetCovarianceMatrixFittingParam(config.bf_cov_snapshotsWindowSize, config.bf_cov_freqAverageIndex);
+        this->bf.SetTargetDirection(config.bf_target__alt, config.bf_target__az, config.bf_waveVelocity);
 
         /* Get predelay */
 
-        this->bf_dcrcb.UpdateAndGetElementPredelay(this->fir.FIRLength(), this->hardwareSamplingFrequency, true,
+        this->bf.UpdateAndGetElementPredelay(this->fir.FIRLength(), this->hardwareSamplingFrequency, true,
             &predelayCount, &predelayTime, &channelName);
 
          /* Set frequency range */
 
         this->fir.SetFrequencyRange(config.bf_freq__lower, config.bf_freq__upper);
-        this->fir.GetZeroFIRBankCoefficient(&firCoefficients, this->bf_dcrcb.ElementCount());
+        this->fir.GetZeroFIRBankCoefficient(&firCoefficients, this->bf.ElementCount());
         FIR_LENGTH = this->fir.FIRLength();
     }
 
@@ -194,7 +197,7 @@ void vuprs::ARM_FPGA_CollaborationBeamfomer::ReDirect(double alt, double az, dou
 {
     {
         std::unique_lock<std::mutex> lock(this->mut_alg);  /* LOCK */
-        this->bf_dcrcb.SetTargetDirection(alt, az, waveVelocity);
+        this->bf.SetTargetDirection(alt, az, waveVelocity);
     }
 }
 
@@ -273,6 +276,10 @@ void vuprs::ARM_FPGA_CollaborationBeamfomer::THREAD__ListenDMAInterrupt()
         try
         {
             vuprs::FPGA_API__DMA__GetAndClearInterruptFlag(&this->controller, &r_val);
+
+            #if ARM_FPGA_BF_COLLAB_CPP__DEBUG_PRINT
+                printf("[debug] DMA interrupt flag = %d\n", r_val);
+            #endif
         }
         catch(const std::exception& e)
         {
@@ -365,6 +372,10 @@ void vuprs::ARM_FPGA_CollaborationBeamfomer::THREAD__ReadCircularBuffer()
         try
         {
             this->controller.dev__Circular_Buffer.ReadSingleRegisterBIT(vuprs::Circular_Buffer__Registers::CBUF_RS, 1, &r_val);
+
+            #if ARM_FPGA_BF_COLLAB_CPP__DEBUG_PRINT
+                printf("[debug] circular buffer CBUF_RS[1] = %d\n", r_val);
+            #endif
         }
         catch(const std::exception& e)
         {
@@ -411,6 +422,7 @@ void vuprs::ARM_FPGA_CollaborationBeamfomer::THREAD__AlgorithmCalculation()
     vuprs::SignalData signal;
     Eigen::Matrix<Eigen::dcomplex, -1, -1> firExpectedFrequencyResponse;  /* Expected frequency response of FIR filter bank */
     std::vector<std::vector<double>> firCoefficients;  /* Coefficient of FIR filter bank */
+    std::vector<std::string> channelName;  /* Channel name */
 
     while(this->system_run)
     {
@@ -441,22 +453,26 @@ void vuprs::ARM_FPGA_CollaborationBeamfomer::THREAD__AlgorithmCalculation()
             signal = this->arraySignalQueue.front();
             this->arraySignalQueue.pop();
 
+            #if ARM_FPGA_BF_COLLAB_CPP__DEBUG_SAVE
+                signal.ToCSV("../signals/signal.csv");
+            #endif
+
             /* Push data to Beam forming algorithm */
 
-            this->bf_dcrcb.InputSignal(signal);  /* Input signal */
-            this->bf_dcrcb.UpdateCovarianceMatrix();  /* Update covariance matrix */
+            this->bf.InputSignal(signal);  /* Input signal */
+            this->bf.UpdateCovarianceMatrix();  /* Update covariance matrix */
 
-            if (!this->bf_dcrcb.CalculateEnable())
+            if (!this->bf.CalculateEnable())
             {
                 throw std::runtime_error("in [ARM_FPGA_CollaborationBeamfomer::THREAD__AlgorithmCalculation] Beam forming algorithm cannot calculate.");
             }
 
-            this->bf_dcrcb.CalculateBeamforming();  /* Calculate beam forming */
-            this->bf_dcrcb.GetFIRExpectedFrequencyResponse(&firExpectedFrequencyResponse, true);  /* Get FIR filter bank expected frequency response */
+            this->bf.CalculateBeamforming();  /* Calculate beam forming */
+            this->bf.GetFIRExpectedFrequencyResponse(&firExpectedFrequencyResponse, &channelName, true);  /* Get FIR filter bank expected frequency response */
 
             /* Convert frequency response to FIR coefficients */
 
-            this->fir.SolveCoeffUseExpectedFrequencyResponse(firExpectedFrequencyResponse, this->hardwareSamplingFrequency);
+            this->fir.SolveCoeffUseExpectedFrequencyResponse(firExpectedFrequencyResponse, channelName, this->hardwareSamplingFrequency);
             this->fir.GetFIRBankCoefficient(&firCoefficients);
         }
 
@@ -466,8 +482,12 @@ void vuprs::ARM_FPGA_CollaborationBeamfomer::THREAD__AlgorithmCalculation()
 
         try
         {
-            fpgaOperationStatus &= vuprs::FPGA_API__FIR__SetCoefficients(&this->controller, 
-                &firCoefficients, this->fir.MaxAbsoluteFIRCoefficient());
+            fpgaOperationStatus &= vuprs::FPGA_API__FIR__SetCoefficients(&this->controller, &firCoefficients, this->fir.MaxAbsoluteFIRCoefficient());
+
+            #if ARM_FPGA_BF_COLLAB_CPP__DEBUG_PRINT
+                printf("[debug] max FIR coefficient = %.8f\n", this->fir.MaxAbsoluteFIRCoefficient());
+            #endif
+
             if (!fpgaOperationStatus)
             {
                 throw std::runtime_error("in [ARM_FPGA_CollaborationBeamfomer::THREAD__AlgorithmCalculation] FPGA operation failed.");

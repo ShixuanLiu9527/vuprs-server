@@ -51,6 +51,7 @@ namespace vuprs
              * @note Target response size = M x (N/2+1), M = element size & FIR banks, N = signal points.
              * 
              * @param response target response.
+             * @param channelName corresponding channel name for [response].
              * @param fs sampling frequency.
              * 
              * @throw std::runtime_error
@@ -58,7 +59,8 @@ namespace vuprs
              * @retval true: success.
              * @retval false: failed.
              */
-            bool SolveCoeffUseExpectedFrequencyResponse(const Eigen::Matrix<Eigen::dcomplex, -1, -1> &response, double fs);
+            bool SolveCoeffUseExpectedFrequencyResponse(const Eigen::Matrix<Eigen::dcomplex, -1, -1> &response, 
+                const std::vector<std::string> &channelName, double fs);
 
             /**
              * @brief Get FIR Filter Bank coefficients.

@@ -296,3 +296,79 @@ double vuprs::BeamFormingArray::GetMaxAbsoluteTimeDelay() const
 {
     return this->timeDelayVector.array().abs().matrix().maxCoeff();
 }
+
+bool vuprs::SaveToCSV(const std::vector<double> &data, const std::string filename)
+{
+    if (data.empty())
+    {
+        return true;
+    }
+    
+    std::string dir;
+    vuprs::SplitFile(filename, &dir, nullptr, nullptr);
+    
+    if (!dir.empty() && !vuprs::PathExist(dir))
+    {
+        vuprs::MakeDir(dir);
+    }
+    
+    std::ofstream file(filename);
+    if (!file.is_open())
+    {
+        return false;
+    }
+    
+    for (const auto &value : data)
+    {
+        file << value << "\n";
+    }
+    
+    file.close();
+    return true;
+}
+
+bool vuprs::SaveToCSV_complex(const std::vector<std::complex<double>> &data, const std::string filename)
+{
+    if (data.empty())
+    {
+        return true;
+    }
+    
+    std::string dir;
+    vuprs::SplitFile(filename, &dir, nullptr, nullptr);
+    
+    if (!dir.empty() && !vuprs::PathExist(dir))
+    {
+        vuprs::MakeDir(dir);
+    }
+    
+    std::ofstream file(filename);
+    if (!file.is_open())
+    {
+        return false;
+    }
+    
+    file << "real,imag\n";
+    
+    for (const auto &value : data)
+    {
+        file << value.real() << "," << value.imag() << "\n";
+    }
+    
+    file.close();
+    return true;
+}
+
+bool vuprs::SaveToCSV(const Eigen::Matrix<double, -1, 1> &data, const std::string filename)
+{
+    std::vector<double> _data;
+    vuprs::eigenVector2stdVector<double>(data, &_data);
+    vuprs::SaveToCSV(_data, filename);
+}
+
+bool vuprs::SaveToCSV_complex(const Eigen::Matrix<Eigen::dcomplex, -1, 1> &data, const std::string filename)
+{
+    std::vector<std::complex<double>> _data;
+    vuprs::eigenVector2stdVector<std::complex<double>>(data, &_data);
+    vuprs::SaveToCSV_complex(_data, filename);
+}

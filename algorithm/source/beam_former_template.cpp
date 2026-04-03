@@ -200,9 +200,9 @@ void vuprs::WidebandBeamformerTemplate::GetWeightVectorValues(Eigen::Matrix<Eige
     *dst = this->resultWeightVectors;
 }
 
-void vuprs::WidebandBeamformerTemplate::GetFIRExpectedFrequencyResponse(Eigen::Matrix<Eigen::dcomplex, -1, -1> *dst, bool considerPredelay) const
+void vuprs::WidebandBeamformerTemplate::GetFIRExpectedFrequencyResponse(Eigen::Matrix<Eigen::dcomplex, -1, -1> *dst, std::vector<std::string> *channelName, bool considerPredelay) const
 {
-    if (dst == nullptr)
+    if (dst == nullptr || channelName == nullptr)
     {
         throw std::runtime_error("in [WidebandBeamformerTemplate::GetFIRExpectedFrequencyResponse] Destination cannot be NULL.");
     }
@@ -223,6 +223,7 @@ void vuprs::WidebandBeamformerTemplate::GetFIRExpectedFrequencyResponse(Eigen::M
     double Tm;
 
     dst->resize(this->resultWeightVectors.rows(), this->resultWeightVectors.cols());
+    *channelName = this->elementChannelName;
     
     for (uint64_t i = 0; i < arraySize; i++)
     {
@@ -233,7 +234,7 @@ void vuprs::WidebandBeamformerTemplate::GetFIRExpectedFrequencyResponse(Eigen::M
         exp_j_2_pi_fk_Tm = j_2_pi_fk * Tm;
         exp_j_2_pi_fk_Tm = exp_j_2_pi_fk_Tm.array().exp().matrix();
         
-        /* Hd(fk) = conj(w(fk)) * exp(j2*pi*fk*Tm), k = 0, 1, ..., N/2 + 1 */
+        /* Hd(fk) = conj(w(fk)) * exp(j*2*pi*fk*Tm), k = 0, 1, ..., N/2 + 1 */
 
         dst->row(i) = this->resultWeightVectors.row(i).array().conjugate() * exp_j_2_pi_fk_Tm.array();
     }

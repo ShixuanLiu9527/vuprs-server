@@ -148,9 +148,10 @@ namespace vuprs
              * @brief Get expected frequency response of FIR filter bank.
              * 
              * @param dst output expected frequency response.
+             * @param channelName corresponding channel name.
              * @param considerPredelay if consider predelay in frequency response.
              */
-            void GetFIRExpectedFrequencyResponse(Eigen::Matrix<Eigen::dcomplex, -1, -1> *dst, bool considerPredelay) const;
+            void GetFIRExpectedFrequencyResponse(Eigen::Matrix<Eigen::dcomplex, -1, -1> *dst, std::vector<std::string> *channelName, bool considerPredelay) const;
 
             /**
              * @brief Set covariance matrix fitting parameters.

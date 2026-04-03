@@ -1,5 +1,8 @@
 #include "beam_former.h"
 
+#define BEAM_FORMER_CPP__DEBUG_PRINT false
+#define BEAM_FORMER_CPP__DEBUG_SAVE false
+
 /* ------------------------------------------------------------------------------ */
 /* ---------------------------------- DCRCB ------------------------------------- */
 /* ------------------------------------------------------------------------------ */
@@ -107,6 +110,22 @@ void vuprs::Beamformer_DCRCB::CalculateBeamformingForOneFreq(int freqIndex)
     {
         std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
         this->resultWeightVectors.col(freqIndex) = invR__mul__ps_estimate / (ps_estimate.adjoint() * invR__mul__ps_estimate)(0, 0);
+
+        #if (BEAM_FORMER_CPP__DEBUG_SAVE || BEAM_FORMER_CPP__DEBUG_PRINT)
+
+            /* DEBUG ! */
+
+            if (freqIndex == 100 || freqIndex == 200)
+            {
+                #if BEAM_FORMER_CPP__DEBUG_SAVE
+                    vuprs::SaveToCSV_complex(this->resultWeightVectors.col(freqIndex), "../weights/weight_" + std::to_string(freqIndex) + ".csv");
+                #endif
+                #if BEAM_FORMER_CPP__DEBUG_PRINT
+                    printf("[debug] DCRCB: frequency (@ index = %d) = %.6f Hz\n", freqIndex, this->signalFrequencyList(freqIndex));
+                #endif
+            }
+
+        #endif
     }
     
 }
@@ -136,4 +155,20 @@ void vuprs::Beamformer_CBF::CalculateBeamformingForOneFreq(int freqIndex)
     Eigen::Matrix<Eigen::dcomplex, -1, 1> ps = this->steeringVectors.col(freqIndex);  /* ps */
     double M = this->array.elementArray.size();  /* M */
     this->resultWeightVectors.col(freqIndex) = ps / M;
+
+    #if (BEAM_FORMER_CPP__DEBUG_SAVE || BEAM_FORMER_CPP__DEBUG_PRINT)
+
+        /* DEBUG ! */
+
+        if (freqIndex == 100 || freqIndex == 200)
+        {
+            #if BEAM_FORMER_CPP__DEBUG_SAVE
+                vuprs::SaveToCSV_complex(this->resultWeightVectors.col(freqIndex), "../weights/weight_" + std::to_string(freqIndex) + ".csv");
+            #endif
+            #if BEAM_FORMER_CPP__DEBUG_PRINT
+                printf("[debug] CBF: frequency (@ index = %d) = %.6f Hz\n", freqIndex, this->signalFrequencyList(freqIndex));
+            #endif
+        }
+
+    #endif
 }

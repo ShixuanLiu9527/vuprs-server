@@ -1,5 +1,10 @@
 #include "fpga_data_conversion.h"
 
+vuprs::SignalData::SignalData()
+{
+    this->_channelName = vuprs::ADC_CHANNEL_ADDR_MAP;
+}
+
 bool vuprs::SignalData::contains(const std::string &channelName) const
 {
     auto it = this->CHANNEL_NAME__TO__CHANNEL_INDEX.find(channelName);
@@ -47,6 +52,14 @@ void vuprs::SignalData::ToCSV(const std::string &outputFile)
     if (this->_channelData.empty() || this->_channelName.empty()) 
     {
         throw std::runtime_error("in [SignalData::ToCSV] No channel data to export.");
+    }
+
+    std::string dir;
+    vuprs::SplitFile(outputFile, &dir, nullptr, nullptr);
+
+    if (!vuprs::PathExist(dir))
+    {
+        vuprs::MakeDir(dir);
     }
     
     std::ofstream file(outputFile);
@@ -107,8 +120,6 @@ bool vuprs::FPGACircularBuffer2Frames(vuprs::AlignedBufferDMA *buffer, vuprs::Si
     {
         adcData->_channelData[i].reserve(vectorSize / ADC_FRAME_HALF_WORD_SIZE + 1);
     }
-
-    adcData->_channelName = vuprs::ADC_CHANNEL_ADDR_MAP;
 
     while ((tailerPointer + 1) < vectorSize)
     {

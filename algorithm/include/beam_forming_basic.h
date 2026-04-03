@@ -192,6 +192,11 @@ namespace vuprs
 
             EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };
+
+    bool SaveToCSV(const std::vector<double> &data, const std::string filename);
+    bool SaveToCSV(const Eigen::Matrix<double, -1, 1> &data, const std::string filename);
+    bool SaveToCSV_complex(const std::vector<std::complex<double>> &data, const std::string filename);
+    bool SaveToCSV_complex(const Eigen::Matrix<Eigen::dcomplex, -1, 1> &data, const std::string filename);
 }
 
 #endif
