@@ -6,6 +6,12 @@ vuprs::WidebandBeamformerTemplate::WidebandBeamformerTemplate()
     this->ResetAll();
 }
 
+vuprs::WidebandBeamformerTemplate::~WidebandBeamformerTemplate()
+{
+    vuprs::AlignedEigenVector<Eigen::Matrix<Eigen::dcomplex, -1, -1>>().swap(this->mean_covMatrix);
+    vuprs::AlignedEigenVector<Eigen::Matrix<Eigen::dcomplex, -1, -1>>().swap(this->estimate_covMatrix);
+}
+
 void vuprs::WidebandBeamformerTemplate::ResetAll()
 {
     this->fs = 0.0;

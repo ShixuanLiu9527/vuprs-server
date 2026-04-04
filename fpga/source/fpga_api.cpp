@@ -619,3 +619,14 @@ bool vuprs::FPGA_API__DMA__GetCurrentDescriptor(vuprs::FPGAController *controlle
 
     return operateStatus;
 }
+
+bool vuprs::FPGA_API_DMA__SetTimeoutForInterrupt(vuprs::FPGAController *controller, uint32_t timeout_ms)
+{
+    if (!controller->ConfigDown())
+    {
+        throw std::runtime_error("in [vuprs::FPGA_API_DMA__SetTimeoutForInterrupt] FPGA Controller not configured in advance.");
+    }
+
+    controller->dev__AXI_DMA.SetTimeout(timeout_ms);
+    return true;
+}

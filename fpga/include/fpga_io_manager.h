@@ -8,6 +8,7 @@
 #include <vector>
 #include <fstream>
 #include <stdexcept>
+#include <sys/select.h>
 
 #include <mutex>
 #include <atomic>
@@ -207,6 +208,8 @@ namespace vuprs
     {
         protected:
 
+            std::atomic<uint32_t> timeout_ms;
+
             int OpenFlags() override;
             bool OperationAfterOpened() override;
 
@@ -215,6 +218,8 @@ namespace vuprs
             FPGA_IOManagerForInterrput();
             FPGA_IOManagerForInterrput(const std::string &deviceFilename);
             ~FPGA_IOManagerForInterrput();
+
+            void SetTimeout(uint32_t timeout_ms = 100);
 
             bool ReadEvent(uint32_t *readValue);
     };

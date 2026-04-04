@@ -60,9 +60,17 @@ if [ $? -eq 0 ]; then
 fi
 echo -e "Loading xdma driver... "
 
-# Load the driver in the default or interrupt drive mode.
+# Load the driver and enable interrupt mode (interrupt mode = MSI-X).
+# Note: The interrupt mode can be configured by passing an argument to the insmod command.
+# interrupt_mode=0: auto
+# interrupt_mode=1: MSI
+# interrupt_mode=2: legacy
+# interrupt_mode=3: MSI-X
+# interrupt_mode=4: do not use interrupt, poll mode only
 
-insmod ./xdma.ko
+insmod ./xdma.ko interrupt_mode=3
+
+# Check if the driver was loaded successfully.
 
 if [ $? -ne 0 ]; then
     echo -e "${RED}Error: Kernel module did not load properly.${NC}"

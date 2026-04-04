@@ -300,6 +300,20 @@ vuprs::FPGA_IOManagerForInterrput::FPGA_IOManagerForInterrput(const std::string 
     }
 }
 
+vuprs::FPGA_IOManagerForInterrput::SetTimeout(uint32_t timeout_ms)
+{
+    if (timeout_ms < 1)
+    {
+        timeout_ms = 1;  /* set min timeout to 1 ms */
+    }
+    else if (timeout_ms > 1000)
+    {
+        timeout_ms = 1000;  /* set max timeout to 1 s */
+    }
+
+    this->timeout_ms = timeout_ms;
+}
+
 vuprs::FPGA_IOManagerForInterrput::~FPGA_IOManagerForInterrput()
 {
     this->fd = -1;
@@ -322,12 +336,37 @@ bool vuprs::FPGA_IOManagerForInterrput::ReadEvent(uint32_t *readValue)
         throw std::runtime_error("in [FPGA_IOManagerForInterrput::ReadEvent] FPGA device file is not opened.");
     }
 
-    int ioBytes;
+    *readValue = 0;
+
+    fd_set read_fds;
+    FD_ZERO(&read_fds);
+
+    timeval timeout;
+    timeout.tv_sec = 0;
+    timeout.tv_usec = this->timeout_ms * 1000;  /* timeout = timeout_ms ms */
 
     {
         std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
-        ioBytes = ::read(this->fd, readValue, sizeof(uint32_t));
-    }
 
-     return static_cast<uint64_t>(ioBytes) == sizeof(uint32_t);
+        FD_SET(this->fd, &read_fds);
+        
+        int selectResult = ::select(this->fd + 1, &read_fds, nullptr, nullptr, &timeout);  /* wait for interrupt */
+
+        if (selectResult < 0)  /* error */
+        {
+            throw std::runtime_error("in [FPGA_IOManagerForInterrput::ReadEvent] Select error (return -1).");
+        }
+        if (selectResult == 0)  /* timeout */
+        {
+            *readValue = 0;  /* indicate no interrupt */
+            return true;  /* return true for timeout */
+        }
+        if (!FD_ISSET(this->fd, &read_fds))  /* no interrupt */
+        {
+            throw std::runtime_error("in [FPGA_IOManagerForInterrput::ReadEvent] No interrupt detected after select.");
+        }
+
+        int ioBytes = ::read(this->fd, readValue, sizeof(uint32_t));  /* read interrupt event (1: interrupt detected, 0: no interrupt) */
+        return static_cast<uint64_t>(ioBytes) == sizeof(uint32_t);
+    }
 }

@@ -149,6 +149,7 @@ namespace vuprs
                 }
 
                 std::shared_ptr<vuprs::FPGA_IOManagerForInterrput> manager;
+                *readValue = 0;
                 
                 {
                     std::unique_lock<std::mutex> lock(this->mut_event);  /* LOCK */

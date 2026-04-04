@@ -34,6 +34,21 @@ namespace vuprs
 
             EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };
+
+    class Beamformer_MVDR: public vuprs::WidebandBeamformerTemplate
+    {
+        protected:
+
+            void CalculateBeamformingForOneFreq(int freqIndex) override;
+
+        public:
+
+            Beamformer_MVDR();
+
+            ~Beamformer_MVDR();
+
+            EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+    };
 }
 
 #endif

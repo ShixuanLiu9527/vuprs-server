@@ -39,11 +39,21 @@ vuprs::ARM_FPGA_CollaborationBeamfomer::ARM_FPGA_CollaborationBeamfomer()
     this->configdone = false;
     this->system_run = false;
     this->hardwareSamplingFrequency = 0.0;
+
+    this->BindBeamformer(std::make_unique<vuprs::Beamformer_DCRCB>());  /* default: DCRCB */
 }
 
 vuprs::ARM_FPGA_CollaborationBeamfomer::~ARM_FPGA_CollaborationBeamfomer()
 {
     this->STOP();
+}
+
+void vuprs::ARM_FPGA_CollaborationBeamfomer::BindBeamformer(std::unique_ptr<vuprs::WidebandBeamformerTemplate> beamformer = nullptr)
+{
+    if (beamformer != nullptr)
+    {
+        this->bf = std::move(beamformer);
+    }
 }
 
 bool vuprs::ARM_FPGA_CollaborationBeamfomer::ConfigDone() const
@@ -57,7 +67,7 @@ bool vuprs::ARM_FPGA_CollaborationBeamfomer::InitCollaborationBeamfomer(const st
     try
     {
         operateStatus &= this->controller.ConfigFPGAFromJson(fpgaConfigJson);
-        operateStatus &= this->bf.ConfigArrayFromJson(bfArrayConfigJson);
+        operateStatus &= this->bf->ConfigArrayFromJson(bfArrayConfigJson);
         operateStatus &= this->fir.ConfigFIRFromJsonFile(firConfigJon);
     }
     catch(const std::exception& e)
@@ -84,7 +94,7 @@ bool vuprs::ARM_FPGA_CollaborationBeamfomer::ResetHardwareBeamformer()
 
     {
         std::unique_lock<std::mutex> lock(this->mut_alg);
-        this->bf.ResetCovarianceMatrices();
+        this->bf->ResetCovarianceMatrices();
     }
 
     this->system_run = false;
@@ -145,25 +155,29 @@ bool vuprs::ARM_FPGA_CollaborationBeamfomer::StartBeamformerWithConfiguration(co
         std::unique_lock<std::mutex> lock(this->mut_alg);  /* LOCK */
         this->hardwareSamplingFrequency = this->controller.dev__ADC_Controller.SCI2FS(SCI);
 
-        this->bf.ResetCovarianceMatrices();
-        this->bf.SetCovarianceMatrixFittingParam(config.bf_cov_snapshotsWindowSize, config.bf_cov_freqAverageIndex);
-        this->bf.SetTargetDirection(config.bf_target__alt, config.bf_target__az, config.bf_waveVelocity);
+        this->bf->ResetCovarianceMatrices();
+        this->bf->SetCovarianceMatrixFittingParam(config.bf_cov_snapshotsWindowSize, config.bf_cov_freqAverageIndex);
+        this->bf->SetTargetDirection(config.bf_target__alt, config.bf_target__az, config.bf_waveVelocity);
 
         /* Get predelay */
 
-        this->bf.UpdateAndGetElementPredelay(this->fir.FIRLength(), this->hardwareSamplingFrequency, true,
+        this->bf->UpdateAndGetElementPredelay(this->fir.FIRLength(), this->hardwareSamplingFrequency, true,
             &predelayCount, &predelayTime, &channelName);
 
          /* Set frequency range */
 
         this->fir.SetFrequencyRange(config.bf_freq__lower, config.bf_freq__upper);
-        this->fir.GetZeroFIRBankCoefficient(&firCoefficients, this->bf.ElementCount());
+        this->fir.GetZeroFIRBankCoefficient(&firCoefficients, this->bf->ElementCount());
         FIR_LENGTH = this->fir.FIRLength();
     }
 
     /* System reset FPGA */
 
     retval &= this->ResetHardwareBeamformer();
+
+    /* Set timeout for DMA interrupt (timeout = interrupt wait time / 100) */
+
+    retval &= vuprs::FPGA_API_DMA__SetTimeoutForInterrupt(&this->controller, this->interruptWaitTime_us / (1000 * 100));
 
     /* FPGA: STEP 1 - Config DMA */
 
@@ -197,7 +211,7 @@ void vuprs::ARM_FPGA_CollaborationBeamfomer::ReDirect(double alt, double az, dou
 {
     {
         std::unique_lock<std::mutex> lock(this->mut_alg);  /* LOCK */
-        this->bf.SetTargetDirection(alt, az, waveVelocity);
+        this->bf->SetTargetDirection(alt, az, waveVelocity);
     }
 }
 
@@ -459,16 +473,16 @@ void vuprs::ARM_FPGA_CollaborationBeamfomer::THREAD__AlgorithmCalculation()
 
             /* Push data to Beam forming algorithm */
 
-            this->bf.InputSignal(signal);  /* Input signal */
-            this->bf.UpdateCovarianceMatrix();  /* Update covariance matrix */
+            this->bf->InputSignal(signal);  /* Input signal */
+            this->bf->UpdateCovarianceMatrix();  /* Update covariance matrix */
 
-            if (!this->bf.CalculateEnable())
+            if (!this->bf->CalculateEnable())
             {
                 throw std::runtime_error("in [ARM_FPGA_CollaborationBeamfomer::THREAD__AlgorithmCalculation] Beam forming algorithm cannot calculate.");
             }
 
-            this->bf.CalculateBeamforming();  /* Calculate beam forming */
-            this->bf.GetFIRExpectedFrequencyResponse(&firExpectedFrequencyResponse, &channelName, true);  /* Get FIR filter bank expected frequency response */
+            this->bf->CalculateBeamforming();  /* Calculate beam forming */
+            this->bf->GetFIRExpectedFrequencyResponse(&firExpectedFrequencyResponse, &channelName, true);  /* Get FIR filter bank expected frequency response */
 
             /* Convert frequency response to FIR coefficients */
 

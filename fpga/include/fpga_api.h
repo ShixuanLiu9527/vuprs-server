@@ -253,6 +253,19 @@ namespace vuprs
         vuprs::AXI_DMA_ScatterGatherDescriptor *currentDescriptor, 
         vuprs::AXI_DMA_ScatterGatherDescriptor *previousDescriptor,
         vuprs::AXI_DMA_ScatterGatherDescriptor *nextDescriptor);
+
+    /**
+     * @brief Set timeout for interrupt detection in AXI DMA.
+     * 
+     * @param controller FPGA controller.
+     * @param timeout_ms timeout in milliseconds.
+     *
+     * @retval true: success.
+     * @retval false: failed.
+     * 
+     * @throw std::runtime_error
+     */
+    bool FPGA_API_DMA__SetTimeoutForInterrupt(vuprs::FPGAController *controller, uint32_t timeout_ms);
 }
 
 #endif

@@ -74,7 +74,7 @@ namespace vuprs
             std::queue<vuprs::SignalData> arraySignalQueue;  /* Array signal queue, [controlled by mut_alg] */
             
             vuprs::FIRCalculator fir;  /* FIR algorithm, [controlled by mut_alg] (can be only used in THREAD__AlgorithmCalculation) */
-            vuprs::Beamformer_DCRCB bf;  /* Beam forming algorithm, [controlled by mut_alg] (can be only used in THREAD__AlgorithmCalculation) */
+            std::unique_ptr<vuprs::WidebandBeamformerTemplate> bf;  /* Beam forming algorithm, [controlled by mut_alg] (can be only used in THREAD__AlgorithmCalculation) */
             double hardwareSamplingFrequency;  /* Hardware sampling frequency, calculate by SCI register, [controlled by mut_alg] */
 
             /* DMA Interrupt */
@@ -145,6 +145,13 @@ namespace vuprs
              * @param firConfigJson FIR filter config JSON file.
              */
             bool InitCollaborationBeamfomer(const std::string &fpgaConfigJson, const std::string &bfArrayConfigJson, const std::string &firConfigJon);
+
+            /**
+             * @brief Bind beam forming algorithm.
+             * 
+             * @param beamformer beam forming algorithm (must be created by user, and bind to this class).
+             */
+            void BindBeamformer(std::unique_ptr<vuprs::WidebandBeamformerTemplate> beamformer = nullptr);
 
             /**
              * @brief Indicate beam former has started.

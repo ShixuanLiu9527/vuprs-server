@@ -89,7 +89,7 @@ namespace vuprs
 
             WidebandBeamformerTemplate();
 
-            virtual ~WidebandBeamformerTemplate() = default;
+            virtual ~WidebandBeamformerTemplate();
 
             /* STEP 1: CONFIG */
 

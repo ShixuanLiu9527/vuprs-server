@@ -19,13 +19,6 @@ vuprs::Beamformer_DCRCB::~Beamformer_DCRCB()
 
 void vuprs::Beamformer_DCRCB::CalculateBeamformingForOneFreq(int freqIndex)
 {
-    if (freqIndex == 0)
-    {
-        std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
-        this->resultWeightVectors.col(freqIndex) *= 0;
-        return;
-    }
-
     Eigen::Matrix<Eigen::dcomplex, -1, 1> ps;  /* steering vector for this frequency: ps */
     Eigen::Matrix<Eigen::dcomplex, -1, -1> R;  /* covariance matrix: R */
     double fs;  /* sampling frequency: fs */
@@ -167,11 +160,6 @@ vuprs::Beamformer_CBF::~Beamformer_CBF()
 void vuprs::Beamformer_CBF::CalculateBeamformingForOneFreq(int freqIndex)
 {
     std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
-    if (freqIndex == 0)
-    {
-        this->resultWeightVectors.col(freqIndex) *= 0;
-        return;
-    }
     Eigen::Matrix<Eigen::dcomplex, -1, 1> ps = this->steeringVectors.col(freqIndex);  /* ps */
     double M = this->array.elementArray.size();  /* M */
     this->resultWeightVectors.col(freqIndex) = ps / M;
@@ -191,4 +179,63 @@ void vuprs::Beamformer_CBF::CalculateBeamformingForOneFreq(int freqIndex)
         }
 
     #endif
+}
+
+/* ------------------------------------------------------------------------------ */
+/* ------------------------------------ MVDR ------------------------------------ */
+/* ------------------------------------------------------------------------------ */
+
+vuprs::Beamformer_MVDR::Beamformer_MVDR()
+{
+
+}
+
+vuprs::Beamformer_MVDR::~Beamformer_MVDR()
+{
+
+}
+
+void vuprs::Beamformer_MVDR::CalculateBeamformingForOneFreq(int freqIndex)
+{
+    Eigen::Matrix<Eigen::dcomplex, -1, 1> ps;  /* steering vector for this frequency: ps */
+    Eigen::Matrix<Eigen::dcomplex, -1, -1> R;  /* covariance matrix: R */
+    double fs;  /* sampling frequency: fs */
+    int M;  /* element number: M */
+
+    {
+        std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
+        ps = this->steeringVectors.col(freqIndex);
+        fs = this->signalFrequencyList(freqIndex);
+        R = this->estimate_covMatrix[freqIndex];
+        M = this->array.elementArray.size();
+    }
+
+    Eigen::Matrix<Eigen::dcomplex, -1, -1> invR;  /* R.-1 = U * GAMMA.-1 * U.H */
+    Eigen::Matrix<Eigen::dcomplex, -1, 1> invR_ps;  /* R.-1 * ps */
+    Eigen::Matrix<Eigen::dcomplex, -1, 1> w;  /* result weight = (R.-1 * ps) / (ps.H * R.-1 * ps) */
+
+    invR = R.inverse();
+    invR_ps = invR * ps;
+    w = invR_ps / (ps.adjoint() * invR_ps)(0, 0);
+
+    {
+        std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
+        this->resultWeightVectors.col(freqIndex) = w;
+
+        #if (BEAM_FORMER_CPP__DEBUG_SAVE || BEAM_FORMER_CPP__DEBUG_PRINT)
+
+            /* DEBUG ! */
+
+            if (freqIndex == 100 || freqIndex == 200)
+            {
+                #if BEAM_FORMER_CPP__DEBUG_SAVE
+                    vuprs::SaveToCSV_complex(this->resultWeightVectors.col(freqIndex), "../weights/weight_" + std::to_string(freqIndex) + ".csv");
+                #endif
+                #if BEAM_FORMER_CPP__DEBUG_PRINT
+                    printf("[debug] MVDR: frequency (@ index = %d) = %.6f Hz\n", freqIndex, this->signalFrequencyList(freqIndex));
+                #endif
+            }
+
+        #endif
+    }
 }

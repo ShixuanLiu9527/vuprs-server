@@ -455,6 +455,35 @@ void vuprs::LinuxServer::THREAD__Control()
                 operationStatus = true;
                 break;
             }
+            case vuprs::ServerCommand::SERVER_CMD__CHANGE_BEAMFORMER:
+            {
+                if (_cmdINFO.beamformer_name == "dcrcb")
+                {
+                    this->beamformer.BindBeamformer(std::make_unique<vuprs::Beamformer_DCRCB>());
+                    this->beamformer.STOP();
+                    this->beamformer.RUN(this->beamFormerConfig);
+                    operationStatus = true;
+                }
+                else if (_cmdINFO.beamformer_name == "cbf")
+                {
+                    this->beamformer.BindBeamformer(std::make_unique<vuprs::Beamformer_CBF>());
+                    this->beamformer.STOP();
+                    this->beamformer.RUN(this->beamFormerConfig);
+                    operationStatus = true;
+                }
+                else if (_cmdINFO.beamformer_name == "mvdr")
+                {
+                    this->beamformer.BindBeamformer(std::make_unique<vuprs::Beamformer_MVDR>());
+                    this->beamformer.STOP();
+                    this->beamformer.RUN(this->beamFormerConfig);
+                    operationStatus = true;
+                }
+                else
+                {
+                    operationStatus = false;
+                }
+                break;
+            }
             case vuprs::ServerCommand::SERVER_CMD__REDIRECT:  /* use this.config */
             {
                 this->beamformer.ReDirect(_cmdINFO.config.bf_target__alt, _cmdINFO.config.bf_target__az, _cmdINFO.config.bf_waveVelocity);
