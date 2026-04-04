@@ -26,63 +26,76 @@ void vuprs::Beamformer_DCRCB::CalculateBeamformingForOneFreq(int freqIndex)
         return;
     }
 
-    Eigen::Matrix<Eigen::dcomplex, -1, 1> ps;  /* ps */
-    Eigen::Matrix<Eigen::dcomplex, -1, -1> covMatrix;  /* cov matrix */
-    double signalFreq;
-    double steeringErrorRadius;
-    int M;
+    Eigen::Matrix<Eigen::dcomplex, -1, 1> ps;  /* steering vector for this frequency: ps */
+    Eigen::Matrix<Eigen::dcomplex, -1, -1> R;  /* covariance matrix: R */
+    double fs;  /* sampling frequency: fs */
+    double e0;  /* max steering error radius: e0 */
+    int M;  /* element number: M */
 
     {
         std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
-        ps = this->steeringVectors.col(freqIndex);  /* ps */
-        signalFreq = this->signalFrequencyList(freqIndex);
-        covMatrix = this->estimate_covMatrix[freqIndex];
-        steeringErrorRadius = this->array.CalculateSteeringVectorErrorRadius(signalFreq);
+        ps = this->steeringVectors.col(freqIndex);
+        fs = this->signalFrequencyList(freqIndex);
+        R = this->estimate_covMatrix[freqIndex];
+        e0 = this->array.CalculateSteeringVectorErrorRadius(fs);
         M = this->array.elementArray.size();
     }
 
-    Eigen::Matrix<double, -1, 1> gamma_eigenvalues;  /* matrix gamma (pre diag) */
-    Eigen::Matrix<double, -1, 1> inv_gamma_eigenvalues;  /* matrix gamma.(-1) (pre diag) */
-    Eigen::Matrix<double, -1, 1> zs2;  /* zs .* zs */
-    Eigen::Matrix<Eigen::dcomplex, -1, -1> u_eigenvectors;  /* matrix U, R = U * GAMMA * U.H */
+    Eigen::Matrix<double, -1, 1> gamma;  /* matrix gamma (Note: not diag) */
+    Eigen::Matrix<double, -1, 1> inv_gamma;  /* matrix gamma.(-1) (Note: not diag) */
+    Eigen::Matrix<Eigen::dcomplex, -1, -1> U;  /* matrix U, R = U * gamma * U.H */
+    Eigen::Matrix<Eigen::dcomplex, -1, -1> U_H;  /* matrix U.H, R = U * gamma * U.H */
     Eigen::Matrix<Eigen::dcomplex, -1, 1> zs;  /* zs = U.H @ ps */
+    Eigen::Matrix<double, -1, 1> zs2;  /* zs2 = zs .* zs */
+
+    double max_eig;  /* max(eigenvalues) */
+    double min_eig;  /* min(eigenvalues) */
+    double rho = (double)M / pow((double)M - e0 / 2.0, 2.0);  /* M / (M - e0 / 2)^2 */
+    double sqrt_M_rho = sqrt((double)M * rho);  /* sqrt(M * rho) */
+
+    /* STEP 1: Eigenvalue decomposition for covariance matrix R */
+
+    vuprs::EigenvalueDecomposition(R, &gamma, &U);
+
+    inv_gamma = gamma.array().pow(-1.0).matrix();
+    U_H = U.adjoint();
+
+    min_eig = gamma.minCoeff();
+    max_eig = gamma.maxCoeff();
+
+    #if (BEAM_FORMER_CPP__DEBUG_SAVE || BEAM_FORMER_CPP__DEBUG_PRINT)
+
+        /* DEBUG ! */
+
+        if (freqIndex == 100 || freqIndex == 200)
+        {
+            #if BEAM_FORMER_CPP__DEBUG_PRINT
+                printf("[debug] DCRCB: (max, min) eigenvalue (@ index = %d) is (%.6f, %.6f)\n", freqIndex, max_eig, min_eig);
+            #endif
+        }
+
+    #endif
+
+    zs = U_H * ps;
+    zs2 = zs.array().abs2().matrix();
+
+    /* STEP 2: Prepare and do solving */
 
     vuprs::IterationConfig iter;
-
-    double max_eigenvalues, min_eigenvalues;
-    double _max_eigenvalues;  /* 1 / max(eig) */
-    double _min_eigenvalues;  /* 1 / min(eig) */
-    double rho = (double)M / pow((double)M - steeringErrorRadius / 2.0, 2.0);
-    double sqrt_M_rho = sqrt((double)M * rho);
-    double result_val;  /* result lambda */
+    double lambda;  /* result lambda */
     
     vuprs::SetIterationConfigDefault(&iter);
 
-    /* Eigenvalue decomposition */
-
-    vuprs::EigenvalueDecomposition(covMatrix, &gamma_eigenvalues, &u_eigenvectors);
-
-    inv_gamma_eigenvalues = gamma_eigenvalues.array().pow(-1.0).matrix();
-
-    min_eigenvalues = gamma_eigenvalues.minCoeff();
-    max_eigenvalues = gamma_eigenvalues.maxCoeff();
-
-    _min_eigenvalues = 1.0 / min_eigenvalues;
-    _max_eigenvalues = 1.0 / max_eigenvalues;
-
-    zs = u_eigenvectors.adjoint() * ps;
-    zs2 = zs.array().abs2().matrix();
-
     /* Generate range */
 
-    iter.lowerRegion = -_min_eigenvalues;
-    iter.upperRegion = (_max_eigenvalues - sqrt_M_rho * _min_eigenvalues) / (sqrt_M_rho - 1.0);
+    iter.lowerRegion = -(1.0 / max_eig);  /* -1/max(eig) */
+    iter.upperRegion = ((1.0 / min_eig) - sqrt_M_rho / max_eig) / (sqrt_M_rho - 1.0);  /* [(1/min(eig) - sqrt(M * rho)/max(eig)) / (sqrt(M*rho) - 1)] */
     
     /* Generate function: f(val) = h(val) - rho */
 
-    auto func_lambda = [&zs2, &inv_gamma_eigenvalues, &rho](double val) -> double
+    auto func_lambda = [&zs2, &inv_gamma, &rho](double val) -> double
     {
-        Eigen::Matrix<double, -1, 1> part0 = (inv_gamma_eigenvalues.array() + val).matrix();
+        Eigen::Matrix<double, -1, 1> part0 = (inv_gamma.array() + val).matrix();
         Eigen::Matrix<double, -1, 1> part1 = part0.array().pow(-1.0).matrix();
         Eigen::Matrix<double, -1, 1> part2 = part0.array().pow(-2.0).matrix();
 
@@ -93,23 +106,31 @@ void vuprs::Beamformer_DCRCB::CalculateBeamformingForOneFreq(int freqIndex)
 
     /* Iteration */
 
-    BisectionIteration1D(iter, &result_val);
+    BisectionIteration1D(iter, &lambda);
 
-    /* Get weight vector for this frequency band */
+    /* STEP 3: Get ps_hat */
 
-    Eigen::Matrix<Eigen::dcomplex, -1, -1> invR_plus_lambdaI_inv = \
-        u_eigenvectors * ((inv_gamma_eigenvalues.array() + result_val).array().pow(-1.0).matrix().asDiagonal()) * u_eigenvectors.adjoint();  /* (R.-1 + lambda * I).-1 */
-    Eigen::Matrix<Eigen::dcomplex, -1, 1> invR_plus_lambdaI_inv__mul__ps = invR_plus_lambdaI_inv * ps;
+    Eigen::Matrix<Eigen::dcomplex, -1, -1> inv_gamma_lambda_I;  /* (gamma.-1 + lambda * I).-1 */
+    Eigen::Matrix<Eigen::dcomplex, -1, 1> invR_lambdaI_inv_mul_ps;  /* ((R.-1 + lambda * I).-1) * ps */
+    Eigen::Matrix<Eigen::dcomplex, -1, 1> ps_hat;  /* (M - e0 / 2) * [((R.-1 + lambda * I).-1) * ps] / [ps.H * ((R.-1 + lambda * I).-1) * ps] */
 
-    Eigen::Matrix<Eigen::dcomplex, -1, 1> ps_estimate = \
-        ((double)M - steeringErrorRadius / 2.0) * invR_plus_lambdaI_inv__mul__ps / (ps.adjoint() * invR_plus_lambdaI_inv__mul__ps)(0, 0);
+    inv_gamma_lambda_I = (inv_gamma.array() + lambda).array().pow(-1.0).matrix().asDiagonal();
+    invR_lambdaI_inv_mul_ps = U * inv_gamma_lambda_I * U_H * ps;
+    ps_hat = ((double)M - e0 / 2.0) * invR_lambdaI_inv_mul_ps / ((ps.adjoint() * invR_lambdaI_inv_mul_ps)(0, 0));
 
-    Eigen::Matrix<Eigen::dcomplex, -1, -1> invR = u_eigenvectors * inv_gamma_eigenvalues.asDiagonal() * u_eigenvectors.adjoint();  /* R.-1 = U * GAMMA.-1 * U.H */
-    Eigen::Matrix<Eigen::dcomplex, -1, -1> invR__mul__ps_estimate = invR * ps_estimate;
+    /* STEP 4: Get w */
+
+    Eigen::Matrix<Eigen::dcomplex, -1, -1> invR;  /* R.-1 = U * GAMMA.-1 * U.H */
+    Eigen::Matrix<Eigen::dcomplex, -1, 1> invR_ps_hat;  /* R.-1 * ps.hat */
+    Eigen::Matrix<Eigen::dcomplex, -1, 1> w;  /* result weight = (R.-1 * ps_hat) / (ps_hat.H * R.-1 * ps_hat) */
+
+    invR = U * inv_gamma.asDiagonal() * U_H;
+    invR_ps_hat = invR * ps_hat;
+    w = invR_ps_hat / (ps_hat.adjoint() * invR_ps_hat)(0, 0);
 
     {
         std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
-        this->resultWeightVectors.col(freqIndex) = invR__mul__ps_estimate / (ps_estimate.adjoint() * invR__mul__ps_estimate)(0, 0);
+        this->resultWeightVectors.col(freqIndex) = w;
 
         #if (BEAM_FORMER_CPP__DEBUG_SAVE || BEAM_FORMER_CPP__DEBUG_PRINT)
 
@@ -127,7 +148,6 @@ void vuprs::Beamformer_DCRCB::CalculateBeamformingForOneFreq(int freqIndex)
 
         #endif
     }
-    
 }
 
 /* ------------------------------------------------------------------------------ */
