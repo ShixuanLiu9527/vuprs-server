@@ -48,7 +48,7 @@ vuprs::ARM_FPGA_CollaborationBeamfomer::~ARM_FPGA_CollaborationBeamfomer()
     this->STOP();
 }
 
-void vuprs::ARM_FPGA_CollaborationBeamfomer::BindBeamformer(std::unique_ptr<vuprs::WidebandBeamformerTemplate> beamformer = nullptr)
+void vuprs::ARM_FPGA_CollaborationBeamfomer::BindBeamformer(std::unique_ptr<vuprs::WidebandBeamformerTemplate> beamformer)
 {
     if (beamformer != nullptr)
     {
@@ -207,12 +207,26 @@ bool vuprs::ARM_FPGA_CollaborationBeamfomer::StartBeamformerWithConfiguration(co
     return retval;
 }
 
-void vuprs::ARM_FPGA_CollaborationBeamfomer::ReDirect(double alt, double az, double waveVelocity)
+bool vuprs::ARM_FPGA_CollaborationBeamfomer::ReDirect(double alt, double az, double waveVelocity)
 {
+    std::vector<int> predelayCount;
+    std::vector<double> predelayTime;
+    std::vector<std::string> channelName;
+
     {
         std::unique_lock<std::mutex> lock(this->mut_alg);  /* LOCK */
+
+        /* Set target direction */
+
         this->bf->SetTargetDirection(alt, az, waveVelocity);
+
+        /* Get predelay */
+
+        this->bf->UpdateAndGetElementPredelay(this->fir.FIRLength(), this->hardwareSamplingFrequency, true,
+            &predelayCount, &predelayTime, &channelName);
     }
+
+    return vuprs::FPGA_API__PDLY__SetPredelay(&this->controller, predelayCount, channelName);
 }
 
 bool vuprs::ARM_FPGA_CollaborationBeamfomer::IS_RUN() const

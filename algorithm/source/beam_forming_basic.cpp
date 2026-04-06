@@ -204,6 +204,7 @@ void vuprs::BeamFormingArray::UpdateTimeDelay(double targetAlt, double targetAz,
     {
         this->elementArray[i].UpdataTimeDelay(targetAlt, targetAz, waveVelocity);
         this->timeDelayVector(i, 0).real(this->elementArray[i].timeDelay);
+        this->timeDelayVector(i, 0).imag(0.0);
     }
 }
 

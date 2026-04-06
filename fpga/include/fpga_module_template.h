@@ -755,6 +755,35 @@ namespace vuprs
                 return this->EventIO(readValue);
             }
 
+            /**
+             * @brief Set interrupt timeout.
+             * 
+             * @param timeout_ms timeout in milliseconds (for select).
+             * 
+             * @retval true: success.
+             * @retval false: failed.
+             */
+            bool SetInterruptTimeout(uint32_t timeout_ms)
+            {
+                if (!this->isIOManagerBind_Interrupt) 
+                {
+                    throw std::runtime_error("in [FPGADeviceTemplate::SetInterruptTimeout] FPGA event file manager is NULL.");
+                }
+
+                std::shared_ptr<vuprs::FPGA_IOManagerForInterrput> manager;
+
+                {
+                    std::unique_lock<std::mutex> lock(this->mut_event);  /* LOCK */
+                    manager = this->bindIOManager_Interrput.lock();
+                }
+
+                if (!manager) return false;
+
+                return manager->SetTimeout(timeout_ms);
+            }
+
+            /* ------------------------------- Device flag ----------------------------------- */
+
             bool ConfigDone() const
             {
                 return this->configdone;

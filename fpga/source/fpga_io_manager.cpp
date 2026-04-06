@@ -300,7 +300,7 @@ vuprs::FPGA_IOManagerForInterrput::FPGA_IOManagerForInterrput(const std::string 
     }
 }
 
-vuprs::FPGA_IOManagerForInterrput::SetTimeout(uint32_t timeout_ms)
+bool vuprs::FPGA_IOManagerForInterrput::SetTimeout(uint32_t timeout_ms)
 {
     if (timeout_ms < 1)
     {
@@ -312,6 +312,7 @@ vuprs::FPGA_IOManagerForInterrput::SetTimeout(uint32_t timeout_ms)
     }
 
     this->timeout_ms = timeout_ms;
+    return true;
 }
 
 vuprs::FPGA_IOManagerForInterrput::~FPGA_IOManagerForInterrput()

@@ -219,7 +219,7 @@ namespace vuprs
             FPGA_IOManagerForInterrput(const std::string &deviceFilename);
             ~FPGA_IOManagerForInterrput();
 
-            void SetTimeout(uint32_t timeout_ms = 100);
+            bool SetTimeout(uint32_t timeout_ms = 100);
 
             bool ReadEvent(uint32_t *readValue);
     };

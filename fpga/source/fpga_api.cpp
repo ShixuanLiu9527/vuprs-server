@@ -627,6 +627,6 @@ bool vuprs::FPGA_API_DMA__SetTimeoutForInterrupt(vuprs::FPGAController *controll
         throw std::runtime_error("in [vuprs::FPGA_API_DMA__SetTimeoutForInterrupt] FPGA Controller not configured in advance.");
     }
 
-    controller->dev__AXI_DMA.SetTimeout(timeout_ms);
+    controller->dev__AXI_DMA.SetInterruptTimeout(timeout_ms);
     return true;
 }
