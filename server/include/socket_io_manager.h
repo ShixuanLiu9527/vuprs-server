@@ -5,6 +5,8 @@
 #include <mutex>
 #include <memory>
 #include <cstring>
+#include <sys/socket.h>
+#include <unistd.h>
 
 #include "aligned_buffer.h"
 
@@ -43,6 +45,7 @@ namespace vuprs
         public:
 
             SocketIOManager(int client_fd, const sockaddr_in &client_addr);
+            ~SocketIOManager();
 
             std::string ClientInformation() const;
 
@@ -67,6 +70,8 @@ namespace vuprs
              * @param data output data.
              */
             void ReceiveMessage(const std::string &tailer, vuprs::SocketReceiveData *data);
+
+            void CloseSocket();
     };
 
     /**
@@ -78,6 +83,8 @@ namespace vuprs
 
     /**
      * @brief Cut header & tailer.
+     * 
+     * @note This function will cut header & tailer from data, and store the content in result.
      */
     bool ParseMessageFromSocketData(const vuprs::SocketReceiveData &data, const std::string &header, const std::string &tailer, std::string *result);
 }

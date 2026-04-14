@@ -115,8 +115,6 @@ bool vuprs::PROTOCOL_ParseCommandFromMessage(const std::string &message, vuprs::
 	if (cmd == nullptr) return false;
 	if (message.empty()) return false;
 
-	cmd->cmd = vuprs::ServerCommand::SERVER_CMD__INVALID;
-	cmd->beamformer_name.clear();
 	vuprs::Set_ARM_FPGA_BF_Config_ToDefault(&cmd->config);
 
 	try

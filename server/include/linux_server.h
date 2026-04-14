@@ -105,10 +105,25 @@ namespace vuprs
 
             void THREAD__SendToMaster();
 
+            /**
+             * @brief Control thread, handle command from client.
+             * 
+             * @note When receive command, control thread will handle the command and 
+             * @note set serverResponseIRQ to true, then notify serverResponseCV to send response to client.
+             */
             void THREAD__Control();
 
             /**
              * @brief Client session callback.
+             * 
+             * @note This function is called when receive message from client, 
+             * @note and the message is parsed to command information. 
+             * 
+             * @note Then the command information is stored in this->cmdINFO, 
+             * @note and this->controlIRQ is set to true to notify control thread to handle the command. 
+             * 
+             * @note After handling the command, control thread will set this->serverResponseIRQ to true 
+             * @note and notify this->serverResponseCV to send response of this operation to client.
              */
             void SessionCallback(std::weak_ptr<vuprs::SocketIOManager> manager, const std::string& message);
 

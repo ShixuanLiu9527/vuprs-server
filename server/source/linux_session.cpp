@@ -59,7 +59,6 @@ void vuprs::LinuxSession::Start()
 {
     this->running = true;
     std::cout << "[session][" << this->ClientInformation() << "] start receive loop."   << std::endl;
-    this->SendMessage("[session] you are connected.");
     this->ReceiveLoop();
 }
 
@@ -68,6 +67,20 @@ void vuprs::LinuxSession::Stop()
     /* Close client file descriptor */
 
     this->running = false;
+
+    std::shared_ptr<vuprs::SocketIOManager> manager;
+    {
+        std::unique_lock<std::mutex> lock(this->mut);
+        manager = this->socketIOManager.lock();
+        this->socketIOManager.reset();
+    }
+
+    if (manager != nullptr)
+    {
+        manager->CloseSocket();
+    }
+
+    this->isIOManagerBind = false;
 }
 
 bool vuprs::LinuxSession::BindIOManager(std::shared_ptr<vuprs::SocketIOManager> ioManager)
@@ -107,6 +120,15 @@ void vuprs::LinuxSession::SetMessageHandler(vuprs::SessionMessageHandler handler
 void vuprs::LinuxSession::ReceiveLoop() 
 {
     vuprs::SocketReceiveData data;  /* received data */
+    std::string clientInfo = "unknown-client";
+
+    try
+    {
+        clientInfo = this->ClientInformation();
+    }
+    catch (...)
+    {
+    }
     
     while (this->running)
     {
@@ -134,7 +156,7 @@ void vuprs::LinuxSession::ReceiveLoop()
         }
         else if (!data.is_connect)  /* Connect shut down */
         {
-            std::cout << "[session][" << this->ClientInformation() << "] disconnected."  << std::endl;
+            std::cout << "[session][" << clientInfo << "] disconnected."  << std::endl;
             break;
         }
 
@@ -143,7 +165,7 @@ void vuprs::LinuxSession::ReceiveLoop()
     
     running = false;
 
-    std::cout << "[session][" << this->ClientInformation() << "] client service end." << std::endl;
+    std::cout << "[session][" << clientInfo << "] client service end." << std::endl;
 }
 
 std::string vuprs::LinuxSession::DefaultMessageProcess(const std::string& message) 

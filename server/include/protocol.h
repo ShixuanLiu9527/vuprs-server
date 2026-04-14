@@ -24,11 +24,16 @@ namespace vuprs
         SERVER_CMD__GET_NEW_DATA  /* Get newest data from server (Send DMA buffer to host) */
     };
 
+    /**
+     * @note Default value of cmd is SERVER_CMD__INVALID, which means invalid command.
+     */
     struct ServerCommandInformation
     {
         vuprs::ServerCommand cmd;
         ARM_FPGA_BF_Config config;  /* config info */
         std::string beamformer_name;  /* beam former name (for SERVER_CMD__CHANGE_BEAMFORMER) */
+
+        ServerCommandInformation() : cmd(vuprs::ServerCommand::SERVER_CMD__INVALID), beamformer_name("") {}
     };
 
     /**
@@ -39,7 +44,7 @@ namespace vuprs
      * @note If not found, keep message unchanged.
      */
     std::string RemoveFrameIfExists(const std::string &message, const std::string &header, const std::string &tailer);
-    
+
     /**
      * @brief Ensure frame header/tailer exist on boundaries.
      *

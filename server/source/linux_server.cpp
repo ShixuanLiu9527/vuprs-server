@@ -212,8 +212,9 @@ void vuprs::LinuxServer::THREAD__AcceptClient()
 
                 this->server_session->BindIOManager(this->socketIOManager);  /* Bind IO manager */
 
-                this->server_session->SetMessageHandler([this](std::weak_ptr<vuprs::SocketIOManager> manager, const std::string& message){
-                    this->SessionCallback(manager, message);
+                this->server_session->SetMessageHandler(
+                    [this](std::weak_ptr<vuprs::SocketIOManager> manager, const std::string& message){
+                        this->SessionCallback(manager, message);
                 });  /* Set message handler */
                 
                 this->server_session->Start();  /* Start session */
@@ -272,6 +273,18 @@ void vuprs::LinuxServer::Stop()
     this->serverResponseCV.notify_all();
     this->resultSendingCV.notify_all();
     this->controlCV.notify_all();
+
+    if (this->server_fd >= 0)
+    {
+        shutdown(this->server_fd, SHUT_RDWR);
+        close(this->server_fd);
+        this->server_fd = -1;
+    }
+
+    if (this->server_session)
+    {
+        this->server_session->Stop();
+    }
 
     for (auto &f: this->threads)
     {
@@ -348,9 +361,21 @@ void vuprs::LinuxServer::THREAD__SendToMaster()
 
         if (!queueEmpty)
         {
-            this->socketIOManager->SendMessage(header);  /* Send header */
-            this->socketIOManager->SendBuffer(resultToSend);  /* Send data */
-            this->socketIOManager->SendMessage(tailer);  /* Send tailer */
+            std::shared_ptr<vuprs::SocketIOManager> manager = this->socketIOManager;
+            if (!manager)
+            {
+                continue;
+            }
+
+            bool sendOk = true;
+            sendOk &= manager->SendMessage(header);  /* Send header */
+            sendOk &= manager->SendBuffer(resultToSend);  /* Send data */
+            sendOk &= manager->SendMessage(tailer);  /* Send tailer */
+
+            if (!sendOk)
+            {
+                std::cout << "[server][send] send data frame failed." << std::endl;
+            }
         }
     }
 }
@@ -375,13 +400,38 @@ void vuprs::LinuxServer::SessionCallback(std::weak_ptr<vuprs::SocketIOManager> m
 
     try
     {
-        message = vuprs::RemoveFrameIfExists(message, header, tailer);  /* Remove frame */
-        parseStatus = vuprs::PROTOCOL_ParseCommandFromMessage(message, &_cmdINFO);
+        parseStatus = vuprs::PROTOCOL_ParseCommandFromMessage(message, &_cmdINFO);  /* NOTE: header & tailer is cut in advance */
     }
     catch(const std::exception& e)
     {
         std::cout << "Error: " << e.what() << std::endl;
     }
+
+    /* --------------------------------------------------------------- */
+    /* ----------------- Failed: Immediate response ------------------ */
+    /* --------------------------------------------------------------- */
+
+    if (!parseStatus)
+    {
+        /* Invalid command, response with error message */
+
+        sendString = vuprs::PROTOCOL_MakeServerResponse(_cmdINFO, false);
+        sendString = vuprs::AddFrameIfMissing(sendString, header, tailer);
+
+        std::shared_ptr<vuprs::SocketIOManager> _manager = manager.lock();
+        if (_manager != nullptr)
+        {
+            if (!_manager->SendMessage(sendString))
+            {
+                std::cout << "[server][response] failed to send parse-error response." << std::endl;
+            }
+        }
+        return;
+    }
+
+    /* --------------------------------------------------------------- */
+    /* ---------- Normal: Response by the certain thread ------------- */
+    /* --------------------------------------------------------------- */
 
     /* Load command information */
 
@@ -390,19 +440,19 @@ void vuprs::LinuxServer::SessionCallback(std::weak_ptr<vuprs::SocketIOManager> m
         this->cmdINFO = _cmdINFO;
     }
 
-    if (parseStatus)
-    {
-        this->controlIRQ = true;
-        this->controlCV.notify_all();
-    }
-
-    /* Wait for response */
+    this->controlIRQ = true;
+    this->controlCV.notify_all();
 
     {
         std::unique_lock<std::mutex> lock(this->mut_response);
         this->serverResponseCV.wait(lock, [this]{
-            return this->serverResponseIRQ.load();
+            return !this->server_running || this->serverResponseIRQ.load();
         });
+    }
+
+    if (!this->server_running)
+    {
+        return;
     }
 
     /* Get response message */
@@ -423,7 +473,10 @@ void vuprs::LinuxServer::SessionCallback(std::weak_ptr<vuprs::SocketIOManager> m
         _manager = manager.lock();
         if (_manager != nullptr)
         {
-            _manager->SendMessage(sendString);
+            if (!_manager->SendMessage(sendString))
+            {
+                std::cout << "[server][response] failed to send response message." << std::endl;
+            }
         }
     }
 }
