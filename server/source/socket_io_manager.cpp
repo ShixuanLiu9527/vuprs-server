@@ -48,18 +48,26 @@ bool vuprs::SocketIOManager::SendBuffer(const std::vector<double> &buffer)
         return false;
     }
 
-    ssize_t sent;
-
-    {
-        std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
-        sent = send(this->client_fd, buffer.data(), buffer.size() * sizeof(double), 0);
-    }
+    const char* data_ptr = reinterpret_cast<const char*>(buffer.data());
+    size_t total_sent = 0;
+    size_t remaining = buffer.size() * sizeof(double);
     
-    if (sent <= 0) 
+    std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
+
+    while (remaining > 0) 
     {
-        return false;
+        ssize_t sent = send(this->client_fd, data_ptr + total_sent, remaining, 0);
+
+        if (sent <= 0) 
+        {
+            return false;
+        }
+
+        total_sent += sent;
+        remaining -= sent;
     }
-    return sent == static_cast<ssize_t>(buffer.size() * sizeof(double));
+
+    return true;
 }
 
 void vuprs::SocketIOManager::ReceiveMessage(const std::string &tailer, vuprs::SocketReceiveData *data)

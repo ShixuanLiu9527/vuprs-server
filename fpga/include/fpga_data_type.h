@@ -1,5 +1,5 @@
-#ifndef FPGA_DATA_TYPE_CONVERT_H
-#define FPGA_DATA_TYPE_CONVERT_H
+#ifndef FPGA_DATA_TYPE_TYPE_H
+#define FPGA_DATA_TYPE_TYPE_H
 
 #include <stdint.h>
 #include <cmath>

@@ -9,7 +9,7 @@
 #include <algorithm>
 
 #include "aligned_buffer.h"
-#include "fpga_data_conv.h"
+#include "fpga_data_type.h"
 #include "file_processing.h"
 
 #define ADC_CHANNEL_NUMBER               16U

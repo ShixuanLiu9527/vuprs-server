@@ -3,7 +3,7 @@
     "max-port": "10000",
     "accept-client-counts": "1",
     "protocol": {
-        "command-header": "<start>",
-        "command-tailer": "<end>"
+        "command-header": "[HEADER]",
+        "command-tailer": "[TAILER]"
     }
 }

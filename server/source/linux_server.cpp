@@ -361,15 +361,33 @@ void vuprs::LinuxServer::SessionCallback(std::weak_ptr<vuprs::SocketIOManager> m
 
     bool parseStatus = false;
     std::string sendString, header, tailer;
+    vuprs::ServerCommandInformation _cmdINFO;
+
+    /* Get Frame Header and Tailer */
+
+    {
+        std::unique_lock<std::mutex> lock(this->mut_config);  /* LOCK */
+        header = this->server_config.protocol.commandHeader;
+        tailer = this->server_config.protocol.commandTailer;
+    }
+
+    /* Parse command */
 
     try
     {
-        std::unique_lock<std::mutex> lock(this->mut_cmd);  /* LOCK */
-        parseStatus = vuprs::PROTOCOL_ParseCommandFromMessage(message, &this->cmdINFO);
+        message = vuprs::RemoveFrameIfExists(message, header, tailer);  /* Remove frame */
+        parseStatus = vuprs::PROTOCOL_ParseCommandFromMessage(message, &_cmdINFO);
     }
     catch(const std::exception& e)
     {
         std::cout << "Error: " << e.what() << std::endl;
+    }
+
+    /* Load command information */
+
+    {
+        std::unique_lock<std::mutex> lock(this->mut_cmd);  /* LOCK */
+        this->cmdINFO = _cmdINFO;
     }
 
     if (parseStatus)
@@ -402,15 +420,10 @@ void vuprs::LinuxServer::SessionCallback(std::weak_ptr<vuprs::SocketIOManager> m
 
     if (this->serverNeedResponse)
     {
-        {
-            std::unique_lock<std::mutex> lock(this->mut_config);  /* LOCK */
-            header = this->server_config.protocol.commandHeader;
-            tailer = this->server_config.protocol.commandTailer;
-        }
         _manager = manager.lock();
         if (_manager != nullptr)
         {
-            _manager->SendMessage(header + sendString + tailer);
+            _manager->SendMessage(sendString);
         }
     }
 }
@@ -419,6 +432,14 @@ void vuprs::LinuxServer::THREAD__Control()
 {
     vuprs::ServerCommandInformation _cmdINFO;
     bool operationStatus = false;
+
+    std::string header, tailer, responseMessage;
+
+    {
+        std::unique_lock<std::mutex> lock(this->mut_config);  /* LOCK */
+        header = this->server_config.protocol.commandHeader;
+        tailer = this->server_config.protocol.commandTailer;
+    }
 
     while (this->server_running)
     {
@@ -526,9 +547,12 @@ void vuprs::LinuxServer::THREAD__Control()
 
         /* Make server response */
 
+        responseMessage = vuprs::PROTOCOL_MakeServerResponse(_cmdINFO, operationStatus);
+        responseMessage = vuprs::AddFrameIfMissing(responseMessage, header, tailer);
+
         {
             std::unique_lock<std::mutex> lock(this->mut_response);
-            this->serverResponseMessage = vuprs::PROTOCOL_MakeServerResponse(_cmdINFO, operationStatus);
+            this->serverResponseMessage = responseMessage;
         }
 
         /* Send Response */
