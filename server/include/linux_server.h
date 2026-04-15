@@ -60,7 +60,9 @@ namespace vuprs
             uint16_t server_port;
 
             std::unique_ptr<vuprs::LinuxSession> server_session;  /* socket session */
-            std::shared_ptr<vuprs::SocketIOManager> client_io_manager;  /* socket io manager for client */
+
+            std::mutex mut_client_io_manager;  /* mutex for client io manager */
+            std::shared_ptr<vuprs::SocketIOManager> client_io_manager;  /* socket io manager for client, controlled by this->mut_client_io_manager */
 
             /* --- Algorithms --- */
 
@@ -102,11 +104,24 @@ namespace vuprs
 
             /* --- Threads --- */
 
+            /**
+             * @brief Accept client thread, which will block in accept() and wait for client connection.
+             */
             void THREAD__AcceptClient();
 
+            /**
+             * @brief Get result thread, which will block in read() and wait for hardware data ready, 
+             * @brief then read data from hardware and store in this->resultQueue.
+             */
             void THREAD__GetResult();
 
-            void THREAD__SendToMaster();
+            /**
+             * @brief Send thread, which will block in sendingCV and wait for sendingIRQ, then send data to client.
+             * 
+             * @note Fork 1: send result data (when this->sendingFormat is SERVER_CMD__GET_NEW_DATA, send data in this->resultQueue).
+             * @note Fork 2: send current algorithm parameters (when this->sendingFormat is SERVER_CMD__GET_ALG_PARAM, send current algorithm parameters).
+             */
+            void THREAD__Send();
 
             /**
              * @brief Control thread, handle command from client.

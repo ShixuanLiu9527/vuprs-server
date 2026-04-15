@@ -149,6 +149,10 @@ namespace vuprs
             std::condition_variable algorithmCV;  /* Algorithm interrupt condition var, [controlled by mut_alg] */
 
             std::queue<vuprs::SignalData> arraySignalQueue;  /* Array signal queue, [controlled by mut_alg] */
+
+            std::atomic<bool> newArraySignalInput{false};  /* new array signal input flag */
+            std::mutex mut_output_arraySignal;  /* Output array signal mutex lock */
+            std::queue<vuprs::SignalData> outputArraySignalQueue;  /* Output array signal queue, controlled by mut_output_arraySignal */
             
             vuprs::FIRCalculator fir;  /* FIR algorithm, [controlled by mut_alg] (can be only used in THREAD__AlgorithmCalculation) */
             std::unique_ptr<vuprs::WidebandBeamformerTemplate> bf;  /* Beam forming algorithm, [controlled by mut_alg] (can be only used in THREAD__AlgorithmCalculation) */
@@ -159,13 +163,12 @@ namespace vuprs
             std::mutex mut_dma;  /* DMA Interrupt mutex lock */
             std::condition_variable dmaInterruptCV;  /* DMA Interrupt condition var, [controlled by mut_dma] */
 
+            std::atomic<bool> newResultDataInput{false};  /* assign to outside */
             std::queue<std::vector<uint32_t>> resultQueue;  /* Result queue, [controlled by mut_dma] */
 
             /* Atomics */
 
             std::atomic<bool> system_run{false};  /* system run enable */
-
-            std::atomic<bool> newResultDataInput{false};  /* assign to outside */
 
             std::atomic<bool> circularBufferIRQ{false};  /* Circular buffer interrupt flag */
             std::atomic<bool> dmaDescriptorIRQ{false};  /* DMA Interrupt flag */
@@ -269,6 +272,14 @@ namespace vuprs
             bool NewResultDataInput() const;
 
             /**
+             * @brief Indicate new array signal input.
+             * 
+             * @retval true: new array signal input;
+             * @retval false: no new array signal input.
+             */
+            bool NewArraySignalInput() const;
+
+            /**
              * @brief Read result from result queue.
              * 
              * @param result pointer to vector to store the result.
@@ -277,6 +288,16 @@ namespace vuprs
              * @retval false: failed.
              */
             bool ReadResultFromQueue(std::vector<uint32_t> *result);
+
+            /**
+             * @brief Read array signal from output array signal queue.
+             * 
+             * @param signalData pointer to SignalData struct to store the array signal.
+             * 
+             * @retval true: success.
+             * @retval false: failed.
+             */
+            bool ReadArraySignalFromQueue(vuprs::SignalData *signalData);
 
             /**
              * @brief Stop & reset beam former.

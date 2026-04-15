@@ -9,8 +9,8 @@
 ## 项目结构
 
 本项目结构如下:  
-
-    root/
+```bash
+root/
     ├── algorithm      # 项目算法部分代码, 包括信号处理, 波束形成算法等.
     ├── eigen          # Eigen 线性代数库
     ├── fftw3          # FFTW 信号处理库
@@ -23,23 +23,25 @@
     ├── xdma_driver    # XDMA 驱动源代码
     ├── configs        # 项目配置文件模板.
     └── docs           # 项目相关文档.
-
+```
 ## Build
 
 为了正常编译, 请按照以下步骤设置相关参数:  
 
 ### Step 1: 在 `rk3568_toolchain.cmake` 指定交叉编译器路径:
 
-    set(CMAKE_C_COMPILER "/usr/local/arm/gcc-linaro-7.5.0-2019.12-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-gcc")
-    set(CMAKE_CXX_COMPILER "/usr/local/arm/gcc-linaro-7.5.0-2019.12-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-g++")
+```cmake
+set(CMAKE_C_COMPILER "/usr/local/arm/gcc-linaro-7.5.0-2019.12-x86_64_aarch64-linux-gnu/binaarch64-linux-gnu-gcc")
+set(CMAKE_CXX_COMPILER "/usr/local/arm/gcc-linaro-7.5.0-2019.12-x86_64_aarch64-linux-gnu/binaarch64-linux-gnu-g++")
+```
 
 [[ 查看 `rk3568_toolchain.cmake` ]](./rk3568_toolchain.cmake)  
 
 ### Step 2: 在 `build.sh` 中指定 `XDMA` 交叉编译相关参数:  
-```bash
-    XDMA__ARCH="arm64"
-    XDMA__CROSS_COMPILE="/home/lsx/source/linux/rk356x_linux/prebuilts/gcc/linux-x86/aarch64/gcc-linaro-6.3.1-2017.05-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-"
-    XDMA__KERNEL_DIR="/home/lsx/source/linux/rk356x_linux/kernel"
+```shell
+XDMA__ARCH="arm64"
+XDMA__CROSS_COMPILE="/home/lsx/source/linux/rk356x_linux/prebuilts/gcc/linux-x86/aarch64/gcc-linaro-6.3.1-2017.05-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-"
+XDMA__KERNEL_DIR="/home/lsx/source/linux/rk356x_linux/kernel"
 ```
 [[ 查看 `build.sh` ]](./build.sh)  
 
@@ -54,38 +56,40 @@ sudo sh ./build.sh all  # 编译全部 (XDMA 驱动, Server 和 FPGA-Tool)
 sudo sh ./build.sh help
 ```
 编译完成后, 在 `./build` 目录下将会出现如下可执行文件:  
-
-    build/
-    ├── server                    # 服务器可执行文件
-    ├── fpga_tool/
-    │   └── tool                  # FPGA Tool 工具
-    ├── xdma/
-    │   └── xdma.ko               # XDMA 驱动
-    └── fftw3/                    # FFTW 动态库
-        ├── libfftw3.so
-        ├── libfftw3.so.3
-        ├── libfftw3.so.3.6.9
-        ├── libfftw3_threads.so
-        ├── libfftw3_threads.so.3
-        └── libfftw3_threads.so.3.6.9
-
+```bash
+build/
+├── server                    # 服务器可执行文件
+├── fpga_tool/
+│   └── tool                  # FPGA Tool 工具
+├── xdma/
+│   └── xdma.ko               # XDMA 驱动
+└── fftw3/                    # FFTW 动态库
+    ├── libfftw3.so
+    ├── libfftw3.so.3
+    ├── libfftw3.so.3.6.9
+    ├── libfftw3_threads.so
+    ├── libfftw3_threads.so.3
+    └── libfftw3_threads.so.3.6.9
+```
 ## Run Server
 
 ### Step 1: 组织运行目录
 
 编译完成后, 需要按照如下方式组织文件: 
 
-    your/run_dir/
-    ├── system_run.sh           # 本仓库提供的脚本文件
-    ├── xdma.ko                 # XDMA 驱动
-    ├── server                  # 编译得到的服务器可执行文件
-    └── fftw3/                  # FFTW3 动态链接库
-        ├── libfftw3.so
-        ├── libfftw3.so.3
-        ├── libfftw3.so.3.6.9
-        ├── libfftw3_threads.so
-        ├── libfftw3_threads.so.3
-        └── libfftw3_threads.so.3.6.9
+```bash
+your/run_dir/
+├── system_run.sh           # 本仓库提供的脚本文件
+├── xdma.ko                 # XDMA 驱动
+├── server                  # 编译得到的服务器可执行文件
+└── fftw3/                  # FFTW3 动态链接库
+    ├── libfftw3.so
+    ├── libfftw3.so.3
+    ├── libfftw3.so.3.6.9
+    ├── libfftw3_threads.so
+    ├── libfftw3_threads.so.3
+    └── libfftw3_threads.so.3.6.9
+```
 
 上述文件目录可以通过 `create_run_dir.sh` 创建:  
 ```bash
@@ -96,7 +100,7 @@ sudo sh ./create_run_dir.sh
 ### Step 2: 配置启动脚本文件
 
 设置脚本 `run_server.sh` 中的 `4` 个配置文件在板子系统中的位置:  
-```bash
+```shell
 FPGA_CONFIG="./fpga_config.json"
 SERVER_CONFIG="./server_config.json"
 ARRAY_CONFIG="./array_config.json"
@@ -107,7 +111,7 @@ FIR_CONFIG="./fir_config.json"
 ### Step 3: 配置以太网静态 `IP` 地址
 
 在 `config_eth0.sh` 中设置以太网: 
-```bash
+```shell
 INTERFACE="eth0"
 STATIC_IP="192.168.1.100"
 NETMASK="255.255.255.0"

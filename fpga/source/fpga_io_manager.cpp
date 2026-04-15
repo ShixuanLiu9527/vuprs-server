@@ -23,7 +23,7 @@ vuprs::FPGA_IOManagerBase::~FPGA_IOManagerBase()
 void vuprs::FPGA_IOManagerBase::Close() noexcept
 {
     {
-        std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
+        std::lock_guard<std::mutex> lock(this->mut);  /* LOCK */
 
         if (this->IsOpen())
         {
@@ -42,7 +42,7 @@ std::string vuprs::FPGA_IOManagerBase::GetDeviceFilename() const
 bool vuprs::FPGA_IOManagerBase::Open(const std::string &deviceFilename) noexcept
 {
     {
-        std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
+        std::lock_guard<std::mutex> lock(this->mut);  /* LOCK */
 
         if (this->IsOpen())
         {
@@ -91,7 +91,7 @@ vuprs::FPGA_IOManagerForDevice::FPGA_IOManagerForDevice(const std::string &devic
 vuprs::FPGA_IOManagerForDevice::~FPGA_IOManagerForDevice()
 {
     {
-        std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
+        std::lock_guard<std::mutex> lock(this->mut);  /* LOCK */
         this->MemoryUnmap();
     }
 }
@@ -147,7 +147,7 @@ bool vuprs::FPGA_IOManagerForDevice::RegisterIO(uint32_t* ioValue, uint32_t abso
     uint8_t* _mmap_base;
 
     {
-        std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
+        std::lock_guard<std::mutex> lock(this->mut);  /* LOCK */
         _mmap_base = (uint8_t *)this->mmap_base;
     }
 
@@ -191,7 +191,7 @@ bool vuprs::FPGA_IOManagerForDevice::RegisterListIO(std::vector<uint32_t> *ioVal
     uint8_t* _mmap_base;
 
     {
-        std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
+        std::lock_guard<std::mutex> lock(this->mut);  /* LOCK */
         _mmap_base = (uint8_t *)this->mmap_base;
     }
 
@@ -264,7 +264,7 @@ bool vuprs::FPGA_IOManagerForMemory::BufferIO(void* source, uint32_t absoluteAdd
     int ioBytes;
 
     {
-        std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
+        std::lock_guard<std::mutex> lock(this->mut);  /* LOCK */
 
         off_t currentOffset = ::lseek(this->fd, absoluteAddress, SEEK_SET);
         if (static_cast<uint64_t>(currentOffset) != absoluteAddress || currentOffset < 0 || currentOffset == (off_t) - 1)
@@ -347,7 +347,7 @@ bool vuprs::FPGA_IOManagerForInterrput::ReadEvent(uint32_t *readValue)
     timeout.tv_usec = this->timeout_ms * 1000;  /* timeout = timeout_ms ms */
 
     {
-        std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
+        std::lock_guard<std::mutex> lock(this->mut);  /* LOCK */
 
         FD_SET(this->fd, &read_fds);
         

@@ -188,8 +188,9 @@ void vuprs::LinuxServer::THREAD__AcceptClient()
             this->ConnectCallback(false, "");
 
             this->server_session->Stop();
-
             this->server_session.reset();
+
+            std::lock_guard<std::mutex> lock(this->mut_client_io_manager);  /* LOCK */
             this->client_io_manager.reset();
         }
         if (!this->server_session)  /* try to connect */
@@ -200,16 +201,24 @@ void vuprs::LinuxServer::THREAD__AcceptClient()
             {
                 /* Generate session */
 
-                this->client_io_manager = std::make_shared<vuprs::SocketIOManager>(client_fd, client_addr);  /* Generate IO manager */
+                std::shared_ptr<vuprs::SocketIOManager> manager;
 
                 {
-                    std::unique_lock<std::mutex> lock(this->mut_server_config);  /* LOCK */
-                    this->server_session = std::make_unique<vuprs::LinuxSession>( 
-                        this->server_config.protocol.commandHeader, this->server_config.protocol.commandTailer);  /* Generate session */
+                    std::lock_guard<std::mutex> lock(this->mut_client_io_manager);  /* LOCK */
+                    this->client_io_manager = std::make_shared<vuprs::SocketIOManager>(client_fd, client_addr);  /* Generate IO manager */
+                    manager = this->client_io_manager;
                 }
 
-                this->server_session->BindIOManager(this->client_io_manager);  /* Bind IO manager */
+                std::string header, tailer;
 
+                {
+                    std::lock_guard<std::mutex> lock(this->mut_server_config);  /* LOCK */
+                    header = this->server_config.protocol.commandHeader;
+                    tailer = this->server_config.protocol.commandTailer;
+                }
+
+                this->server_session = std::make_unique<vuprs::LinuxSession>(header, tailer);  /* Generate session */
+                this->server_session->BindIOManager(manager);  /* Bind IO manager */
                 this->server_session->SetMessageHandler(
                     [this](std::weak_ptr<vuprs::SocketIOManager> manager, const std::string& message){
                         this->SessionCallback(manager, message);
@@ -217,9 +226,9 @@ void vuprs::LinuxServer::THREAD__AcceptClient()
                 
                 this->server_session->Start();  /* Start session */
             
-                std::cout << "[server][listening] successfully connect client: [" << this->client_io_manager->ClientInformation() << "]" << std::endl;
+                std::cout << "[server][listening] successfully connect client: [" << manager->ClientInformation() << "]" << std::endl;
             
-                this->ConnectCallback(true, this->client_io_manager->ClientInformation());
+                this->ConnectCallback(true, manager->ClientInformation());
             }
         }
 
@@ -244,13 +253,19 @@ void vuprs::LinuxServer::Run()
 
         this->threads.emplace_back([this]{this->THREAD__Control();});
         this->threads.emplace_back([this]{this->THREAD__GetResult();});
-        this->threads.emplace_back([this]{this->THREAD__SendToMaster();});
+        this->threads.emplace_back([this]{this->THREAD__Send();});
         this->threads.emplace_back([this]{this->THREAD__AcceptClient();});
 
         /* Start beam former */
 
-        std::unique_lock<std::mutex> lock(this->mut_bf_config);  /* LOCK */
-        this->beamformer.RUN(this->beamFormerConfig);
+        vuprs::ARM_FPGA_BF_Config config;
+
+        {
+            std::lock_guard<std::mutex> lock(this->mut_bf_config);  /* LOCK */
+            config = this->beamFormerConfig;
+        }
+
+        this->beamformer.RUN(config);
     }
     else
     {
@@ -303,7 +318,7 @@ void vuprs::LinuxServer::THREAD__GetResult()
         {
             this->beamformer.ReadResultFromQueue(&result);
             {
-                std::unique_lock<std::mutex> lock(this->mut_readResult);  /* LOCK */
+                std::lock_guard<std::mutex> lock(this->mut_readResult);  /* LOCK */
                 this->resultQueue.push(result);
                 if (this->resultQueue.size() > DEFAULT_SENDING_DATA_QUEUE_LENGTH)
                 {
@@ -315,15 +330,15 @@ void vuprs::LinuxServer::THREAD__GetResult()
     }
 }
 
-void vuprs::LinuxServer::THREAD__SendToMaster()
+void vuprs::LinuxServer::THREAD__Send()
 {
     std::vector<uint32_t> resultToSend;
-    vuprs::ServerCommandInformation _cmdINFO;
     bool queueEmpty;
     std::string header, tailer, sendString;
+    uint32_t sendDataSize;  /* send data size in bytes (if send buffer) */
 
     {
-        std::unique_lock<std::mutex> lock(this->mut_server_config);  /* LOCK */
+        std::lock_guard<std::mutex> lock(this->mut_server_config);  /* LOCK */
         header = this->server_config.protocol.commandHeader;
         tailer = this->server_config.protocol.commandTailer;
     }
@@ -342,6 +357,19 @@ void vuprs::LinuxServer::THREAD__SendToMaster()
         if (!this->sendingIRQ) continue;
         else this->sendingIRQ = false;
 
+        std::shared_ptr<vuprs::SocketIOManager> manager;
+
+        {
+            std::lock_guard<std::mutex> lock(this->mut_client_io_manager);  /* LOCK */
+            manager = this->client_io_manager;
+        }
+
+        if (!manager)
+        {
+            std::cout << "[server][send] no client connected, cannot send." << std::endl;
+            continue;
+        }
+
         /* ---------------------------------------------------------------------- */
         /* ------------------- Fork 1: Send result data ------------------------- */
         /* ---------------------------------------------------------------------- */
@@ -353,7 +381,7 @@ void vuprs::LinuxServer::THREAD__SendToMaster()
             queueEmpty = true;
 
             {
-                std::unique_lock<std::mutex> lock(this->mut_readResult);  /* LOCK */
+                std::lock_guard<std::mutex> lock(this->mut_readResult);  /* LOCK */
                 if (!this->resultQueue.empty())
                 {
                     queueEmpty = false;
@@ -366,14 +394,11 @@ void vuprs::LinuxServer::THREAD__SendToMaster()
 
             if (!queueEmpty)
             {
-                std::shared_ptr<vuprs::SocketIOManager> manager = this->client_io_manager;
-                if (!manager)
-                {
-                    continue;
-                }
+                sendDataSize = resultToSend.size() * sizeof(uint32_t);
 
                 bool sendOk = true;
                 sendOk &= manager->SendMessage(header);  /* Send header */
+                sendOk &= manager->SendWord<uint32_t>(sendDataSize);  /* Send data size */
                 sendOk &= manager->SendBuffer<uint32_t>(resultToSend);  /* Send data */
                 sendOk &= manager->SendMessage(tailer);  /* Send tailer */
 
@@ -392,42 +417,42 @@ void vuprs::LinuxServer::THREAD__SendToMaster()
         {
             try
             {
-                std::unique_lock<std::mutex> lock(this->mut_bf_config);  /* LOCK */
-                sendString = vuprs::PROTOCOL_MakeServerParameterResponse(this->beamFormerConfig);
+                vuprs::ARM_FPGA_BF_Config config;
+                {
+                    std::lock_guard<std::mutex> lock(this->mut_bf_config);  /* LOCK */
+                    config = this->beamFormerConfig;
+                }
+                sendString = vuprs::PROTOCOL_MakeServerParameterResponse(config);
                 sendString = vuprs::AddFrameIfMissing(sendString, header, tailer);
             }
             catch(const std::exception& e)
             {
-                std::cout << "Error in [LinuxServer::THREAD__SendToMaster] " << e.what() << std::endl;
+                std::cout << "Error in [LinuxServer::THREAD__Send] " << e.what() << std::endl;
             }
 
-            std::shared_ptr<vuprs::SocketIOManager> manager = this->client_io_manager;
-            if (!manager)
-            {
-                continue;
-            }
-
-            bool sendOk = true;
-            sendOk &= manager->SendMessage(sendString);  /* Send data */
+            bool sendOk = manager->SendMessage(sendString);  /* Send data */
 
             if (!sendOk)
             {
                 std::cout << "[server][send] send data frame failed." << std::endl;
             }
         }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
 }
 
 void vuprs::LinuxServer::THREAD__Control()
 {
     vuprs::ServerCommandInformation _cmdINFO;
+    vuprs::ARM_FPGA_BF_Config config;
     bool operationStatus = false;
     bool needResponseInThisThread = true;
 
     std::string header, tailer, responseMessage, errorInfo;
 
     {
-        std::unique_lock<std::mutex> lock(this->mut_server_config);  /* LOCK */
+        std::lock_guard<std::mutex> lock(this->mut_server_config);  /* LOCK */
         header = this->server_config.protocol.commandHeader;
         tailer = this->server_config.protocol.commandTailer;
     }
@@ -449,7 +474,7 @@ void vuprs::LinuxServer::THREAD__Control()
         /* Get command & config information */
 
         {
-            std::unique_lock<std::mutex> lock(this->mut_cmd);  /* LOCK */
+            std::lock_guard<std::mutex> lock(this->mut_cmd);  /* LOCK */
             _cmdINFO = this->cmdINFO;
         }
 
@@ -461,6 +486,10 @@ void vuprs::LinuxServer::THREAD__Control()
 
         try
         {
+            {
+                std::lock_guard<std::mutex> lock(this->mut_bf_config);  /* LOCK */
+                config = this->beamFormerConfig;
+            }
             switch (_cmdINFO.cmd)
             {
                 case vuprs::ServerCommand::SERVER_CMD__ACK:
@@ -471,8 +500,7 @@ void vuprs::LinuxServer::THREAD__Control()
                 case vuprs::ServerCommand::SERVER_CMD__RESET:  /* use this.config */
                 {
                     this->beamformer.STOP();
-                    std::unique_lock<std::mutex> lock(this->mut_bf_config);  /* LOCK */
-                    this->beamformer.RUN(this->beamFormerConfig);
+                    this->beamformer.RUN(config);
                     break;
                 }
                 case vuprs::ServerCommand::SERVER_CMD__CHANGE_BEAMFORMER:
@@ -481,22 +509,19 @@ void vuprs::LinuxServer::THREAD__Control()
                     {
                         this->beamformer.BindBeamformer(std::make_unique<vuprs::Beamformer_DCRCB>());
                         this->beamformer.STOP();
-                        std::unique_lock<std::mutex> lock(this->mut_bf_config);  /* LOCK */
-                        this->beamformer.RUN(this->beamFormerConfig);
+                        this->beamformer.RUN(config);
                     }
                     else if (_cmdINFO.beamformer_name == "cbf")
                     {
                         this->beamformer.BindBeamformer(std::make_unique<vuprs::Beamformer_CBF>());
                         this->beamformer.STOP();
-                        std::unique_lock<std::mutex> lock(this->mut_bf_config);  /* LOCK */
-                        this->beamformer.RUN(this->beamFormerConfig);
+                        this->beamformer.RUN(config);
                     }
                     else if (_cmdINFO.beamformer_name == "mvdr")
                     {
                         this->beamformer.BindBeamformer(std::make_unique<vuprs::Beamformer_MVDR>());
                         this->beamformer.STOP();
-                        std::unique_lock<std::mutex> lock(this->mut_bf_config);  /* LOCK */
-                        this->beamformer.RUN(this->beamFormerConfig);
+                        this->beamformer.RUN(config);
                     }
                     else
                     {
@@ -506,15 +531,17 @@ void vuprs::LinuxServer::THREAD__Control()
                 }
                 case vuprs::ServerCommand::SERVER_CMD__REDIRECT:  /* use this.config */
                 {
-                    std::unique_lock<std::mutex> lock(this->mut_bf_config);  /* LOCK */
-                    vuprs::Merge_ARM_FPGA_BF_Config(&this->beamFormerConfig, _cmdINFO.config, _cmdINFO.configMask);
-                    this->beamformer.ReDirect(this->beamFormerConfig.bf_target__alt, this->beamFormerConfig.bf_target__az, this->beamFormerConfig.bf_waveVelocity);
+                    {
+                        std::lock_guard<std::mutex> lock(this->mut_bf_config);  /* LOCK */
+                        vuprs::Merge_ARM_FPGA_BF_Config(&this->beamFormerConfig, _cmdINFO.config, _cmdINFO.configMask);
+                        config = this->beamFormerConfig;
+                    }
+                    this->beamformer.ReDirect(config.bf_target__alt, config.bf_target__az, config.bf_waveVelocity);
                     break;
                 }
                 case vuprs::ServerCommand::SERVER_CMD__START:  /* use this.config */
                 {
-                    std::unique_lock<std::mutex> lock(this->mut_bf_config);  /* LOCK */
-                    this->beamformer.RUN(this->beamFormerConfig);
+                    this->beamformer.RUN(config);
                     break;
                 }
                 case vuprs::ServerCommand::SERVER_CMD__STOP: 
@@ -544,11 +571,13 @@ void vuprs::LinuxServer::THREAD__Control()
                 }
                 case vuprs::ServerCommand::SERVER_CMD__CHANGE_ALG_PARAM: 
                 {
-                    std::unique_lock<std::mutex> lock(this->mut_bf_config);  /* LOCK */
-                    vuprs::Merge_ARM_FPGA_BF_Config(&this->beamFormerConfig, _cmdINFO.config, _cmdINFO.configMask);
+                    {
+                        std::lock_guard<std::mutex> lock(this->mut_bf_config);  /* LOCK */
+                        vuprs::Merge_ARM_FPGA_BF_Config(&this->beamFormerConfig, _cmdINFO.config, _cmdINFO.configMask);
+                        config = this->beamFormerConfig;
+                    }
                     this->beamformer.STOP();
-                    this->beamformer.RUN(this->beamFormerConfig);
-
+                    this->beamformer.RUN(config);
                     break;
                 }
                 default:
@@ -579,7 +608,7 @@ void vuprs::LinuxServer::THREAD__Control()
             }
 
             {
-                std::unique_lock<std::mutex> lock(this->mut_response);
+                std::lock_guard<std::mutex> lock(this->mut_response);
                 this->serverResponseMessage = responseMessage;
             }
         }
@@ -608,7 +637,7 @@ void vuprs::LinuxServer::SessionCallback(std::weak_ptr<vuprs::SocketIOManager> m
     /* Get Frame Header and Tailer */
 
     {
-        std::unique_lock<std::mutex> lock(this->mut_server_config);  /* LOCK */
+        std::lock_guard<std::mutex> lock(this->mut_server_config);  /* LOCK */
         header = this->server_config.protocol.commandHeader;
         tailer = this->server_config.protocol.commandTailer;
     }
@@ -654,7 +683,7 @@ void vuprs::LinuxServer::SessionCallback(std::weak_ptr<vuprs::SocketIOManager> m
     /* Load command information */
 
     {
-        std::unique_lock<std::mutex> lock(this->mut_cmd);  /* LOCK */
+        std::lock_guard<std::mutex> lock(this->mut_cmd);  /* LOCK */
         this->cmdINFO = _cmdINFO;
     }
 
@@ -677,7 +706,7 @@ void vuprs::LinuxServer::SessionCallback(std::weak_ptr<vuprs::SocketIOManager> m
     if (this->serverNeedResponse)
     {
         {
-            std::unique_lock<std::mutex> lock(this->mut_response);
+            std::lock_guard<std::mutex> lock(this->mut_response);
             sendString = this->serverResponseMessage;
         }
 

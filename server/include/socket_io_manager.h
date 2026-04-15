@@ -69,13 +69,24 @@ namespace vuprs
             template<typename T>
             bool SendBuffer(const std::vector<T> &buffer)
             {
-                if (buffer.empty()) 
+                if (buffer.empty())
                 {
                     return false;
                 }
             
                 const char* data_ptr = reinterpret_cast<const char*>(buffer.data());
                 size_t bytes = buffer.size() * sizeof(T);
+
+                std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
+            
+                return vuprs::SendAllWithRetry(this->client_fd, data_ptr, bytes);
+            }
+
+            template<typename T>
+            bool SendWord(const T &word)
+            {
+                const char* data_ptr = reinterpret_cast<const char*>(&word);
+                size_t bytes = sizeof(T);
 
                 std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
             

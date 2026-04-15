@@ -80,7 +80,7 @@ bool vuprs::SocketIOManager::SendMessage(const std::string &message)
         return true;
     }
     
-    std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
+    std::lock_guard<std::mutex> lock(this->mut);  /* LOCK */
 
     return vuprs::SendAllWithRetry(this->client_fd, message.data(), message.size());
 }
@@ -94,7 +94,7 @@ bool vuprs::SocketIOManager::SendBuffer(const vuprs::AlignedBufferDMA &buffer)
 
     const char* data_ptr = reinterpret_cast<const char*>(buffer.data());
 
-    std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
+    std::lock_guard<std::mutex> lock(this->mut);  /* LOCK */
 
     return vuprs::SendAllWithRetry(this->client_fd, data_ptr, static_cast<size_t>(buffer.size()));
 }
@@ -110,7 +110,7 @@ void vuprs::SocketIOManager::ReceiveMessage(const std::string &tailer, vuprs::So
 
     vuprs::SetSocketReceiveDataToDefault(data);
 
-    std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
+    std::lock_guard<std::mutex> lock(this->mut);  /* LOCK */
 
     if (this->client_fd < 0)
     {
@@ -153,7 +153,7 @@ void vuprs::SocketIOManager::ReceiveMessage(const std::string &tailer, vuprs::So
 
 void vuprs::SocketIOManager::CloseSocket()
 {
-    std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
+    std::lock_guard<std::mutex> lock(this->mut);  /* LOCK */
 
     if (this->client_fd >= 0)
     {

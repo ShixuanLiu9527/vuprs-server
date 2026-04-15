@@ -120,7 +120,7 @@ bool vuprs::ARM_FPGA_CollaborationBeamfomer::ResetHardwareBeamformer()
     /* Algorithm reset */
 
     {
-        std::unique_lock<std::mutex> lock(this->mut_alg);
+        std::lock_guard<std::mutex> lock(this->mut_alg);
         this->bf->ResetCovarianceMatrices();
     }
 
@@ -156,7 +156,7 @@ bool vuprs::ARM_FPGA_CollaborationBeamfomer::StartBeamformerWithConfiguration(co
     /* Generate descriptors */
 
     {
-        std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
+        std::lock_guard<std::mutex> lock(this->mut);  /* LOCK */
 
         this->sg_descriptorConfig.bufferCount = config.dma__bufferCount;
         this->sg_descriptorConfig.bufferSize = config.dma__bufferSize;
@@ -179,7 +179,7 @@ bool vuprs::ARM_FPGA_CollaborationBeamfomer::StartBeamformerWithConfiguration(co
     uint32_t SCI = this->controller.dev__ADC_Controller.GetSCIValueForSamplingFrequency(config.fs);
 
     {
-        std::unique_lock<std::mutex> lock(this->mut_alg);  /* LOCK */
+        std::lock_guard<std::mutex> lock(this->mut_alg);  /* LOCK */
         this->hardwareSamplingFrequency = this->controller.dev__ADC_Controller.SCI2FS(SCI);
 
         this->bf->ResetCovarianceMatrices();
@@ -241,7 +241,7 @@ bool vuprs::ARM_FPGA_CollaborationBeamfomer::ReDirect(double alt, double az, dou
     std::vector<std::string> channelName;
 
     {
-        std::unique_lock<std::mutex> lock(this->mut_alg);  /* LOCK */
+        std::lock_guard<std::mutex> lock(this->mut_alg);  /* LOCK */
 
         /* Set target direction */
 
@@ -307,9 +307,8 @@ bool vuprs::ARM_FPGA_CollaborationBeamfomer::ReadResultFromQueue(std::vector<uin
 
     if (this->newResultDataInput)
     {
-        this->newResultDataInput = false;
         {
-            std::unique_lock<std::mutex> lock(this->mut_dma);  /* LOCK */
+            std::lock_guard<std::mutex> lock(this->mut_dma);  /* LOCK */
 
             if (!this->resultQueue.empty())
             {
@@ -317,6 +316,34 @@ bool vuprs::ARM_FPGA_CollaborationBeamfomer::ReadResultFromQueue(std::vector<uin
                 this->resultQueue.pop();
                 readSuccess = true;
             }
+            this->newResultDataInput = !this->resultQueue.empty();
+        }
+    }
+
+    return readSuccess;
+}
+
+bool vuprs::ARM_FPGA_CollaborationBeamfomer::NewArraySignalInput() const
+{
+    return this->newArraySignalInput;
+}
+
+bool vuprs::ARM_FPGA_CollaborationBeamfomer::ReadArraySignalFromQueue(vuprs::SignalData *signalData)
+{
+    bool readSuccess = false;
+
+    if (this->newArraySignalInput)
+    {
+        {
+            std::lock_guard<std::mutex> lock(this->mut_output_arraySignal);  /* LOCK */
+
+            if (!this->outputArraySignalQueue.empty())
+            {
+                *signalData = this->outputArraySignalQueue.front();
+                this->outputArraySignalQueue.pop();
+                readSuccess = true;
+            }
+            this->newArraySignalInput = !this->outputArraySignalQueue.empty();
         }
     }
 
@@ -359,7 +386,7 @@ void vuprs::ARM_FPGA_CollaborationBeamfomer::THREAD__ReadResult()
     bool hasInterrupt;
 
     {
-        std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
+        std::lock_guard<std::mutex> lock(this->mut);  /* LOCK */
         _refDescriptors = this->dmaDescriptors;
     }
 
@@ -404,7 +431,7 @@ void vuprs::ARM_FPGA_CollaborationBeamfomer::THREAD__ReadResult()
             /* Push to queue */
 
             {
-                std::unique_lock<std::mutex> lock(this->mut_dma);  /* LOCK */
+                std::lock_guard<std::mutex> lock(this->mut_dma);  /* LOCK */
                 if (this->resultQueue.size() < this->resultQueueSizeMAX)
                 {
                     this->resultQueue.push(result);
@@ -451,7 +478,7 @@ void vuprs::ARM_FPGA_CollaborationBeamfomer::THREAD__ReadCircularBuffer()
                 if (vuprs::FPGA_API__CBUF__ReadCircularBuffer(&this->controller, &multichannelSignal))
                 {
                     {
-                        std::unique_lock<std::mutex> lock(this->mut_alg);  /* LOCK */
+                        std::lock_guard<std::mutex> lock(this->mut_alg);  /* LOCK */
                         if (this->arraySignalQueue.size() < this->circularBufferQueueSizeMAX)
                         {
                             this->arraySignalQueue.push(multichannelSignal);
@@ -459,6 +486,14 @@ void vuprs::ARM_FPGA_CollaborationBeamfomer::THREAD__ReadCircularBuffer()
                     }
                     this->circularBufferIRQ = true;
                     algorithmCV.notify_all();
+                    {
+                        std::lock_guard<std::mutex> lock(this->mut_output_arraySignal);  /* LOCK */
+                        if (this->outputArraySignalQueue.size() < this->circularBufferQueueSizeMAX)
+                        {
+                            this->outputArraySignalQueue.push(multichannelSignal);
+                        }
+                    }
+                    this->newArraySignalInput = true;
                 }
                 else
                 {
@@ -509,7 +544,7 @@ void vuprs::ARM_FPGA_CollaborationBeamfomer::THREAD__AlgorithmCalculation()
         /* Do algorithm calculation */
 
         {
-            std::unique_lock<std::mutex> lock(this->mut_alg);  /* LOCK */
+            std::lock_guard<std::mutex> lock(this->mut_alg);  /* LOCK */
             signal = this->arraySignalQueue.front();
             this->arraySignalQueue.pop();
 
