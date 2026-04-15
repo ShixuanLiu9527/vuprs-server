@@ -178,10 +178,10 @@ data tailer: [TAILER]
 ```
 
 说明: `get_data`是特殊指令, 控制通道不返回JSON状态包, 服务端直接发送数据帧:
-
 ```text
 [HEADER] + binary(double array) + [TAILER]
 ```
+`binary` 中, 前 `4` 字节描述了该数据的大小 (单位是 `byte`), 然后紧接着是数据.  
 
 ### 8. Change Algorithm Parameters
 

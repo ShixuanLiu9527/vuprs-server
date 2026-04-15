@@ -44,6 +44,7 @@ bool vuprs::WidebandBeamformerTemplate::ConfigArrayFromJson(const std::string &a
             this->elementChannelName[i] = this->array.elementArray[i].adcChannel;
         }
         this->is_arrayConfigDone = true;
+        this->scan_array.LoadArrayFromJson(arrayConfigJsonFilename);  /* Load scan array, which has same element position as array but different time delay */
         return true;
     }
     return false;
@@ -325,6 +326,68 @@ void vuprs::WidebandBeamformerTemplate::UpdateAndGetElementPredelay(
 {
     this->UpdateElementPredelay_externalFS(firLength, fs, includeFIRGroupDelay, 
         elementPredelayCount, elementPredelayTime, channelName);
+}
+
+bool vuprs::WidebandBeamformerTemplate::ScanForPositionPower(
+    std::vector<double> *res, 
+    const std::vector<double> &alt, const std::vector<double> &az, 
+    double frequency, double waveVelocity)
+{
+    if (res == nullptr)
+    {
+        throw std::runtime_error("in [ScanForPositionPower] Result pointer cannot be NULL.");
+    }
+    if (!this->ConfigDone())
+    {
+        throw std::runtime_error("in [ScanForPositionPower] Config not complete.");
+    }
+    if (alt.size() != az.size())
+    {
+        throw std::runtime_error("in [ScanForPositionPower] Altitude and azimuth size mismatch.");
+    }
+    if (this->is_covMatrixEmpty)
+    {
+        return false;
+    }
+
+    /* STEP 1: Get covariance matrix for the specified frequency */
+
+    int freqIndex = static_cast<int>(std::round(frequency / this->fs * this->signalPoints));
+
+    if (freqIndex < 0 || freqIndex >= this->estimate_covMatrix.size())
+    {
+        freqIndex = this->estimate_covMatrix.size() / 2 - 1;  /* Set to the closest frequency index (N/2 - 1) if out of range */
+    }
+
+    double realFrequency = this->signalFrequencyList(freqIndex);
+    Eigen::Matrix<Eigen::dcomplex, -1, -1> R = this->estimate_covMatrix[freqIndex];
+
+    double M = R.cols();  /* Element counts */
+
+    /* STEP 2: Get steering vectors for all alt & az */
+
+    Eigen::Matrix<Eigen::dcomplex, -1, -1> weights;  /* size = M x numScans */
+    this->scan_array.GetSteeringVectorMatrix(&weights, alt, az, realFrequency, waveVelocity);
+
+    weights /= M;  /* for CBF: w = ps/M */
+
+    /* STEP 3: Eigenvalue decomposition */
+
+    Eigen::Matrix<double, -1, 1> gamma;
+    Eigen::Matrix<Eigen::dcomplex, -1, -1> U;  /* R = U * gamma * U.H */
+    vuprs::EigenvalueDecomposition(R, &gamma, &U);
+
+    Eigen::Matrix<Eigen::dcomplex, -1, -1> B = U * gamma.cwiseSqrt().asDiagonal();  /* R = U * gamma * U.H = B * B.H */
+
+    /* STEP 4: Calculate power for each alt & az */
+
+    Eigen::Matrix<Eigen::dcomplex, -1, -1> Y = B.adjoint() * weights;  /* Y = B.H * w */
+    Eigen::Matrix<double, -1, 1> power = Y.colwise().norm().transpose();  /* power(i) = norm(Y.col(i)) */
+
+    /* STEP 5: Convert to result */
+
+    vuprs::eigenVector2stdVector(power, res);
+    return true;
 }
 
 void vuprs::WidebandBeamformerTemplate::CalculateBeamforming()

@@ -319,10 +319,10 @@ void vuprs::LinuxServer::THREAD__GetResult()
             this->beamformer.ReadResultFromQueue(&result);
             {
                 std::lock_guard<std::mutex> lock(this->mut_readResult);  /* LOCK */
-                this->resultQueue.push(result);
+                this->resultQueue.push_back(result);
                 if (this->resultQueue.size() > DEFAULT_SENDING_DATA_QUEUE_LENGTH)
                 {
-                    this->resultQueue.pop();
+                    this->resultQueue.pop_front();  /* Pop the oldest data to avoid overflow */
                 }
             }
         }
@@ -386,7 +386,7 @@ void vuprs::LinuxServer::THREAD__Send()
                 {
                     queueEmpty = false;
                     resultToSend = this->resultQueue.front();
-                    this->resultQueue.pop();
+                    this->resultQueue.pop_front();
                 }
             }
 

@@ -3,20 +3,36 @@
 #define ARM_FPGA_BF_COLLAB_CPP__DEBUG_PRINT false  /* print something @ debug mode */
 #define ARM_FPGA_BF_COLLAB_CPP__DEBUG_SAVE false  /* save data @ debug mode */
 
-void vuprs::_Set_ARM_FPGA_BF_Config_ToDefault(vuprs::ARM_FPGA_BF_Config *config)
+void vuprs::ARM_FPGA_BF_Config::SetDefault()
 {
-    config->fs = 10000.0;  /* sampling frequency (unit: Hz) */
-    config->bf_target__alt = 90.0;  /* altitude (unit: degree) beam former pointing target */
-    config->bf_target__az = 0.0;  /* azimuth (unit: degree) beam former pointing target */
-    config->bf_waveVelocity = 346.0;
-    config->bf_freq__lower = 100.0;  /* lower boundary of beam former work frequency (unit: Hz) */
-    config->bf_freq__upper = 5000.0;  /* upper boundary of beam former work frequency (unit: Hz) */
-    config->bf_cov_snapshotsWindowSize = 50;  /* Snapshots window size (to fit covariance matrix) */
-    config->bf_cov_freqAverageIndex = 0.8;  /* frequency average index (to fit covariance matrix) */
-    config->dma__bufferSize = 32768;  /* AXI DMA descriptor buffer size */
-    config->dma__bufferCount = 10;  /* AXI DMA descriptor buffer count */
-    config->queue__circularBufferQueueSizeMAX = 10;
-    config->queue__resultQueueSizeMAX = 10;
+    this->fs = 10000.0;  /* sampling frequency (unit: Hz) */
+    this->bf_target__alt = 90.0;  /* altitude (unit: degree) beam former pointing target */
+    this->bf_target__az = 0.0;  /* azimuth (unit: degree) beam former pointing target */
+    this->bf_waveVelocity = 346.0;
+    this->bf_freq__lower = 100.0;  /* lower boundary of beam former work frequency (unit: Hz) */
+    this->bf_freq__upper = 5000.0;  /* upper boundary of beam former work frequency (unit: Hz) */
+    this->bf_cov_snapshotsWindowSize = 50;  /* Snapshots window size (to fit covariance matrix) */
+    this->bf_cov_freqAverageIndex = 0.8;  /* frequency average index (to fit covariance matrix) */
+    this->dma__bufferSize = 32768;  /* AXI DMA descriptor buffer size */
+    this->dma__bufferCount = 10;  /* AXI DMA descriptor buffer count */
+    this->queue__circularBufferQueueSizeMAX = 10;
+    this->queue__resultQueueSizeMAX = 10;
+}
+
+void vuprs::ARM_FPGA_BF_Config_MASK::Reset()
+{
+    this->m_fs = false;
+    this->m_bf_target__alt = false;
+    this->m_bf_target__az = false;
+    this->m_bf_waveVelocity = false;
+    this->m_bf_freq__lower = false;
+    this->m_bf_freq__upper = false;
+    this->m_bf_cov_snapshotsWindowSize = false;
+    this->m_bf_cov_freqAverageIndex = false;
+    this->m_dma__bufferSize = false;
+    this->m_dma__bufferCount = false;
+    this->m_queue__circularBufferQueueSizeMAX = false;
+    this->m_queue__resultQueueSizeMAX = false;
 }
 
 bool vuprs::_Check_ARM_FPGA_BF_Config_Valid(vuprs::FPGAController *controller, const vuprs::ARM_FPGA_BF_Config &config)
@@ -313,7 +329,7 @@ bool vuprs::ARM_FPGA_CollaborationBeamfomer::ReadResultFromQueue(std::vector<uin
             if (!this->resultQueue.empty())
             {
                 *result = this->resultQueue.front();
-                this->resultQueue.pop();
+                this->resultQueue.pop_front();
                 readSuccess = true;
             }
             this->newResultDataInput = !this->resultQueue.empty();
@@ -340,7 +356,7 @@ bool vuprs::ARM_FPGA_CollaborationBeamfomer::ReadArraySignalFromQueue(vuprs::Sig
             if (!this->outputArraySignalQueue.empty())
             {
                 *signalData = this->outputArraySignalQueue.front();
-                this->outputArraySignalQueue.pop();
+                this->outputArraySignalQueue.pop_front();
                 readSuccess = true;
             }
             this->newArraySignalInput = !this->outputArraySignalQueue.empty();
@@ -348,6 +364,11 @@ bool vuprs::ARM_FPGA_CollaborationBeamfomer::ReadArraySignalFromQueue(vuprs::Sig
     }
 
     return readSuccess;
+}
+
+bool vuprs::ARM_FPGA_CollaborationBeamfomer::ReadCovarianceMatrix(Eigen::Matrix<Eigen::dcomplex, -1, -1> *covMatrix, double frequency)
+{
+    this->bf->GetCovarianceMatrix(covMatrix, frequency);
 }
 
 void vuprs::ARM_FPGA_CollaborationBeamfomer::THREAD__ListenDMAInterrupt()
@@ -432,9 +453,10 @@ void vuprs::ARM_FPGA_CollaborationBeamfomer::THREAD__ReadResult()
 
             {
                 std::lock_guard<std::mutex> lock(this->mut_dma);  /* LOCK */
-                if (this->resultQueue.size() < this->resultQueueSizeMAX)
+                this->resultQueue.push_back(result);
+                if (this->resultQueue.size() > this->resultQueueSizeMAX)
                 {
-                    this->resultQueue.push(result);
+                    this->resultQueue.pop_front();  /* Pop the oldest data to avoid overflow */
                 }
             }
 
@@ -479,18 +501,20 @@ void vuprs::ARM_FPGA_CollaborationBeamfomer::THREAD__ReadCircularBuffer()
                 {
                     {
                         std::lock_guard<std::mutex> lock(this->mut_alg);  /* LOCK */
-                        if (this->arraySignalQueue.size() < this->circularBufferQueueSizeMAX)
+                        this->arraySignalQueue.push_back(multichannelSignal);
+                        if (this->arraySignalQueue.size() > this->circularBufferQueueSizeMAX)
                         {
-                            this->arraySignalQueue.push(multichannelSignal);
+                            this->arraySignalQueue.pop_front();  /* Pop the oldest data to avoid overflow */
                         }
                     }
                     this->circularBufferIRQ = true;
                     algorithmCV.notify_all();
                     {
                         std::lock_guard<std::mutex> lock(this->mut_output_arraySignal);  /* LOCK */
-                        if (this->outputArraySignalQueue.size() < this->circularBufferQueueSizeMAX)
+                        this->outputArraySignalQueue.push_back(multichannelSignal);
+                        if (this->outputArraySignalQueue.size() > this->circularBufferQueueSizeMAX)
                         {
-                            this->outputArraySignalQueue.push(multichannelSignal);
+                            this->outputArraySignalQueue.pop_front();  /* Pop the oldest data to avoid overflow */
                         }
                     }
                     this->newArraySignalInput = true;
@@ -546,7 +570,7 @@ void vuprs::ARM_FPGA_CollaborationBeamfomer::THREAD__AlgorithmCalculation()
         {
             std::lock_guard<std::mutex> lock(this->mut_alg);  /* LOCK */
             signal = this->arraySignalQueue.front();
-            this->arraySignalQueue.pop();
+            this->arraySignalQueue.pop_front();
 
             #if ARM_FPGA_BF_COLLAB_CPP__DEBUG_SAVE
                 signal.ToCSV("../signals/signal.csv");

@@ -193,6 +193,46 @@ namespace vuprs
             EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };
 
+    /**
+     * @brief Beam forming scan array.
+     * 
+     * @note aligned.
+     */
+    class BeamFormingScanArray
+    {
+        private:
+
+            vuprs::AlignedEigenVector<vuprs::BeamFormingElement> elementArray;
+
+        public:
+
+            BeamFormingScanArray();
+
+            ~BeamFormingScanArray();
+
+            /**
+             * @brief Load beam forming scan array from json file.
+             * 
+             * @throw std::runtime_error when error occurs.
+             */
+            bool LoadArrayFromJson(const std::string &filename);
+
+            /**
+             * @brief Calculate steering vector for one frequency domain.
+             * 
+             * @param matrix output steering vector.
+             * @param alt alt of the target position (relative to array), unit: deg.
+             * @param az az of the target position (relative to array), unit: deg.
+             * @param frequency signal frequency (unit: Hz), omega = 2 * pi * f.
+             * @param waveVelocity velocity of wave, unit: m/sec.
+             */
+            void GetSteeringVectorMatrix(Eigen::Matrix<Eigen::dcomplex, -1, -1> *matrix, const std::vector<double> &alt, const std::vector<double> &az, double frequency, double waveVelocity) const;
+
+            bool empty() const;
+
+            EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+    };
+
     bool SaveToCSV(const std::vector<double> &data, const std::string filename);
     bool SaveToCSV(const Eigen::Matrix<double, -1, 1> &data, const std::string filename);
     bool SaveToCSV_complex(const std::vector<std::complex<double>> &data, const std::string filename);

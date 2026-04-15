@@ -3,6 +3,7 @@
 
 #include <mutex>
 #include <queue>
+#include <deque>
 #include <atomic>
 #include <condition_variable>
 
@@ -33,7 +34,9 @@ namespace vuprs
         uint32_t queue__circularBufferQueueSizeMAX;  /* MAX size of circular buffer data queue */
         uint32_t queue__resultQueueSizeMAX;  /* MAX size of result data queue */
 
-        ARM_FPGA_BF_Config() {vuprs::_Set_ARM_FPGA_BF_Config_ToDefault(this);}
+        ARM_FPGA_BF_Config() {this->SetDefault();}
+
+        void SetDefault();
     };
 
     struct ARM_FPGA_BF_Config_MASK
@@ -59,30 +62,9 @@ namespace vuprs
 
         ARM_FPGA_BF_Config_MASK() {this->Reset();}
 
-        void Reset()
-        {
-            m_fs = false;
-
-            m_bf_target__alt = false;
-            m_bf_target__az = false;
-
-            m_bf_waveVelocity = false;
-
-            m_bf_freq__lower = false;
-            m_bf_freq__upper = false;
-
-            m_bf_cov_snapshotsWindowSize = false;
-            m_bf_cov_freqAverageIndex = false;
-
-            m_dma__bufferSize = false;
-            m_dma__bufferCount = false;
-
-            m_queue__circularBufferQueueSizeMAX = false;
-            m_queue__resultQueueSizeMAX = false;
-        }
+        void Reset();
     };
 
-    void _Set_ARM_FPGA_BF_Config_ToDefault(vuprs::ARM_FPGA_BF_Config *config);
     bool _Check_ARM_FPGA_BF_Config_Valid(vuprs::FPGAController *controller, const vuprs::ARM_FPGA_BF_Config &config);
 
     /**
@@ -148,11 +130,11 @@ namespace vuprs
             std::mutex mut_alg;  /* Algorithm mutex lock */
             std::condition_variable algorithmCV;  /* Algorithm interrupt condition var, [controlled by mut_alg] */
 
-            std::queue<vuprs::SignalData> arraySignalQueue;  /* Array signal queue, [controlled by mut_alg] */
+            std::deque<vuprs::SignalData> arraySignalQueue;  /* Array signal queue, [controlled by mut_alg] */
 
             std::atomic<bool> newArraySignalInput{false};  /* new array signal input flag */
             std::mutex mut_output_arraySignal;  /* Output array signal mutex lock */
-            std::queue<vuprs::SignalData> outputArraySignalQueue;  /* Output array signal queue, controlled by mut_output_arraySignal */
+            std::deque<vuprs::SignalData> outputArraySignalQueue;  /* Output array signal queue, controlled by mut_output_arraySignal */
             
             vuprs::FIRCalculator fir;  /* FIR algorithm, [controlled by mut_alg] (can be only used in THREAD__AlgorithmCalculation) */
             std::unique_ptr<vuprs::WidebandBeamformerTemplate> bf;  /* Beam forming algorithm, [controlled by mut_alg] (can be only used in THREAD__AlgorithmCalculation) */
@@ -164,7 +146,7 @@ namespace vuprs
             std::condition_variable dmaInterruptCV;  /* DMA Interrupt condition var, [controlled by mut_dma] */
 
             std::atomic<bool> newResultDataInput{false};  /* assign to outside */
-            std::queue<std::vector<uint32_t>> resultQueue;  /* Result queue, [controlled by mut_dma] */
+            std::deque<std::vector<uint32_t>> resultQueue;  /* Result queue, [controlled by mut_dma] */
 
             /* Atomics */
 
@@ -298,6 +280,17 @@ namespace vuprs
              * @retval false: failed.
              */
             bool ReadArraySignalFromQueue(vuprs::SignalData *signalData);
+
+            /**
+             * @brief Read covariance matrix of current array signal.
+             * 
+             * @param covMatrix pointer to Eigen matrix to store the covariance matrix.
+             * @param frequency frequency (unit: Hz) of current covariance matrix.
+             * 
+             * @retval true: success.
+             * @retval false: failed.
+             */
+            bool ReadCovarianceMatrix(Eigen::Matrix<Eigen::dcomplex, -1, -1> *covMatrix, double frequency);
 
             /**
              * @brief Stop & reset beam former.

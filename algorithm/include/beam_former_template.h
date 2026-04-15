@@ -55,6 +55,7 @@ namespace vuprs
             std::mutex mut;
 
             vuprs::BeamFormingArray array;
+            vuprs::BeamFormingScanArray scan_array;  /* for scanning, which has same element position as array but different time delay */
 
             Eigen::Matrix<Eigen::dcomplex, -1, -1> snap_signalMatrix_freqDomain;  /* Size: (M) x (N / 2 + 1) */
             Eigen::Matrix<Eigen::dcomplex, -1, -1> steeringVectors;  /* Size: (M) x (N / 2 + 1) */
@@ -206,6 +207,17 @@ namespace vuprs
             bool ConfigDone() const;
             bool CalculateEnable() const;
 
+            /**
+             * @brief Scan for position power.
+             * 
+             * @param res output position power result. Size: alt.size()
+             * @param alt altitude list (degree).
+             * @param az azimuth list (degree).
+             * @param frequency frequency (Hz).
+             * @param waveVelocity wave velocity (m/s).
+             */
+            bool ScanForPositionPower(std::vector<double> *res, const std::vector<double> &alt, const std::vector<double> &az, double frequency, double waveVelocity);
+            
             /**
              * @brief Reset all.
              */

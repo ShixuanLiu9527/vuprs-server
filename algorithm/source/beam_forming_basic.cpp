@@ -298,6 +298,154 @@ double vuprs::BeamFormingArray::GetMaxAbsoluteTimeDelay() const
     return this->timeDelayVector.array().abs().matrix().maxCoeff();
 }
 
+/* --------------------------------------------------------------------------------------------------------------- */
+/* -------------------------------------------- Beam Forming Scan Array ------------------------------------------ */
+/* --------------------------------------------------------------------------------------------------------------- */
+
+vuprs::BeamFormingScanArray::BeamFormingScanArray()
+{
+    
+}
+
+vuprs::BeamFormingScanArray::~BeamFormingScanArray()
+{
+    
+}
+
+bool vuprs::BeamFormingScanArray::LoadArrayFromJson(const std::string &filename)
+{
+    std::ifstream arrayConfigJsonFile;
+
+    arrayConfigJsonFile.open(filename);
+    if (!arrayConfigJsonFile.is_open())
+    {
+        throw std::runtime_error("in [BeamFormingArray::LoadArrayFromJson] Cannot open file: " + filename);
+    }
+
+    nlohmann::json configJsonData;
+
+    try
+    {
+        arrayConfigJsonFile >> configJsonData;
+    }
+    catch(const std::exception& e)
+    {
+        throw std::runtime_error("in [BeamFormingArray::LoadArrayFromJson] Failed to load array data from: " + filename);
+    }
+
+    if (configJsonData.contains("beam_forming_array"))
+    {
+        auto beamFormingArray = configJsonData["beam_forming_array"];
+        if (beamFormingArray.contains("array"))
+        {
+            auto arrayData = beamFormingArray["array"];
+            if (arrayData.is_array())
+            {
+                int arraySize = arrayData.size();
+                this->elementArray.clear();
+                this->elementArray.reserve(arraySize);
+
+                for (int i = 0; i < arraySize; i++)
+                {
+                    if (arrayData[i].contains("position_x") && 
+                        arrayData[i].contains("position_y") && 
+                        arrayData[i].contains("position_z") && 
+                        arrayData[i].contains("adc_channel"))
+                    {
+                        double x = 0, y = 0, z = 0;
+                        std::string adcChannel;
+                        vuprs::BeamFormingElement oneBeamFormingElement;
+
+                        vuprs::__JsonStringParseFLOAT<double>(&x, arrayData[i], "position_x", true);
+                        vuprs::__JsonStringParseFLOAT<double>(&y, arrayData[i], "position_y", true);
+                        vuprs::__JsonStringParseFLOAT<double>(&z, arrayData[i], "position_z", true);
+
+                        oneBeamFormingElement.positionVector(0, 0) = x;
+                        oneBeamFormingElement.positionVector(1, 0) = y;
+                        oneBeamFormingElement.positionVector(2, 0) = z;
+
+                        vuprs::__JsonParseString(&adcChannel, arrayData[i], "adc_channel", true);
+                        
+                        oneBeamFormingElement.adcChannel = adcChannel;
+
+                        if (IS_ADC_CHANNEL_NAME(adcChannel))
+                        {
+                            this->elementArray.push_back(std::move(oneBeamFormingElement));
+                        }
+                        else
+                        {
+                            throw std::runtime_error("in [BeamFormingArray::LoadArrayFromJson] Invalid ADC channel name in file: " + filename);
+                        }
+                    }
+                    else
+                    {
+                        throw std::runtime_error("in [BeamFormingArray::LoadArrayFromJson] Missing element at index: " + std::to_string(i));
+                    }
+                }
+            }
+            else
+            {
+                throw std::runtime_error("in [BeamFormingArray::LoadArrayFromJson] Cannot find array in file: " + filename);
+            }
+        }
+        else
+        {
+            throw std::runtime_error("in [BeamFormingArray::LoadArrayFromJson] Missing element [array]");
+        }
+    }
+    else
+    {
+        throw std::runtime_error("in [BeamFormingArray::LoadArrayFromJson] Missing element [beam_forming_array]");
+    }
+
+    return true;
+}
+
+void vuprs::BeamFormingScanArray::GetSteeringVectorMatrix(Eigen::Matrix<Eigen::dcomplex, -1, -1> *matrix, const std::vector<double> &alt, const std::vector<double> &az, double frequency, double waveVelocity) const
+{
+    if (this->empty())
+    {
+        throw std::runtime_error("in [BeamFormingScanArray::GetSteeringVectorMatrix] Array is empty.");
+    }
+    if (alt.size() != az.size())
+    {
+        throw std::runtime_error("in [BeamFormingScanArray::GetSteeringVectorMatrix] Size of alt and az should be the same.");
+    }
+
+    int k = alt.size();
+    int M = this->elementArray.size();
+    std::complex<double> j(0, 1);
+    Eigen::Matrix<double, 3, 1> pointingVector;
+    Eigen::Matrix<double, -1, -1> elementPositionMatrix;
+
+    elementPositionMatrix.resize(M, 3);
+
+    for (int i = 0; i < M; i++)
+    {
+        elementPositionMatrix.row(i) = this->elementArray[i].positionVector.transpose();
+    }
+
+    matrix->resize(M, k);
+
+    for (int i = 0; i < k; i++)
+    {
+        pointingVector = vuprs::AltAz2PointingVector(alt[i], az[i]);
+        (*matrix).col(i) = -elementPositionMatrix * pointingVector * j / waveVelocity;
+    }
+
+    (*matrix) *= -2.0 * PI * frequency;
+    (*matrix) = (*matrix).array().exp().matrix();
+}
+
+bool vuprs::BeamFormingScanArray::empty() const
+{
+    return this->elementArray.size() <= 0;
+}
+
+/* --------------------------------------------------------------------------------------------------------------- */
+/* ------------------------------------------------ Tool functions ----------------------------------------------- */
+/* --------------------------------------------------------------------------------------------------------------- */
+
 bool vuprs::SaveToCSV(const std::vector<double> &data, const std::string filename)
 {
     if (data.empty())

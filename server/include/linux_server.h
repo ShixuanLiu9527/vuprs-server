@@ -82,7 +82,7 @@ namespace vuprs
             std::condition_variable readResultCV;
             std::atomic<bool> readResultIRQ;  /* true: should send */
 
-            std::queue<std::vector<uint32_t>> resultQueue;  /* Result queue (read from hardware), controlled by mut_readResult */
+            std::deque<std::vector<uint32_t>> resultQueue;  /* Result queue (read from hardware), controlled by mut_readResult */
 
             std::mutex mut_response;
             std::atomic<bool> serverResponseIRQ;
