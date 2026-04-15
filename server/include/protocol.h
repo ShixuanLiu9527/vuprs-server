@@ -2,7 +2,10 @@
 #define LINUX_SERVER_PROTOCOL_H
 
 #include <string>
-#include <arpa/inet.h>
+
+#ifdef __linux__
+    #include <arpa/inet.h>
+#endif
 
 #include "arm_fpga_bf_collab.h"
 #include "nlohmann/json.hpp"
@@ -15,13 +18,15 @@ namespace vuprs
     enum class ServerCommand
     {
         SERVER_CMD__INVALID = 0,  /* Invalid command */
+        SERVER_CMD__ACK,  /* Acknowledge command, which is used to indicate that the server has received the command and is processing it, and the client can wait for response. */
         SERVER_CMD__RESET,  /* Reset beam former (STEP 1: Stop, STEP 2: Clear) */
         SERVER_CMD__REDIRECT,  /* Redirect beam former */
         SERVER_CMD__CHANGE_BEAMFORMER,  /* Change beam former */
         SERVER_CMD__CHANGE_ALG_PARAM,  /* Change algorithm parameters (STEP 1: Stop, STEP 2: Start with new parameters) */
         SERVER_CMD__STOP,  /* Stop beam former */
         SERVER_CMD__START,  /* Start beam former */
-        SERVER_CMD__GET_NEW_DATA  /* Get newest data from server (Send DMA buffer to host) */
+        SERVER_CMD__GET_NEW_DATA,  /* Get newest data from server (Send DMA buffer to host) */
+        SERVER_CMD__GET_ALG_PARAM  /* Get current algorithm parameters */
     };
 
     /**
@@ -29,29 +34,14 @@ namespace vuprs
      */
     struct ServerCommandInformation
     {
+        vuprs::ARM_FPGA_BF_Config config;  /* config info */
+        vuprs::ARM_FPGA_BF_Config_MASK configMask;  /* mask of config info, which indicates which config parameters are valid and should be updated */
+
         vuprs::ServerCommand cmd;
-        ARM_FPGA_BF_Config config;  /* config info */
         std::string beamformer_name;  /* beam former name (for SERVER_CMD__CHANGE_BEAMFORMER) */
 
         ServerCommandInformation() : cmd(vuprs::ServerCommand::SERVER_CMD__INVALID), beamformer_name("") {}
     };
-
-    /**
-     * @brief Remove frame header/tailer if exists on boundaries.
-     *
-     * @note If header exists at message beginning, remove it.
-     * @note If tailer exists at message ending, remove it.
-     * @note If not found, keep message unchanged.
-     */
-    std::string RemoveFrameIfExists(const std::string &message, const std::string &header, const std::string &tailer);
-
-    /**
-     * @brief Ensure frame header/tailer exist on boundaries.
-     *
-     * @note If both header and tailer already exist, keep unchanged.
-     * @note Otherwise add missing part(s).
-     */
-    std::string AddFrameIfMissing(const std::string &message, const std::string &header, const std::string &tailer);
 
     /**
      * @brief Parse command information from message.
@@ -74,11 +64,19 @@ namespace vuprs
      * @note which should be added before sending to client.
      * 
      * @param cmd Command information.
+     * @param info Additional information for the response.
      * @param operationStatus Operation status of command (true: success, false: failed).
      * 
      * @retval Server response message.
      */
-    std::string PROTOCOL_MakeServerResponse(const ServerCommandInformation &cmd, bool operationStatus);
+    std::string PROTOCOL_MakeServerOperationResponse(const ServerCommandInformation &cmd, const std::string &info = "", bool operationStatus = true);
+
+    /**
+     * @brief Make server response message for current algorithm parameters.
+     * 
+     * @param config Current algorithm parameters.
+     */
+    std::string PROTOCOL_MakeServerParameterResponse(const vuprs::ARM_FPGA_BF_Config &config);
 }
 
 #endif

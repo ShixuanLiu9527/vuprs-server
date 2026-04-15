@@ -60,25 +60,27 @@ namespace vuprs
             uint16_t server_port;
 
             std::unique_ptr<vuprs::LinuxSession> server_session;  /* socket session */
-            std::shared_ptr<vuprs::SocketIOManager> socketIOManager;  /* socket io manager */
+            std::shared_ptr<vuprs::SocketIOManager> client_io_manager;  /* socket io manager for client */
 
             /* --- Algorithms --- */
 
-            vuprs::ARM_FPGA_BF_Config beamFormerConfig;  /* Set by client or default value */
             vuprs::ARM_FPGA_CollaborationBeamfomer beamformer;  /* System beam former */
+
+            std::mutex mut_bf_config;
+            vuprs::ARM_FPGA_BF_Config beamFormerConfig;  /* Set by client or default value, controlled by mut_bf_config */
 
             /* --- Thread data --- */
 
             std::atomic<bool> server_running;  /* server running */
 
-            std::mutex mut_config;
-            vuprs::ServerConfig server_config;  /* controlled by mut_config */
+            std::mutex mut_server_config;
+            vuprs::ServerConfig server_config;  /* controlled by mut_server_config */
 
             std::mutex mut_readResult;
             std::condition_variable readResultCV;
             std::atomic<bool> readResultIRQ;  /* true: should send */
 
-            std::queue<std::vector<double>> resultQueue;  /* Result queue (read from hardware), controlled by mut_readResult */
+            std::queue<std::vector<uint32_t>> resultQueue;  /* Result queue (read from hardware), controlled by mut_readResult */
 
             std::mutex mut_response;
             std::atomic<bool> serverResponseIRQ;
@@ -87,8 +89,9 @@ namespace vuprs
             std::string serverResponseMessage;
 
             std::mutex mut_send;
-            std::condition_variable resultSendingCV;
-            std::atomic<bool> resultSendingIRQ;  /* true: should send */
+            std::condition_variable sendingCV;
+            std::atomic<bool> sendingIRQ;  /* true: should send */
+            std::atomic<uint32_t> sendingFormat;  /* Sending format: data, current alg param */
 
             std::mutex mut_control;
             std::atomic<bool> controlIRQ;

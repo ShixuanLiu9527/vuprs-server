@@ -16,7 +16,7 @@ static bool SetSocketTimeoutOption(int fd, int option, int timeoutMs)
     return setsockopt(fd, SOL_SOCKET, option, &tv, sizeof(tv)) == 0;
 }
 
-static bool SendAllWithRetry(int fd, const char* data, size_t bytes)
+bool vuprs::SendAllWithRetry(int fd, const char* data, size_t bytes)
 {
     if (fd < 0 || data == nullptr || bytes == 0)
     {
@@ -82,7 +82,7 @@ bool vuprs::SocketIOManager::SendMessage(const std::string &message)
     
     std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
 
-    return SendAllWithRetry(this->client_fd, message.data(), message.size());
+    return vuprs::SendAllWithRetry(this->client_fd, message.data(), message.size());
 }
 
 bool vuprs::SocketIOManager::SendBuffer(const vuprs::AlignedBufferDMA &buffer)
@@ -96,22 +96,7 @@ bool vuprs::SocketIOManager::SendBuffer(const vuprs::AlignedBufferDMA &buffer)
 
     std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
 
-    return SendAllWithRetry(this->client_fd, data_ptr, static_cast<size_t>(buffer.size()));
-}
-
-bool vuprs::SocketIOManager::SendBuffer(const std::vector<double> &buffer)
-{
-    if (buffer.empty()) 
-    {
-        return false;
-    }
-
-    const char* data_ptr = reinterpret_cast<const char*>(buffer.data());
-    size_t bytes = buffer.size() * sizeof(double);
-    
-    std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
-
-    return SendAllWithRetry(this->client_fd, data_ptr, bytes);
+    return vuprs::SendAllWithRetry(this->client_fd, data_ptr, static_cast<size_t>(buffer.size()));
 }
 
 void vuprs::SocketIOManager::ReceiveMessage(const std::string &tailer, vuprs::SocketReceiveData *data)
@@ -189,26 +174,19 @@ std::string vuprs::ParseClientInformationFromSocketaddr(const sockaddr_in &clien
     return std::string(ip) + ":" + std::to_string(ntohs(client_addr.sin_port));
 }
 
-bool vuprs::ParseMessageFromSocketData(const vuprs::SocketReceiveData &data, const std::string &header, const std::string &tailer, std::string *result)
+bool vuprs::CheckFrameFormat(const vuprs::SocketReceiveData &data, const std::string &header, const std::string &tailer, std::string *result)
 {
     if (!result) return false;
     if (header.empty() || tailer.empty()) return false;
     
     std::string dataString(data.buf, data.receiveBytes);
     
-    size_t headerPos = dataString.find(header);
-    size_t tailerPos = dataString.find(tailer);
+    if (dataString.size() < header.size() + tailer.size()) return false;
+    if (dataString.compare(0, header.size(), header) != 0) return false;
+    if (dataString.compare(dataString.size() - tailer.size(), tailer.size(), tailer) != 0) return false;
     
-    if (headerPos != std::string::npos && tailerPos != std::string::npos && headerPos + header.length() < tailerPos)
-    {
-        size_t contentStart = headerPos + header.length();
-        size_t contentLength = tailerPos - contentStart;
-        
-        *result = dataString.substr(contentStart, contentLength);
-        return true;
-    }
-    
-    return false;
+    *result = dataString;  /* do not cut */
+    return true;
 }
 
 void vuprs::SetSocketReceiveDataToDefault(vuprs::SocketReceiveData *data)

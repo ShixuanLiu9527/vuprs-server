@@ -1,12 +1,15 @@
 #ifndef SOCKET_IO_MANAGER_H
 #define SOCKET_IO_MANAGER_H
 
-#include <arpa/inet.h>
 #include <mutex>
 #include <memory>
 #include <cstring>
-#include <sys/socket.h>
-#include <unistd.h>
+
+#ifdef __linux__
+    #include <unistd.h>
+    #include <arpa/inet.h>
+    #include <sys/socket.h>
+#endif
 
 #include "aligned_buffer.h"
 
@@ -26,6 +29,8 @@ namespace vuprs
     };
 
     void SetSocketReceiveDataToDefault(vuprs::SocketReceiveData *data);
+
+    bool SendAllWithRetry(int fd, const char* data, size_t bytes);
 
     /**
      * @brief Socket IO Manager.
@@ -61,7 +66,21 @@ namespace vuprs
 
             bool SendBuffer(const vuprs::AlignedBufferDMA &buffer);
 
-            bool SendBuffer(const std::vector<double> &buffer);
+            template<typename T>
+            bool SendBuffer(const std::vector<T> &buffer)
+            {
+                if (buffer.empty()) 
+                {
+                    return false;
+                }
+            
+                const char* data_ptr = reinterpret_cast<const char*>(buffer.data());
+                size_t bytes = buffer.size() * sizeof(T);
+
+                std::unique_lock<std::mutex> lock(this->mut);  /* LOCK */
+            
+                return vuprs::SendAllWithRetry(this->client_fd, data_ptr, bytes);
+            }
 
             /**
              * @brief Socket receive message.
@@ -82,11 +101,14 @@ namespace vuprs
     std::string ParseClientInformationFromSocketaddr(const sockaddr_in &client_addr);
 
     /**
-     * @brief Cut header & tailer.
+     * @brief Check frame format.
      * 
-     * @note This function will cut header & tailer from data, and store the content in result.
+     * @note Check if the received data has correct frame format (header & tailer).
+     * 
+     * @retval true: if frame format is correct, and output the data string (including header & tailer) to result;
+     * @retval false: otherwise, and result is unchanged.
      */
-    bool ParseMessageFromSocketData(const vuprs::SocketReceiveData &data, const std::string &header, const std::string &tailer, std::string *result);
+    bool CheckFrameFormat(const vuprs::SocketReceiveData &data, const std::string &header, const std::string &tailer, std::string *result);
 }
 
 #endif

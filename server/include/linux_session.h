@@ -1,18 +1,21 @@
 #ifndef LINUX_SESSION_H
 #define LINUX_SESSION_H
 
-#include <netinet/in.h>
 #include <string>
 #include <memory>
 #include <functional>
 #include <thread>
-#include <sys/socket.h>
 #include <unistd.h>
 #include <errno.h>
 #include <iostream>
-#include <arpa/inet.h>
 #include <cstring>
 #include <atomic>
+
+#ifdef __linux__
+    #include <netinet/in.h>
+    #include <arpa/inet.h>
+    #include <sys/socket.h>
+#endif
 
 #include "aligned_buffer.h"
 #include "socket_io_manager.h"

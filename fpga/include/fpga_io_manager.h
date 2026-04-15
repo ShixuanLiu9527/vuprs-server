@@ -8,18 +8,16 @@
 #include <vector>
 #include <fstream>
 #include <stdexcept>
-#include <sys/select.h>
-
 #include <mutex>
 #include <atomic>
 #include <condition_variable>
-
-#ifndef _WIN32
-#include <sys/mman.h>
-#endif
-
 #include <fcntl.h>
 #include <unistd.h>
+
+#ifdef __linux__
+    #include <sys/select.h>
+    #include <sys/mman.h>
+#endif
 
 #if __BYTE_ORDER == __LITTLE_ENDIAN
     #define ltohl(x)               (x)

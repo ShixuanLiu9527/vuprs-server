@@ -3,7 +3,7 @@
 #define ARM_FPGA_BF_COLLAB_CPP__DEBUG_PRINT false  /* print something @ debug mode */
 #define ARM_FPGA_BF_COLLAB_CPP__DEBUG_SAVE false  /* save data @ debug mode */
 
-void vuprs::Set_ARM_FPGA_BF_Config_ToDefault(vuprs::ARM_FPGA_BF_Config *config)
+void vuprs::_Set_ARM_FPGA_BF_Config_ToDefault(vuprs::ARM_FPGA_BF_Config *config)
 {
     config->fs = 10000.0;  /* sampling frequency (unit: Hz) */
     config->bf_target__alt = 90.0;  /* altitude (unit: degree) beam former pointing target */
@@ -23,6 +23,11 @@ bool vuprs::_Check_ARM_FPGA_BF_Config_Valid(vuprs::FPGAController *controller, c
 {
     bool retval = true;
 
+    if (!controller->ConfigDown())
+    {
+        throw std::runtime_error("in [_Check_ARM_FPGA_BF_Config_Valid] FPGA config not complete.");
+    }
+
     retval &= (config.fs > 0 && config.fs < controller->dev__ADC_Controller.MaxSamplingFrequency());
     retval &= (config.bf_freq__lower < config.fs / 2.0);
     retval &= (config.bf_freq__upper < config.fs / 2.0);
@@ -32,6 +37,28 @@ bool vuprs::_Check_ARM_FPGA_BF_Config_Valid(vuprs::FPGAController *controller, c
     retval &= ((config.dma__bufferSize * config.dma__bufferCount) < controller->mem__DDR.MaxSizeBytes());
 
     return retval;
+}
+
+void vuprs::Merge_ARM_FPGA_BF_Config(vuprs::ARM_FPGA_BF_Config *config, const vuprs::ARM_FPGA_BF_Config &newConfig, const vuprs::ARM_FPGA_BF_Config_MASK &configMask)
+{
+    if (configMask.m_fs) config->fs = newConfig.fs;
+
+    if (configMask.m_bf_target__alt) config->bf_target__alt = newConfig.bf_target__alt;
+    if (configMask.m_bf_target__az) config->bf_target__az = newConfig.bf_target__az;
+
+    if (configMask.m_bf_waveVelocity) config->bf_waveVelocity = newConfig.bf_waveVelocity;
+
+    if (configMask.m_bf_freq__lower) config->bf_freq__lower = newConfig.bf_freq__lower;
+    if (configMask.m_bf_freq__upper) config->bf_freq__upper = newConfig.bf_freq__upper;
+
+    if (configMask.m_bf_cov_snapshotsWindowSize) config->bf_cov_snapshotsWindowSize = newConfig.bf_cov_snapshotsWindowSize;
+    if (configMask.m_bf_cov_freqAverageIndex) config->bf_cov_freqAverageIndex = newConfig.bf_cov_freqAverageIndex;
+
+    if (configMask.m_dma__bufferSize) config->dma__bufferSize = newConfig.dma__bufferSize;
+    if (configMask.m_dma__bufferCount) config->dma__bufferCount = newConfig.dma__bufferCount;
+
+    if (configMask.m_queue__circularBufferQueueSizeMAX) config->queue__circularBufferQueueSizeMAX = newConfig.queue__circularBufferQueueSizeMAX;
+    if (configMask.m_queue__resultQueueSizeMAX) config->queue__resultQueueSizeMAX = newConfig.queue__resultQueueSizeMAX;
 }
 
 vuprs::ARM_FPGA_CollaborationBeamfomer::ARM_FPGA_CollaborationBeamfomer()
@@ -274,7 +301,7 @@ bool vuprs::ARM_FPGA_CollaborationBeamfomer::NewResultDataInput() const
     return this->newResultDataInput;
 }
 
-bool vuprs::ARM_FPGA_CollaborationBeamfomer::ReadResultFromQueue(std::vector<double> *result)
+bool vuprs::ARM_FPGA_CollaborationBeamfomer::ReadResultFromQueue(std::vector<uint32_t> *result)
 {
     bool readSuccess = false;
 
@@ -326,8 +353,9 @@ void vuprs::ARM_FPGA_CollaborationBeamfomer::THREAD__ListenDMAInterrupt()
 void vuprs::ARM_FPGA_CollaborationBeamfomer::THREAD__ReadResult()
 {
     vuprs::AXI_DMA_ScatterGatherDescriptor currentDescriptor, previousDescriptor, nextDescriptor;
-    vuprs::AlignedBufferDMA buffer;
     std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> _refDescriptors;
+    vuprs::AlignedBufferDMA buffer;
+    std::vector<uint32_t> result;
     bool hasInterrupt;
 
     {
@@ -369,13 +397,17 @@ void vuprs::ARM_FPGA_CollaborationBeamfomer::THREAD__ReadResult()
             vuprs::FPGA_API__DDR__ReadDDR(&this->controller, &buffer, 
                 previousDescriptor.BUFFER_ADDRESS, previousDescriptor.ALIGNMENT_2_BUFFER_SIZE);
 
+            /* Convert buffer to vector */
+
+            result = buffer.to_vector<uint32_t>();
+
             /* Push to queue */
 
             {
                 std::unique_lock<std::mutex> lock(this->mut_dma);  /* LOCK */
                 if (this->resultQueue.size() < this->resultQueueSizeMAX)
                 {
-                    this->resultQueue.push(buffer.to_vector<double>());
+                    this->resultQueue.push(result);
                 }
             }
 

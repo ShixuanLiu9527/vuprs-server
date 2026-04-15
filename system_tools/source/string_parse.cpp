@@ -158,3 +158,50 @@ void vuprs::__JsonParseString(std::string *target, const nlohmann::json &json, c
         throw std::runtime_error("in [__JsonParseString] Item: " + item + " not found.");
     }
 }
+
+std::string vuprs::RemoveFrameIfExists(const std::string &message, const std::string &header, const std::string &tailer)
+{
+    std::string result = message;
+
+    if (!header.empty() && result.size() >= header.size() &&
+        result.compare(0, header.size(), header) == 0)
+    {
+        result.erase(0, header.size());
+    }
+
+    if (!tailer.empty() && result.size() >= tailer.size() &&
+        result.compare(result.size() - tailer.size(), tailer.size(), tailer) == 0)
+    {
+        result.erase(result.size() - tailer.size(), tailer.size());
+    }
+
+    return result;
+}
+
+std::string vuprs::AddFrameIfMissing(const std::string &message, const std::string &header, const std::string &tailer)
+{
+    std::string result = message;
+
+    const bool hasHeader = (!header.empty() && result.size() >= header.size() &&
+                            result.compare(0, header.size(), header) == 0);
+
+    const bool hasTailer = (!tailer.empty() && result.size() >= tailer.size() &&
+                            result.compare(result.size() - tailer.size(), tailer.size(), tailer) == 0);
+
+    if (hasHeader && hasTailer)
+    {
+        return result;
+    }
+
+    if (!hasHeader && !header.empty())
+    {
+        result = header + result;
+    }
+
+    if (!hasTailer && !tailer.empty())
+    {
+        result += tailer;
+    }
+
+    return result;
+}

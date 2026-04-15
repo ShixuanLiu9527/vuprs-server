@@ -32,10 +32,67 @@ namespace vuprs
 
         uint32_t queue__circularBufferQueueSizeMAX;  /* MAX size of circular buffer data queue */
         uint32_t queue__resultQueueSizeMAX;  /* MAX size of result data queue */
+
+        ARM_FPGA_BF_Config() {vuprs::_Set_ARM_FPGA_BF_Config_ToDefault(this);}
     };
 
-    void Set_ARM_FPGA_BF_Config_ToDefault(vuprs::ARM_FPGA_BF_Config *config);
+    struct ARM_FPGA_BF_Config_MASK
+    {
+        bool m_fs;
+
+        bool m_bf_target__alt;
+        bool m_bf_target__az;
+
+        bool m_bf_waveVelocity;
+
+        bool m_bf_freq__lower;
+        bool m_bf_freq__upper;
+
+        bool m_bf_cov_snapshotsWindowSize;
+        bool m_bf_cov_freqAverageIndex;
+
+        bool m_dma__bufferSize;
+        bool m_dma__bufferCount;
+
+        bool m_queue__circularBufferQueueSizeMAX;
+        bool m_queue__resultQueueSizeMAX;
+
+        ARM_FPGA_BF_Config_MASK() {this->Reset();}
+
+        void Reset()
+        {
+            m_fs = false;
+
+            m_bf_target__alt = false;
+            m_bf_target__az = false;
+
+            m_bf_waveVelocity = false;
+
+            m_bf_freq__lower = false;
+            m_bf_freq__upper = false;
+
+            m_bf_cov_snapshotsWindowSize = false;
+            m_bf_cov_freqAverageIndex = false;
+
+            m_dma__bufferSize = false;
+            m_dma__bufferCount = false;
+
+            m_queue__circularBufferQueueSizeMAX = false;
+            m_queue__resultQueueSizeMAX = false;
+        }
+    };
+
+    void _Set_ARM_FPGA_BF_Config_ToDefault(vuprs::ARM_FPGA_BF_Config *config);
     bool _Check_ARM_FPGA_BF_Config_Valid(vuprs::FPGAController *controller, const vuprs::ARM_FPGA_BF_Config &config);
+
+    /**
+     * @brief Merge newConfig to config according to configMask.
+     * 
+     * @param config original config, will be updated after merging.
+     * @param newConfig new config, will be merged to original config according to configMask
+     * @param configMask config mask, indicate which field in newConfig will be merged to original config. true: merge, false: not merge.
+     */
+    void Merge_ARM_FPGA_BF_Config(vuprs::ARM_FPGA_BF_Config *config, const vuprs::ARM_FPGA_BF_Config &newConfig, const vuprs::ARM_FPGA_BF_Config_MASK &configMask);
 
     /**
      * @brief ARM FPGA Collaboration Beamformer.
@@ -102,7 +159,7 @@ namespace vuprs
             std::mutex mut_dma;  /* DMA Interrupt mutex lock */
             std::condition_variable dmaInterruptCV;  /* DMA Interrupt condition var, [controlled by mut_dma] */
 
-            std::queue<std::vector<double>> resultQueue;  /* Result queue, [controlled by mut_dma] */
+            std::queue<std::vector<uint32_t>> resultQueue;  /* Result queue, [controlled by mut_dma] */
 
             /* Atomics */
 
@@ -219,7 +276,7 @@ namespace vuprs
              * @retval true: success.
              * @retval false: failed.
              */
-            bool ReadResultFromQueue(std::vector<double> *result);
+            bool ReadResultFromQueue(std::vector<uint32_t> *result);
 
             /**
              * @brief Stop & reset beam former.

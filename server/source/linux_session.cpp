@@ -139,7 +139,7 @@ void vuprs::LinuxSession::ReceiveLoop()
         {
             std::string message;
 
-            if(vuprs::ParseMessageFromSocketData(data, this->frameHeader, this->frameTailer, &message))
+            if(vuprs::CheckFrameFormat(data, this->frameHeader, this->frameTailer, &message))
             {
                 /* Get message from client */
             

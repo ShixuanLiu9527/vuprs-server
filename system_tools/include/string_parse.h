@@ -68,6 +68,23 @@ namespace vuprs
     }
 
     void __JsonParseString(std::string *target, const nlohmann::json &json, const std::string &item, bool required = true);
+
+    /**
+     * @brief Remove frame header/tailer if exists on boundaries.
+     *
+     * @note If header exists at message beginning, remove it.
+     * @note If tailer exists at message ending, remove it.
+     * @note If not found, keep message unchanged.
+     */
+    std::string RemoveFrameIfExists(const std::string &message, const std::string &header, const std::string &tailer);
+
+    /**
+     * @brief Ensure frame header/tailer exist on boundaries.
+     *
+     * @note If both header and tailer already exist, keep unchanged.
+     * @note Otherwise add missing part(s).
+     */
+    std::string AddFrameIfMissing(const std::string &message, const std::string &header, const std::string &tailer);
 } 
 
 #endif

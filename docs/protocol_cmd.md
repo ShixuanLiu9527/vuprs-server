@@ -13,7 +13,31 @@ data tailer: [TAILER]
 - 服务端协议解析函数只处理去除 `[HEADER]` 和 `[TAILER]` 后的JSON字符串.  
 - 服务端响应构造函数返回的也是纯JSON字符串, 由会话层统一拼接 `[HEADER]` 和 `[TAILER]`.    
 
-### Reset (or Restart)
+### 1. ACK
+
+*client to server*  
+
+```json
+[HEADER]
+{
+    "cmd": "ack",
+    "params": {}
+}
+[TAILER]
+```
+
+*server response*  
+
+```json
+[HEADER]
+{
+    "response_cmd": "ack",
+    "operation_status": "done"
+}
+[TAILER]
+```
+
+### 2. Reset (or Restart)
 
 *client to server*  
 
@@ -37,7 +61,7 @@ data tailer: [TAILER]
 [TAILER]
 ```
 
-### Change beamformer
+### 3. Change beamformer
 
 *client to server*  
 
@@ -65,7 +89,7 @@ data tailer: [TAILER]
 
 可选值: `mvdr`, `cbf`, `dcrcb` (后期可拓展).  
 
-### Redirect
+### 4. Redirect
 
 ```json
 [HEADER]
@@ -90,9 +114,9 @@ data tailer: [TAILER]
 [TAILER]
 ```
 
-*注: `alt` 和 `az` 的单位是 `degree`*.  
+*注: `alt` 和 `az` 的单位是 `degree`, 必须以浮点数字符串形式发送*.  
 
-### Start
+### 5. Start
 
 ```json
 [HEADER]
@@ -114,7 +138,7 @@ data tailer: [TAILER]
 [TAILER]
 ```
 
-### Stop
+### 6. Stop
 
 ```json
 [HEADER]
@@ -136,7 +160,7 @@ data tailer: [TAILER]
 [TAILER]
 ```
 
-### Get data (beam forming result)
+### 7. Get data (beam forming result)
 
 ```json
 [HEADER]
@@ -157,4 +181,78 @@ data tailer: [TAILER]
 
 ```text
 [HEADER] + binary(double array) + [TAILER]
+```
+
+### 8. Change Algorithm Parameters
+
+```json
+[HEADER]
+{
+    "cmd": "change_algorithm_parameters",
+    "params": {
+        "fs": "40000.0",
+        "wave_velocity": "346.0", 
+        "lower_frequency": "100.0",
+        "upper_frequency": "4000.0",
+        "snapshot_window_size": "100",
+        "covariance_average_index": "0.8"
+    }
+}
+[TAILER]
+```
+
+*server response*  
+
+```json
+[HEADER]
+{
+    "response_cmd": "change_algorithm_parameters",
+    "operation_status": "done"
+}
+[TAILER]
+```
+
+*注: 必须以浮点数字符串形式发送*.  
+*注: 可修改参数均按照上述所示.*.  
+可以只发送一部分, 代表只修改当前参数, 其他参数与当前一致, 例如:  
+```json
+[HEADER]
+{
+    "cmd": "change_algorithm_parameters",
+    "params": {
+        "fs": "40000.0",
+    }
+}
+[TAILER]
+```
+代表只修改采样频率, 其他参数保证现状.  
+
+### 9. Read Current Algorithm Parameters
+
+```json
+[HEADER]
+{
+    "cmd": "read_algorithm_parameters",
+    "params": {}
+}
+[TAILER]
+```
+
+*server response*  
+
+```json
+[HEADER]
+{
+    "response_cmd": "read_algorithm_parameters",
+    "operation_status": "done",
+    "params": {
+        "fs": "40000.0",
+        "wave_velocity": "346.0", 
+        "lower_frequency": "100.0",
+        "upper_frequency": "4000.0",
+        "snapshot_window_size": "100",
+        "covariance_average_index": "0.8"
+    }
+}
+[TAILER]
 ```
