@@ -228,6 +228,18 @@ namespace vuprs
              */
             void GetSteeringVectorMatrix(Eigen::Matrix<Eigen::dcomplex, -1, -1> *matrix, const std::vector<double> &alt, const std::vector<double> &az, double frequency, double waveVelocity) const;
 
+            /**
+             * @brief Calculate steering vector for one frequency domain.
+             * 
+             * @note output->col{i} = [jT{1}, jT{2}, ..., jT{M}].T
+             * 
+             * @param matrix output steering vector.
+             * @param alt alt of the target position (relative to array), unit: deg.
+             * @param az az of the target position (relative to array), unit: deg.
+             * @param waveVelocity velocity of wave, unit: m/sec.
+             */
+            Eigen::Matrix<Eigen::dcomplex, -1, -1> GetImagTimedelay(const std::vector<double> &alt, const std::vector<double> &az, double waveVelocity) const;
+
             bool empty() const;
 
             EIGEN_MAKE_ALIGNED_OPERATOR_NEW

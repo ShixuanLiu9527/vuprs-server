@@ -11,6 +11,10 @@
 #include "fir.h"
 #include "fpga_api.h"
 
+#define DEFAULT_SCANNING_POINTS_IN_HALF 100
+#define DEFAULT_SCANNING_ALTITUDE_MIN 15.0
+#define DEFAULT_SCANNING_WAVE_VELOCITY 346.0
+
 namespace vuprs
 {
     struct ARM_FPGA_BF_Config
@@ -65,6 +69,25 @@ namespace vuprs
         void Reset();
     };
 
+    struct ScanningConfig
+    {
+        int pointsInHalf;
+        double alt_min;
+        bool needRegeneratePositionPoints;
+
+        ScanningConfig(): 
+        pointsInHalf(DEFAULT_SCANNING_POINTS_IN_HALF), 
+        alt_min(DEFAULT_SCANNING_ALTITUDE_MIN), 
+        needRegeneratePositionPoints(true) {}
+    };
+
+    struct ScanResult
+    {
+        std::vector<uint16_t> scanResult;  /* scan result in power, unit: dB */
+        double minPowerDB;  /* minimum power in dB for scan result */
+        double maxPowerDB;  /* maximum power in dB for scan result */
+    };
+
     bool _Check_ARM_FPGA_BF_Config_Valid(vuprs::FPGAController *controller, const vuprs::ARM_FPGA_BF_Config &config);
 
     /**
@@ -96,7 +119,7 @@ namespace vuprs
      * @note Step 5: Call ReadResultFromQueue() to read result from queue.
      * @note Step 6: Call STOP() to stop & reset beam former.
      */
-    class ARM_FPGA_CollaborationBeamfomer
+    class ARM_FPGA_CollaborationBeamformer
     {
         private:
 
@@ -124,6 +147,18 @@ namespace vuprs
             /* Thread parameters */
 
             std::mutex mut;  /* Global mutex lock */
+
+            /* Scan */
+
+            std::mutex mut_scan_opt;  /* Scan mutex lock */
+            std::vector<double> scan_alt, scan_az;  /* controlled by mut_scan_opt */
+            int scan_pointsInHalf;  /* controlled by mut_scan_opt */
+            double scan_waveVelocity, scan_alt_min;  /* controlled by mut_scan_opt */
+
+            std::atomic<bool> newScanPointsInput{false};  /* scan points changed flag */
+            std::mutex mut_scan_result;  /* Scan result mutex lock */
+            std::condition_variable scanCV;  /* Scan condition var, controlled by mut_scan */
+            std::deque<vuprs::ScanResult> scanResultQueue;  /* Scan result, controlled by mut_scan_result */
             
             /* Circular buffer interrupt */
 
@@ -161,6 +196,10 @@ namespace vuprs
             std::atomic<uint32_t> circularBufferQueueSizeMAX;  /* MAX size of circular buffer queue */
             std::atomic<uint32_t> resultQueueSizeMAX;  /* MAX size of result queue */
 
+            std::atomic<bool> scanEnable{false};  /* Scan enable flag */
+            std::atomic<bool> scanOptionsChanged{false};  /* Scan options changed flag */
+            std::atomic<bool> scanOptionsInitialized{false};  /* Scan options initialized flag */
+
             /* Threads */
 
             /**
@@ -194,10 +233,15 @@ namespace vuprs
              */
             void THREAD__AlgorithmCalculation();
 
+            /**
+             * @brief Get data from output array signal queue and do scan power calculation.
+             */
+            void THREAD__ScanPowerCalculation();
+
         public:
 
-            ARM_FPGA_CollaborationBeamfomer();
-            ~ARM_FPGA_CollaborationBeamfomer();
+            ARM_FPGA_CollaborationBeamformer();
+            ~ARM_FPGA_CollaborationBeamformer();
 
             /**
              * @brief Initialize FPGA controller & Beamforming algorithm.
@@ -206,7 +250,7 @@ namespace vuprs
              * @param bfArrayConfigJson Beam forming array config JSON file.
              * @param firConfigJson FIR filter config JSON file.
              */
-            bool InitCollaborationBeamfomer(const std::string &fpgaConfigJson, const std::string &bfArrayConfigJson, const std::string &firConfigJon);
+            bool InitCollaborationBeamformer(const std::string &fpgaConfigJson, const std::string &bfArrayConfigJson, const std::string &firConfigJson);
 
             /**
              * @brief Bind beam forming algorithm.
@@ -262,6 +306,31 @@ namespace vuprs
             bool NewArraySignalInput() const;
 
             /**
+             * @brief Indicate new scan points input.
+             * 
+             * @retval true: new scan points input;
+             * @retval false: no new scan points input.
+             */
+            bool NewScanPowerInput() const;
+
+            /**
+             * @brief Set scan enable.
+             * 
+             * @param enable true: enable scan; false: disable scan.
+             */
+            void ScanSwitch(bool enable);
+            bool ScanSwitch() const;
+
+            /**
+             * @brief Set scan options.
+             * 
+             * @param pointsInHalf scanning points in half of the scanning area (altitude: 0-90 degree, azimuth: -180-180 degree).
+             * @param alt_min minimum altitude (unit: degree) of scanning area.
+             * @param waveVelocity wave velocity (m/s). e.g. 346.0 for speed of sound in air.
+             */
+            void ScanOptions(int pointsInHalf, double alt_min, double waveVelocity);
+
+            /**
              * @brief Read result from result queue.
              * 
              * @param result pointer to vector to store the result.
@@ -282,15 +351,16 @@ namespace vuprs
             bool ReadArraySignalFromQueue(vuprs::SignalData *signalData);
 
             /**
-             * @brief Read covariance matrix of current array signal.
+             * @brief Read scan power from scan power queue.
              * 
-             * @param covMatrix pointer to Eigen matrix to store the covariance matrix.
-             * @param frequency frequency (unit: Hz) of current covariance matrix.
+             * @param scanPower pointer to vector to store the scan power (in dB).
+             * @param maxPowerDB pointer to maximum power value in dB.
+             * @param minPowerDB pointer to minimum power value in dB.
              * 
              * @retval true: success.
              * @retval false: failed.
              */
-            bool ReadCovarianceMatrix(Eigen::Matrix<Eigen::dcomplex, -1, -1> *covMatrix, double frequency);
+            bool ReadScanPowerFromQueue(std::vector<uint16_t> *scanPower, double *maxPowerDB, double *minPowerDB);
 
             /**
              * @brief Stop & reset beam former.

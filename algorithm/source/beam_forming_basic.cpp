@@ -401,7 +401,7 @@ bool vuprs::BeamFormingScanArray::LoadArrayFromJson(const std::string &filename)
     return true;
 }
 
-void vuprs::BeamFormingScanArray::GetSteeringVectorMatrix(Eigen::Matrix<Eigen::dcomplex, -1, -1> *matrix, const std::vector<double> &alt, const std::vector<double> &az, double frequency, double waveVelocity) const
+Eigen::Matrix<Eigen::dcomplex, -1, -1> vuprs::BeamFormingScanArray::GetImagTimedelay(const std::vector<double> &alt, const std::vector<double> &az, double waveVelocity) const
 {
     if (this->empty())
     {
@@ -414,27 +414,38 @@ void vuprs::BeamFormingScanArray::GetSteeringVectorMatrix(Eigen::Matrix<Eigen::d
 
     int k = alt.size();
     int M = this->elementArray.size();
+    Eigen::Matrix<Eigen::dcomplex, -1, -1> res;
     std::complex<double> j(0, 1);
     Eigen::Matrix<double, 3, 1> pointingVector;
-    Eigen::Matrix<double, -1, -1> elementPositionMatrix;
-
-    elementPositionMatrix.resize(M, 3);
+    Eigen::Matrix<double, -1, -1> elementPositionMatrix(M, 3);
 
     for (int i = 0; i < M; i++)
     {
         elementPositionMatrix.row(i) = this->elementArray[i].positionVector.transpose();
     }
-
-    matrix->resize(M, k);
-
     for (int i = 0; i < k; i++)
     {
         pointingVector = vuprs::AltAz2PointingVector(alt[i], az[i]);
-        (*matrix).col(i) = -elementPositionMatrix * pointingVector * j / waveVelocity;
+        res.col(i) = elementPositionMatrix * pointingVector * j / waveVelocity;
+    }
+    return res;
+}
+
+void vuprs::BeamFormingScanArray::GetSteeringVectorMatrix(Eigen::Matrix<Eigen::dcomplex, -1, -1> *matrix, const std::vector<double> &alt, const std::vector<double> &az, double frequency, double waveVelocity) const
+{
+    if (this->empty())
+    {
+        throw std::runtime_error("in [BeamFormingScanArray::GetSteeringVectorMatrix] Array is empty.");
+    }
+    if (alt.size() != az.size())
+    {
+        throw std::runtime_error("in [BeamFormingScanArray::GetSteeringVectorMatrix] Size of alt and az should be the same.");
     }
 
-    (*matrix) *= -2.0 * PI * frequency;
-    (*matrix) = (*matrix).array().exp().matrix();
+    Eigen::Matrix<Eigen::dcomplex, -1, -1> jT = this->GetImagTimedelay(alt, az, waveVelocity);
+
+    (*matrix) = (-2.0 * PI * frequency) * jT;
+    matrix->array() = matrix->array().exp();
 }
 
 bool vuprs::BeamFormingScanArray::empty() const

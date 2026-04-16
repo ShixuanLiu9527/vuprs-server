@@ -327,6 +327,22 @@ void vuprs::EigenvalueDecomposition(
     *eigenvectors = solver.eigenvectors();
 }
 
+void vuprs::CholeskyDecomposition(const Eigen::Matrix<Eigen::dcomplex, -1, -1> &covMatrix, Eigen::Matrix<Eigen::dcomplex, -1, -1> *G)
+{
+    if (covMatrix.rows() != covMatrix.cols()) 
+    {
+        throw std::invalid_argument("in [vuprs::CholeskyDecomposition] Covariance matrix must be square");
+    }
+    if (G == nullptr) 
+    {
+        throw std::invalid_argument("in [vuprs::CholeskyDecomposition] Output pointer cannot be null");
+    }
+    Eigen::Matrix<double, -1, 1> gamma;
+    Eigen::Matrix<Eigen::dcomplex, -1, -1> U;  /* R = U * gamma * U.H */
+    vuprs::EigenvalueDecomposition(covMatrix, &gamma, &U);
+    *G = U * gamma.cwiseSqrt().asDiagonal();  /* R = U * gamma * U.H = B * B.H */
+}
+
 void vuprs::Get_FIR_EXPMatrix(int L_fir, int N_points, Eigen::Matrix<Eigen::dcomplex, -1, -1> *expMatrix, bool usePositiveFreq)
 {
     int outputSize;
@@ -343,4 +359,41 @@ void vuprs::Get_FIR_EXPMatrix(int L_fir, int N_points, Eigen::Matrix<Eigen::dcom
     *expMatrix *= -2.0 * PI * std::complex<double>(0, 1.0) / (double)N_points;  /* -j * 2 * pi / N */
     *expMatrix = expMatrix->array() * (k_vec * l_vec.transpose()).array();  /* -j * 2 * pi * k * l / N */
     *expMatrix = expMatrix->array().exp().matrix();  /* E(k,l) = exp(-j * 2 * pi * k * l / N) */
+}
+
+void vuprs::FibonacciGrid(int nInHalf, std::vector<double> *alt, std::vector<double> *az, double alt_min = 15.0)
+{
+    if (alt == nullptr || az == nullptr)
+    {
+        throw std::invalid_argument("in [vuprs::FibonacciGrid] Output pointers cannot be null");
+    }
+
+    double phi = (std::sqrt(5.0) - 1.0) / 2.0;  /* Golden ratio */
+    double xn, yn, zn, _alt, _az;
+    int N = 2 * nInHalf + 1, n;
+    int start_n = (N + 1) / 2;  /* Number of points in upper hemisphere */
+    int resultSize = N - start_n + 1;
+    Eigen::Matrix<double, 3, 1> vec;
+
+    alt->clear();
+    az->clear();
+    
+    alt->reserve(resultSize);
+    az->reserve(resultSize);
+
+    for (int i = 0; i < resultSize; i++)
+    {
+        n = start_n + i;
+        zn = 2.0 * (double)n / (double)N - 1.0;
+        xn = std::sqrt(1.0 - zn * zn) * std::cos(2.0 * PI * (double)n * phi);
+        yn = std::sqrt(1.0 - zn * zn) * std::sin(2.0 * PI * (double)n * phi);
+        vec << xn, yn, zn;
+
+        vuprs::PointingVector2AltAz(vec, &_alt, &_az);
+
+        if (_alt < alt_min) continue;
+
+        alt->push_back(_alt);
+        az->push_back(_az);
+    }
 }

@@ -16,6 +16,10 @@
 
 #define DEFAULT_SENDING_DATA_QUEUE_LENGTH 10U
 
+#define IS_BINARY_DATA_SENDING_CMD(VAL) \
+((VAL) == static_cast<uint32_t>(vuprs::ServerCommand::SERVER_CMD__GET_NEW_DATA) || \
+ (VAL) == static_cast<uint32_t>(vuprs::ServerCommand::SERVER_CMD__SCAN_FOR_POSITION_POWER))
+
 namespace vuprs
 {
     struct SystemConfigFiles
@@ -66,10 +70,14 @@ namespace vuprs
 
             /* --- Algorithms --- */
 
-            vuprs::ARM_FPGA_CollaborationBeamfomer beamformer;  /* System beam former */
+            std::mutex mut_bf;  /* mutex for beam former */
+            vuprs::ARM_FPGA_CollaborationBeamformer beamformer;  /* System beam former, controlled by mut_bf */
 
             std::mutex mut_bf_config;
             vuprs::ARM_FPGA_BF_Config beamFormerConfig;  /* Set by client or default value, controlled by mut_bf_config */
+
+            std::mutex mut_scan_config;
+            vuprs::ScanningConfig scanningConfig;  /* Set by client or default value, controlled by mut_scan_config */
 
             /* --- Thread data --- */
 
@@ -77,12 +85,6 @@ namespace vuprs
 
             std::mutex mut_server_config;
             vuprs::ServerConfig server_config;  /* controlled by mut_server_config */
-
-            std::mutex mut_readResult;
-            std::condition_variable readResultCV;
-            std::atomic<bool> readResultIRQ;  /* true: should send */
-
-            std::deque<std::vector<uint32_t>> resultQueue;  /* Result queue (read from hardware), controlled by mut_readResult */
 
             std::mutex mut_response;
             std::atomic<bool> serverResponseIRQ;
@@ -108,12 +110,6 @@ namespace vuprs
              * @brief Accept client thread, which will block in accept() and wait for client connection.
              */
             void THREAD__AcceptClient();
-
-            /**
-             * @brief Get result thread, which will block in read() and wait for hardware data ready, 
-             * @brief then read data from hardware and store in this->resultQueue.
-             */
-            void THREAD__GetResult();
 
             /**
              * @brief Send thread, which will block in sendingCV and wait for sendingIRQ, then send data to client.

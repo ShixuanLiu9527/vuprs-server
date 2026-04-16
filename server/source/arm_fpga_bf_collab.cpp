@@ -77,21 +77,31 @@ void vuprs::Merge_ARM_FPGA_BF_Config(vuprs::ARM_FPGA_BF_Config *config, const vu
     if (configMask.m_queue__resultQueueSizeMAX) config->queue__resultQueueSizeMAX = newConfig.queue__resultQueueSizeMAX;
 }
 
-vuprs::ARM_FPGA_CollaborationBeamfomer::ARM_FPGA_CollaborationBeamfomer()
+vuprs::ARM_FPGA_CollaborationBeamformer::ARM_FPGA_CollaborationBeamformer()
 {
     this->configdone = false;
     this->system_run = false;
     this->hardwareSamplingFrequency = 0.0;
 
+    {
+        std::lock_guard<std::mutex> lock(this->mut_scan_opt);  /* LOCK */
+        this->scan_pointsInHalf = DEFAULT_SCANNING_POINTS_IN_HALF;
+        this->scan_alt_min = DEFAULT_SCANNING_ALTITUDE_MIN;
+        this->scan_waveVelocity = DEFAULT_SCANNING_WAVE_VELOCITY;
+        vuprs::FibonacciGrid(this->scan_pointsInHalf, &this->scan_alt, &this->scan_az, this->scan_alt_min);
+    }
+
+    this->scanOptionsInitialized = false;
+
     this->BindBeamformer(std::make_unique<vuprs::Beamformer_DCRCB>());  /* default: DCRCB */
 }
 
-vuprs::ARM_FPGA_CollaborationBeamfomer::~ARM_FPGA_CollaborationBeamfomer()
+vuprs::ARM_FPGA_CollaborationBeamformer::~ARM_FPGA_CollaborationBeamformer()
 {
     this->STOP();
 }
 
-void vuprs::ARM_FPGA_CollaborationBeamfomer::BindBeamformer(std::unique_ptr<vuprs::WidebandBeamformerTemplate> beamformer)
+void vuprs::ARM_FPGA_CollaborationBeamformer::BindBeamformer(std::unique_ptr<vuprs::WidebandBeamformerTemplate> beamformer)
 {
     if (beamformer != nullptr)
     {
@@ -99,12 +109,22 @@ void vuprs::ARM_FPGA_CollaborationBeamfomer::BindBeamformer(std::unique_ptr<vupr
     }
 }
 
-bool vuprs::ARM_FPGA_CollaborationBeamfomer::ConfigDone() const
+bool vuprs::ARM_FPGA_CollaborationBeamformer::ConfigDone() const
 {
     return this->configdone;
 }
 
-bool vuprs::ARM_FPGA_CollaborationBeamfomer::InitCollaborationBeamfomer(const std::string &fpgaConfigJson, const std::string &bfArrayConfigJson, const std::string &firConfigJon)
+void vuprs::ARM_FPGA_CollaborationBeamformer::ScanSwitch(bool enable)
+{
+    this->scanEnable = enable;
+}
+
+bool vuprs::ARM_FPGA_CollaborationBeamformer::ScanSwitch() const
+{
+    return this->scanEnable;
+}
+
+bool vuprs::ARM_FPGA_CollaborationBeamformer::InitCollaborationBeamformer(const std::string &fpgaConfigJson, const std::string &bfArrayConfigJson, const std::string &firConfigJon)
 {
     bool operateStatus = true;
     try
@@ -115,14 +135,44 @@ bool vuprs::ARM_FPGA_CollaborationBeamfomer::InitCollaborationBeamfomer(const st
     }
     catch(const std::exception& e)
     {
-        throw std::runtime_error("in [ARM_FPGA_CollaborationBeamfomer::InitCollaborationBeamfomer] Error occurred in initialization.");
+        throw std::runtime_error("in [ARM_FPGA_CollaborationBeamformer::InitCollaborationBeamformer] Error occurred in initialization.");
     }
 
     this->configdone = operateStatus;
     return operateStatus;
 }
 
-bool vuprs::ARM_FPGA_CollaborationBeamfomer::ResetHardwareBeamformer()
+void vuprs::ARM_FPGA_CollaborationBeamformer::ScanOptions(int pointsInHalf, double alt_min, double waveVelocity)
+{
+    if (pointsInHalf <= 0)
+    {
+        throw std::runtime_error("in [ARM_FPGA_CollaborationBeamformer::ScanOptions] pointsInHalf should be positive.");
+    }
+    if (alt_min < 0 || alt_min > 90)
+    {
+        throw std::runtime_error("in [ARM_FPGA_CollaborationBeamformer::ScanOptions] alt_min should be between 0 and 90.");
+    }
+    if (waveVelocity <= 0)
+    {
+        throw std::runtime_error("in [ARM_FPGA_CollaborationBeamformer::ScanOptions] waveVelocity should be positive.");
+    }
+
+    if (pointsInHalf != this->scan_pointsInHalf || alt_min != this->scan_alt_min || waveVelocity != this->scan_waveVelocity)
+    {
+        {
+            std::lock_guard<std::mutex> lock(this->mut_scan_opt);  /* LOCK */
+
+            this->scan_pointsInHalf = pointsInHalf;
+            this->scan_alt_min = alt_min;
+            vuprs::FibonacciGrid(this->scan_pointsInHalf, &this->scan_alt, &this->scan_az, this->scan_alt_min);
+
+            this->scan_waveVelocity = waveVelocity;
+        }
+        this->scanOptionsChanged = true;
+    }
+}
+
+bool vuprs::ARM_FPGA_CollaborationBeamformer::ResetHardwareBeamformer()
 {
     bool retval = true;
 
@@ -145,11 +195,11 @@ bool vuprs::ARM_FPGA_CollaborationBeamfomer::ResetHardwareBeamformer()
     return retval;
 }
 
-bool vuprs::ARM_FPGA_CollaborationBeamfomer::StartBeamformerWithConfiguration(const ARM_FPGA_BF_Config &config)
+bool vuprs::ARM_FPGA_CollaborationBeamformer::StartBeamformerWithConfiguration(const ARM_FPGA_BF_Config &config)
 {
     if (!this->ConfigDone())
     {
-        throw std::runtime_error("in [ARM_FPGA_CollaborationBeamfomer::StartBeamformerWithConfiguration] Config not complete.");
+        throw std::runtime_error("in [ARM_FPGA_CollaborationBeamformer::StartBeamformerWithConfiguration] Config not complete.");
     }
 
     Eigen::Matrix<Eigen::dcomplex, -1, -1> firExpectedFrequencyResponse;  /* Expected frequency response of FIR filter bank */
@@ -244,13 +294,13 @@ bool vuprs::ARM_FPGA_CollaborationBeamfomer::StartBeamformerWithConfiguration(co
 
     if (!retval)
     {
-        throw std::runtime_error("in [ARM_FPGA_CollaborationBeamfomer::StartBeamformerWithConfiguration] Cannot start beam former with config");
+        throw std::runtime_error("in [ARM_FPGA_CollaborationBeamformer::StartBeamformerWithConfiguration] Cannot start beam former with config");
     }
     
     return retval;
 }
 
-bool vuprs::ARM_FPGA_CollaborationBeamfomer::ReDirect(double alt, double az, double waveVelocity)
+bool vuprs::ARM_FPGA_CollaborationBeamformer::ReDirect(double alt, double az, double waveVelocity)
 {
     std::vector<int> predelayCount;
     std::vector<double> predelayTime;
@@ -272,12 +322,12 @@ bool vuprs::ARM_FPGA_CollaborationBeamfomer::ReDirect(double alt, double az, dou
     return vuprs::FPGA_API__PDLY__SetPredelay(&this->controller, predelayCount, channelName);
 }
 
-bool vuprs::ARM_FPGA_CollaborationBeamfomer::IS_RUN() const
+bool vuprs::ARM_FPGA_CollaborationBeamformer::IS_RUN() const
 {
     return this->system_run;
 }
 
-bool vuprs::ARM_FPGA_CollaborationBeamfomer::RUN(const vuprs::ARM_FPGA_BF_Config &config)
+bool vuprs::ARM_FPGA_CollaborationBeamformer::RUN(const vuprs::ARM_FPGA_BF_Config &config)
 {
     this->STOP();
     this->StartBeamformerWithConfiguration(config);
@@ -289,12 +339,13 @@ bool vuprs::ARM_FPGA_CollaborationBeamfomer::RUN(const vuprs::ARM_FPGA_BF_Config
     this->threads.emplace_back([this](){this->THREAD__ReadResult();});
     this->threads.emplace_back([this](){this->THREAD__ListenDMAInterrupt();});
     this->threads.emplace_back([this](){this->THREAD__AlgorithmCalculation();});
+    this->threads.emplace_back([this](){this->THREAD__ScanPowerCalculation();});
     this->threads.emplace_back([this](){this->THREAD__ReadCircularBuffer();});
 
     return true;
 }
 
-void vuprs::ARM_FPGA_CollaborationBeamfomer::STOP()
+void vuprs::ARM_FPGA_CollaborationBeamformer::STOP()
 {
     this->system_run = false;
     
@@ -312,12 +363,12 @@ void vuprs::ARM_FPGA_CollaborationBeamfomer::STOP()
 
 /* ------------------------------------------ Thread Control ----------------------------------------- */
 
-bool vuprs::ARM_FPGA_CollaborationBeamfomer::NewResultDataInput() const
+bool vuprs::ARM_FPGA_CollaborationBeamformer::NewResultDataInput() const
 {
     return this->newResultDataInput;
 }
 
-bool vuprs::ARM_FPGA_CollaborationBeamfomer::ReadResultFromQueue(std::vector<uint32_t> *result)
+bool vuprs::ARM_FPGA_CollaborationBeamformer::ReadResultFromQueue(std::vector<uint32_t> *result)
 {
     bool readSuccess = false;
 
@@ -339,12 +390,12 @@ bool vuprs::ARM_FPGA_CollaborationBeamfomer::ReadResultFromQueue(std::vector<uin
     return readSuccess;
 }
 
-bool vuprs::ARM_FPGA_CollaborationBeamfomer::NewArraySignalInput() const
+bool vuprs::ARM_FPGA_CollaborationBeamformer::NewArraySignalInput() const
 {
     return this->newArraySignalInput;
 }
 
-bool vuprs::ARM_FPGA_CollaborationBeamfomer::ReadArraySignalFromQueue(vuprs::SignalData *signalData)
+bool vuprs::ARM_FPGA_CollaborationBeamformer::ReadArraySignalFromQueue(vuprs::SignalData *signalData)
 {
     bool readSuccess = false;
 
@@ -366,12 +417,112 @@ bool vuprs::ARM_FPGA_CollaborationBeamfomer::ReadArraySignalFromQueue(vuprs::Sig
     return readSuccess;
 }
 
-bool vuprs::ARM_FPGA_CollaborationBeamfomer::ReadCovarianceMatrix(Eigen::Matrix<Eigen::dcomplex, -1, -1> *covMatrix, double frequency)
+bool vuprs::ARM_FPGA_CollaborationBeamformer::NewScanPowerInput() const
 {
-    this->bf->GetCovarianceMatrix(covMatrix, frequency);
+    return this->newScanPointsInput;
 }
 
-void vuprs::ARM_FPGA_CollaborationBeamfomer::THREAD__ListenDMAInterrupt()
+bool vuprs::ARM_FPGA_CollaborationBeamformer::ReadScanPowerFromQueue(std::vector<uint16_t> *scanPower, double *maxPowerDB, double *minPowerDB)
+{
+    bool readSuccess = false;
+
+    if (this->newScanPointsInput)
+    {
+        {
+            std::lock_guard<std::mutex> lock(this->mut_scan_result);  /* LOCK */
+
+            if (!this->scanResultQueue.empty())
+            {
+                *scanPower = this->scanResultQueue.front().scanResult;
+                *maxPowerDB = this->scanResultQueue.front().maxPowerDB;
+                *minPowerDB = this->scanResultQueue.front().minPowerDB;
+                this->scanResultQueue.pop_front();
+                readSuccess = true;
+            }
+            this->newScanPointsInput = !this->scanResultQueue.empty();
+        }
+    }
+
+    return readSuccess;
+}
+
+void vuprs::ARM_FPGA_CollaborationBeamformer::THREAD__ScanPowerCalculation()
+{
+    vuprs::ScanResult scanResult;
+    std::vector<double> alt, az, _scanResult;
+    double waveVelocity, powerRange;
+    size_t pointsCount;
+    uint16_t normalizedPower;
+    bool calculateStatus = false;
+
+    while (this->system_run)
+    {
+        {
+            std::unique_lock<std::mutex> lock(this->mut_scan_result);  /* LOCK */
+            this->scanCV.wait(lock, [this]() {
+                return this->scanEnable || !this->system_run;
+            });
+        }
+
+        if (!this->system_run) break;  /* Jump out */
+        if (!this->scanEnable) continue;
+
+        /* sync options */
+
+        if (this->scanOptionsChanged || !this->scanOptionsInitialized)
+        {
+            std::lock_guard<std::mutex> lock(this->mut_scan_opt);  /* LOCK */
+            alt = this->scan_alt;
+            az = this->scan_az;
+            waveVelocity = this->scan_waveVelocity;
+            this->scanOptionsInitialized = true;
+        }
+
+        /* Calculate scan power */
+
+        {
+            std::lock_guard<std::mutex> lock(this->mut_alg);  /* LOCK */
+            calculateStatus = this->bf->ScanForPositionPower(&_scanResult, &scanResult.maxPowerDB, &scanResult.minPowerDB, 
+                alt, az, waveVelocity, 
+                this->scanOptionsChanged, true);
+        }
+        if (!calculateStatus) continue;  /* If calculation failed, skip this loop */
+
+        /* Convert to uint16_t */
+
+        if (this->scanOptionsChanged) this->scanOptionsChanged = false;
+
+        pointsCount = _scanResult.size();
+        scanResult.scanResult.resize(pointsCount);
+        powerRange = scanResult.maxPowerDB - scanResult.minPowerDB;
+
+        for (size_t i = 0; i < pointsCount; i++)
+        {
+            normalizedPower = 0;
+            if (powerRange > 1e-12)
+            {
+                double scaledPower = (_scanResult[i] - scanResult.minPowerDB) / powerRange * 65535.0;
+                if (scaledPower < 0.0) scaledPower = 0.0;
+                else if (scaledPower > 65535.0) scaledPower = 65535.0;
+                normalizedPower = static_cast<uint16_t>(scaledPower);
+            }
+            scanResult.scanResult[i] = normalizedPower;  /* Convert to uint16_t safely */
+        }
+
+        /* Push data to dqueue */
+
+        {
+            std::lock_guard<std::mutex> lock(this->mut_scan_result);  /* LOCK */
+            this->scanResultQueue.push_back(scanResult);
+            if (this->scanResultQueue.size() > this->resultQueueSizeMAX)
+            {
+                this->scanResultQueue.pop_front();  /* Pop the oldest data to avoid overflow */
+            }
+        }
+    }
+}
+
+void vuprs::ARM_FPGA_CollaborationBeamformer::THREAD__ListenDMAInterrupt()
 {
     uint32_t r_val;
     while (this->system_run)
@@ -386,7 +537,7 @@ void vuprs::ARM_FPGA_CollaborationBeamfomer::THREAD__ListenDMAInterrupt()
         }
         catch(const std::exception& e)
         {
-            std::cout << "Error in [ARM_FPGA_CollaborationBeamfomer::THREAD__ListenDMAInterrupt] Error: " << e.what() << std::endl;
+            std::cout << "Error in [ARM_FPGA_CollaborationBeamformer::THREAD__ListenDMAInterrupt] Error: " << e.what() << std::endl;
         }
         if (r_val == 0x01)
         {
@@ -394,11 +545,12 @@ void vuprs::ARM_FPGA_CollaborationBeamfomer::THREAD__ListenDMAInterrupt()
             this->dmaInterruptCV.notify_one();
         }
         if (!this->system_run) break;  /* Jump out */
-        usleep(this->interruptWaitTime_us);
+
+        std::this_thread::sleep_for(std::chrono::microseconds(this->interruptWaitTime_us));
     }
 }
 
-void vuprs::ARM_FPGA_CollaborationBeamfomer::THREAD__ReadResult()
+void vuprs::ARM_FPGA_CollaborationBeamformer::THREAD__ReadResult()
 {
     vuprs::AXI_DMA_ScatterGatherDescriptor currentDescriptor, previousDescriptor, nextDescriptor;
     std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> _refDescriptors;
@@ -464,12 +616,12 @@ void vuprs::ARM_FPGA_CollaborationBeamfomer::THREAD__ReadResult()
         }
         catch(const std::exception& e)
         {
-            std::cout << "Error in [ARM_FPGA_CollaborationBeamfomer::THREAD__ReadResult] " << e.what() << std::endl;
+            std::cout << "Error in [ARM_FPGA_CollaborationBeamformer::THREAD__ReadResult] " << e.what() << std::endl;
         }
     }
 }
 
-void vuprs::ARM_FPGA_CollaborationBeamfomer::THREAD__ReadCircularBuffer()
+void vuprs::ARM_FPGA_CollaborationBeamformer::THREAD__ReadCircularBuffer()
 {
     uint32_t r_val;
     vuprs::SignalData multichannelSignal;  /* signal data (from circular buffer) */
@@ -488,7 +640,7 @@ void vuprs::ARM_FPGA_CollaborationBeamfomer::THREAD__ReadCircularBuffer()
         }
         catch(const std::exception& e)
         {
-            std::cout << "Error in [ARM_FPGA_CollaborationBeamfomer::THREAD__ReadCircularBuffer] " << e.what() << std::endl;
+            std::cout << "Error in [ARM_FPGA_CollaborationBeamformer::THREAD__ReadCircularBuffer] " << e.what() << std::endl;
         }
 
         if (r_val == 0x01)
@@ -521,21 +673,22 @@ void vuprs::ARM_FPGA_CollaborationBeamfomer::THREAD__ReadCircularBuffer()
                 }
                 else
                 {
-                    throw std::runtime_error("in [ARM_FPGA_CollaborationBeamfomer::THREAD__ReadCircularBuffer] Cannot read circular buffer.");
+                    throw std::runtime_error("in [ARM_FPGA_CollaborationBeamformer::THREAD__ReadCircularBuffer] Cannot read circular buffer.");
                 }
             }
             catch(const std::exception& e)
             {
-                std::cout << "Error in [ARM_FPGA_CollaborationBeamfomer::THREAD__ReadCircularBuffer]" << e.what() << std::endl;
+                std::cout << "Error in [ARM_FPGA_CollaborationBeamformer::THREAD__ReadCircularBuffer]" << e.what() << std::endl;
             }
         }
 
         if (!this->system_run) break;  /* Jump out */
-        usleep(this->circularBufferWaitTime_us);
+
+        std::this_thread::sleep_for(std::chrono::microseconds(this->circularBufferWaitTime_us));
     }
 }
 
-void vuprs::ARM_FPGA_CollaborationBeamfomer::THREAD__AlgorithmCalculation()
+void vuprs::ARM_FPGA_CollaborationBeamformer::THREAD__AlgorithmCalculation()
 {
     bool hasInterrupt, fpgaOperationStatus;
     vuprs::SignalData signal;
@@ -581,9 +734,14 @@ void vuprs::ARM_FPGA_CollaborationBeamfomer::THREAD__AlgorithmCalculation()
             this->bf->InputSignal(signal);  /* Input signal */
             this->bf->UpdateCovarianceMatrix();  /* Update covariance matrix */
 
+            if (this->scanEnable)
+            {
+                this->scanCV.notify_all();  /* Notify scan thread to calculate (if waiting) */
+            }
+
             if (!this->bf->CalculateEnable())
             {
-                throw std::runtime_error("in [ARM_FPGA_CollaborationBeamfomer::THREAD__AlgorithmCalculation] Beam forming algorithm cannot calculate.");
+                throw std::runtime_error("in [ARM_FPGA_CollaborationBeamformer::THREAD__AlgorithmCalculation] Beam forming algorithm cannot calculate.");
             }
 
             this->bf->CalculateBeamforming();  /* Calculate beam forming */
@@ -609,12 +767,12 @@ void vuprs::ARM_FPGA_CollaborationBeamfomer::THREAD__AlgorithmCalculation()
 
             if (!fpgaOperationStatus)
             {
-                throw std::runtime_error("in [ARM_FPGA_CollaborationBeamfomer::THREAD__AlgorithmCalculation] FPGA operation failed.");
+                throw std::runtime_error("in [ARM_FPGA_CollaborationBeamformer::THREAD__AlgorithmCalculation] FPGA operation failed.");
             }
         }
         catch(const std::exception& e)
         {
-            std::cout << "Error in [ARM_FPGA_CollaborationBeamfomer::THREAD__AlgorithmCalculation] " << e.what() << std::endl;
+            std::cout << "Error in [ARM_FPGA_CollaborationBeamformer::THREAD__AlgorithmCalculation] " << e.what() << std::endl;
         }
     }
 }

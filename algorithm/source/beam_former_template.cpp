@@ -329,9 +329,11 @@ void vuprs::WidebandBeamformerTemplate::UpdateAndGetElementPredelay(
 }
 
 bool vuprs::WidebandBeamformerTemplate::ScanForPositionPower(
-    std::vector<double> *res, 
-    const std::vector<double> &alt, const std::vector<double> &az, 
-    double frequency, double waveVelocity)
+    std::vector<double> *res, double *maxValue, double *minValue,
+    const std::vector<double> &alt, 
+    const std::vector<double> &az, 
+    double waveVelocity, 
+    bool needRegenerate,bool log)
 {
     if (res == nullptr)
     {
@@ -350,43 +352,95 @@ bool vuprs::WidebandBeamformerTemplate::ScanForPositionPower(
         return false;
     }
 
-    /* STEP 1: Get covariance matrix for the specified frequency */
+    /* STEP 0: Prepare for data */
 
-    int freqIndex = static_cast<int>(std::round(frequency / this->fs * this->signalPoints));
+    double M = this->array.elementArray.size();  /* Element counts */
+    int k = alt.size();  /* Scan points counts */
+    int f_count = this->estimate_covMatrix.size();  /* Frequency counts */
+    Eigen::Matrix<double, 1, -1> totalPower = Eigen::Matrix<double, 1, -1>::Zero(k);  /* Total power for each scan position */
 
-    if (freqIndex < 0 || freqIndex >= this->estimate_covMatrix.size())
+    if (needRegenerate)
     {
-        freqIndex = this->estimate_covMatrix.size() / 2 - 1;  /* Set to the closest frequency index (N/2 - 1) if out of range */
+        std::lock_guard<std::mutex> lock(this->mut_scan);
+        this->imagTimedelay = this->scan_array.GetImagTimedelay(alt, az, waveVelocity);
     }
 
-    double realFrequency = this->signalFrequencyList(freqIndex);
-    Eigen::Matrix<Eigen::dcomplex, -1, -1> R = this->estimate_covMatrix[freqIndex];
+    std::mutex mut_total;  /* Mutex for totalPower */
+    std::vector<std::future<void>> futures;
 
-    double M = R.cols();  /* Element counts */
+    for (int i = 0; i < f_count; i++)
+    {
+        /* Calculate power (in each alt & az) for frequency index i */
+        futures.emplace_back(this->threadPool->enqueue(
+        [this, i, M, &totalPower, &mut_total]()
+        {
+            /* STEP 1: Get covariance matrix for the specified frequency */
 
-    /* STEP 2: Get steering vectors for all alt & az */
+            double f;
+            Eigen::Matrix<Eigen::dcomplex, -1, -1> R;
+            {
+                std::lock_guard<std::mutex> lock(this->mut);
+                f = this->signalFrequencyList(i);
+                R = this->estimate_covMatrix[i];
+            }
 
-    Eigen::Matrix<Eigen::dcomplex, -1, -1> weights;  /* size = M x numScans */
-    this->scan_array.GetSteeringVectorMatrix(&weights, alt, az, realFrequency, waveVelocity);
+            /* STEP 2: Eigenvalue decomposition */
 
-    weights /= M;  /* for CBF: w = ps/M */
+            Eigen::Matrix<Eigen::dcomplex, -1, -1> B;  /* R = B * B.H */
+            vuprs::CholeskyDecomposition(R, &B);
+                    
+            /* STEP 3: Get steering vectors and weights for all alt & az in frequency i */
+            
+            Eigen::Matrix<Eigen::dcomplex, -1, -1> weights;
+            {
+                std::lock_guard<std::mutex> lock(this->mut_scan);
+                weights = -2.0 * PI * f * this->imagTimedelay;
+            }
 
-    /* STEP 3: Eigenvalue decomposition */
+            weights.array() = weights.array().exp();  /* ps = [..., exp(-j * 2 * pi * f * Tm), ...] */
+            weights /= M;  /* for CBF: w = ps/M */
 
-    Eigen::Matrix<double, -1, 1> gamma;
-    Eigen::Matrix<Eigen::dcomplex, -1, -1> U;  /* R = U * gamma * U.H */
-    vuprs::EigenvalueDecomposition(R, &gamma, &U);
+            /* STEP 4: Calculate power for each alt & az */
+                    
+            Eigen::Matrix<Eigen::dcomplex, -1, -1> Y = B.adjoint() * weights;  /* Y = B.H * w */
+            Eigen::Matrix<double, 1, -1> power = Y.colwise().squaredNorm();  /* power(i) = ||Y.col(i)||^2 */
 
-    Eigen::Matrix<Eigen::dcomplex, -1, -1> B = U * gamma.cwiseSqrt().asDiagonal();  /* R = U * gamma * U.H = B * B.H */
+            /* STEP 5: add to result */
 
-    /* STEP 4: Calculate power for each alt & az */
+            {
+                std::lock_guard<std::mutex> lock(mut_total);
+                totalPower += power;
+            }
+        }
+        ));
+    }
 
-    Eigen::Matrix<Eigen::dcomplex, -1, -1> Y = B.adjoint() * weights;  /* Y = B.H * w */
-    Eigen::Matrix<double, -1, 1> power = Y.colwise().norm().transpose();  /* power(i) = norm(Y.col(i)) */
+    for (auto &f : futures) f.get();
 
-    /* STEP 5: Convert to result */
+    /* Convert to result */
 
-    vuprs::eigenVector2stdVector(power, res);
+    double maxPower = totalPower.maxCoeff();
+    double minPower = totalPower.minCoeff();
+
+    if (log)
+    {
+        if (minPower > 0.0)
+        {
+            totalPower = totalPower.array().log10() * 20.0;  /* Convert to dB */
+        }
+        else
+        {
+            totalPower.setZero();
+        }
+        maxPower = totalPower.maxCoeff();
+        minPower = totalPower.minCoeff();
+    }
+
+    vuprs::eigenRow2stdVector(totalPower, res);
+
+    if (maxValue != nullptr) *maxValue = maxPower;
+    if (minValue != nullptr) *minValue = minPower;
+
     return true;
 }
 

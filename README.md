@@ -156,7 +156,7 @@ sh ./run_server.sh
 
 ### 网络通信协议
 
-[网络通信协议V1.0](./docs/PROTOCOL.md)
+[网络通信指令格式](./docs/protocol_cmd.md)
 
 ---
 _Shixuan Liu 2025_

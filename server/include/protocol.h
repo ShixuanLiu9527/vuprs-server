@@ -10,6 +10,18 @@
 #include "arm_fpga_bf_collab.h"
 #include "nlohmann/json.hpp"
 
+#define SERVER_CMD__INVALID__STR "invalid"
+#define SERVER_CMD__ACK__STR "ack"
+#define SERVER_CMD__RESET__STR "reset"
+#define SERVER_CMD__REDIRECT__STR "redirect"
+#define SERVER_CMD__CHANGE_BEAMFORMER__STR "change_beamformer"
+#define SERVER_CMD__CHANGE_ALG_PARAM__STR "change_algorithm_parameters"
+#define SERVER_CMD__STOP__STR "stop"
+#define SERVER_CMD__START__STR "start"
+#define SERVER_CMD__GET_NEW_DATA__STR "get_data"
+#define SERVER_CMD__SCAN_FOR_POSITION_POWER__STR "power_scan"
+#define SERVER_CMD__GET_ALG_PARAM__STR "read_algorithm_parameters"
+
 namespace vuprs
 {
     /**
@@ -26,6 +38,7 @@ namespace vuprs
         SERVER_CMD__STOP,  /* Stop beam former */
         SERVER_CMD__START,  /* Start beam former */
         SERVER_CMD__GET_NEW_DATA,  /* Get newest data from server (Send DMA buffer to host) */
+        SERVER_CMD__SCAN_FOR_POSITION_POWER,  /* Scan for position power */
         SERVER_CMD__GET_ALG_PARAM  /* Get current algorithm parameters */
     };
 
@@ -36,6 +49,8 @@ namespace vuprs
     {
         vuprs::ARM_FPGA_BF_Config config;  /* config info */
         vuprs::ARM_FPGA_BF_Config_MASK configMask;  /* mask of config info, which indicates which config parameters are valid and should be updated */
+
+        vuprs::ScanningConfig scanningConfig;  /* scanning config info, which is used when cmd is SERVER_CMD__SCAN_FOR_POSITION_POWER */
 
         vuprs::ServerCommand cmd;
         std::string beamformer_name;  /* beam former name (for SERVER_CMD__CHANGE_BEAMFORMER) */
@@ -77,6 +92,12 @@ namespace vuprs
      * @param config Current algorithm parameters.
      */
     std::string PROTOCOL_MakeServerParameterResponse(const vuprs::ARM_FPGA_BF_Config &config);
+
+    std::string PROTOCOL_MakeServerScanningResponse(const vuprs::ScanningConfig &scanningConfig, 
+        double minScanPowerDB, double maxScanPowerDB, 
+        const std::string &info = "", bool operationStatus = true);
+
+    std::string PROTOCOL_MakeServerResultDataResponse(const std::string &info = "", bool operationStatus = true);
 }
 
 #endif

@@ -53,6 +53,9 @@ namespace vuprs
             bool is_signalEmpty, is_covMatrixEmpty;
 
             std::mutex mut;
+            std::mutex mut_scan;
+
+            Eigen::Matrix<Eigen::dcomplex, -1, -1> imagTimedelay;  /* Size: M x numScans, jT{m, s} = j * T{m, s}), controlled by mut_scan */
 
             vuprs::BeamFormingArray array;
             vuprs::BeamFormingScanArray scan_array;  /* for scanning, which has same element position as array but different time delay */
@@ -211,12 +214,21 @@ namespace vuprs
              * @brief Scan for position power.
              * 
              * @param res output position power result. Size: alt.size()
+             * @param maxValue output max power value in scan result. (optional, can be NULL)
+             * @param minValue output min power value in scan result. (optional, can be NULL)
              * @param alt altitude list (degree).
              * @param az azimuth list (degree).
-             * @param frequency frequency (Hz).
              * @param waveVelocity wave velocity (m/s).
+             * @param needRegenerate true: regenerate scan points, false: do not regenerate scan points.
+             * @param log true: log, false: do not log.
+             * 
+             * @retval true: success.
+             * @retval false: failed.
              */
-            bool ScanForPositionPower(std::vector<double> *res, const std::vector<double> &alt, const std::vector<double> &az, double frequency, double waveVelocity);
+            bool ScanForPositionPower(std::vector<double> *res, double *maxValue, double *minValue, 
+                const std::vector<double> &alt, const std::vector<double> &az, 
+                double waveVelocity, 
+                bool needRegenerate, bool log = true);
             
             /**
              * @brief Reset all.

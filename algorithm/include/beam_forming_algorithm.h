@@ -224,6 +224,15 @@ namespace vuprs
                                  Eigen::Matrix<Eigen::dcomplex, -1, -1> *eigenvectors);
 
     /**
+     * @brief Cholesky decomposition for covariance matrix.
+     * 
+     * @param R input covariance matrix.
+     * @param G output lower triangular matrix G, where R = G * G.H
+     */
+    void CholeskyDecomposition(const Eigen::Matrix<Eigen::dcomplex, -1, -1> &R, 
+                                 Eigen::Matrix<Eigen::dcomplex, -1, -1> *G);
+
+    /**
      * @brief Get FIR exp matrix (E).
      * 
      * @note N: Signal points, L: FIR Filter Length.
@@ -235,6 +244,20 @@ namespace vuprs
      * @param usePositiveFreq true: E.size = (N/2+1) x L, false: E.size = N x L.
      */
     void Get_FIR_EXPMatrix(int L_fir, int N_points, Eigen::Matrix<Eigen::dcomplex, -1, -1> *expMatrix, bool usePositiveFreq);
+
+    /**
+     * @brief Get scan points using Fibonacci lattice.
+     * 
+     * @note Only points that [alt > alt_min] are generated, and the distribution is uniform on the upper hemisphere.
+     * @note Total points = 2 * n + 1 (n points in upper hemisphere, n points in lower hemisphere, and 1 point at the pole), but only points in upper hemisphere are returned.
+     * 
+     * @param nInHalf number of scan points in each hemisphere (the point count in the half sphere).
+     * @param alt output vector of altitudes (units: degrees).
+     * @param az output vector of azimuths (units: degrees).
+     * @param alt_min minimum altitude for generated scan points (units: degrees).
+
+     */
+    void FibonacciGrid(int nInHalf, std::vector<double> *alt, std::vector<double> *az, double alt_min);
 }
 
 #endif

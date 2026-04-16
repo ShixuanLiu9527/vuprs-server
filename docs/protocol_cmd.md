@@ -91,6 +91,8 @@ data tailer: [TAILER]
 
 ### 4. Redirect
 
+*client to server*  
+
 ```json
 [HEADER]
 {
@@ -118,6 +120,8 @@ data tailer: [TAILER]
 
 ### 5. Start
 
+*client to server*  
+
 ```json
 [HEADER]
 {
@@ -139,6 +143,8 @@ data tailer: [TAILER]
 ```
 
 ### 6. Stop
+
+*client to server*  
 
 ```json
 [HEADER]
@@ -162,6 +168,8 @@ data tailer: [TAILER]
 
 ### 7. Get data (beam forming result)
 
+*client to server*  
+
 ```json
 [HEADER]
 {
@@ -172,6 +180,22 @@ data tailer: [TAILER]
 ```
 
 *server response*  
+
+首先会发送一条配置细节.  
+
+```json
+[HEADER]
+{
+    "response_cmd": "get_data",
+    "operation_status": "done",
+    "params": {
+        "data_format": "uint32_t"
+    }
+}
+[TAILER]
+```
+
+然后发送数据:  
 
 ```json
 [HEADER]data[TAILER]
@@ -184,6 +208,8 @@ data tailer: [TAILER]
 `binary` 中, 前 `4` 字节描述了该数据的大小 (单位是 `byte`), 然后紧接着是数据.  
 
 ### 8. Change Algorithm Parameters
+
+*client to server*  
 
 ```json
 [HEADER]
@@ -229,6 +255,8 @@ data tailer: [TAILER]
 
 ### 9. Read Current Algorithm Parameters
 
+*client to server*  
+
 ```json
 [HEADER]
 {
@@ -256,3 +284,44 @@ data tailer: [TAILER]
 }
 [TAILER]
 ```
+
+### 10. Power Scan
+
+*client to server*  
+
+```json
+[HEADER]
+{
+    "cmd": "power_scan",
+    "params": {
+        "points": "70",
+        "min_alt": "15.0"
+    }
+}
+[TAILER]
+```
+
+*server response*  
+
+首先会发送一条配置细节.  
+
+```json
+[HEADER]
+{
+    "response_cmd": "power_scan",
+    "operation_status": "done",
+    "params": {
+        "points": "70",
+        "min_alt": "15.0",
+        "max_power": "12.04046",
+        "min_power": "-15.00231",
+        "data_format": "uint16_t"
+    }
+}
+[TAILER]
+```
+然后会发送数据: 
+```text
+[HEADER] + binary(double array) + [TAILER]
+```
+`binary` 中, 前 `4` 字节描述了该数据的大小 (单位是 `byte`), 然后紧接着是数据.  
