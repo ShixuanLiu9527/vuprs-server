@@ -27,6 +27,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/server/include
     ${CMAKE_CURRENT_SOURCE_DIR}/logger/include
     ${CMAKE_CURRENT_SOURCE_DIR}/algorithm/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/collab_bf/include
     ${CMAKE_CURRENT_SOURCE_DIR}/system_tools/include
     ${CMAKE_CURRENT_SOURCE_DIR}/eigen
     ${CMAKE_CURRENT_SOURCE_DIR}/fftw3
@@ -38,7 +39,8 @@ file(GLOB_RECURSE SYS_TOOL_SRC "${CMAKE_CURRENT_SOURCE_DIR}/system_tools/source/
 file(GLOB_RECURSE LOGGER_SRC "${CMAKE_CURRENT_SOURCE_DIR}/logger/source/*.cpp")
 file(GLOB_RECURSE ALGORITHM_SRC "${CMAKE_CURRENT_SOURCE_DIR}/algorithm/source/*.cpp")
 file(GLOB_RECURSE SERVER_SRC "${CMAKE_CURRENT_SOURCE_DIR}/server/source/*.cpp")
+file(GLOB_RECURSE COLLAB_BF_SRC "${CMAKE_CURRENT_SOURCE_DIR}/collab_bf/source/*.cpp")
 
-add_executable(server main.cpp ${FPGA_SRC} ${SYS_TOOL_SRC} ${LOGGER_SRC} ${ALGORITHM_SRC} ${SERVER_SRC})
+add_executable(server main.cpp ${FPGA_SRC} ${SYS_TOOL_SRC} ${LOGGER_SRC} ${ALGORITHM_SRC} ${SERVER_SRC} ${COLLAB_BF_SRC})
 
 target_link_libraries(server PRIVATE Threads::Threads m fftw3)

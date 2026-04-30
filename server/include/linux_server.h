@@ -11,7 +11,7 @@
 
 #include "linux_session.h"
 #include "string_parse.h"
-#include "arm_fpga_bf_collab.h"
+#include "collaboration_beamformer.h"
 #include "protocol.h"
 
 #define DEFAULT_SENDING_DATA_QUEUE_LENGTH 10U
@@ -71,10 +71,10 @@ namespace vuprs
             /* --- Algorithms --- */
 
             std::mutex mut_bf;  /* mutex for beam former */
-            vuprs::ARM_FPGA_CollaborationBeamformer beamformer;  /* System beam former, controlled by mut_bf */
+            vuprs::CollaborationBeamformer beamformer;  /* System beam former, controlled by mut_bf */
 
             std::mutex mut_bf_config;
-            vuprs::ARM_FPGA_BF_Config beamFormerConfig;  /* Set by client or default value, controlled by mut_bf_config */
+            vuprs::CollaborationBeamformerConfig beamFormerConfig;  /* Set by client or default value, controlled by mut_bf_config */
 
             std::mutex mut_scan_config;
             vuprs::ScanningConfig scanningConfig;  /* Set by client or default value, controlled by mut_scan_config */

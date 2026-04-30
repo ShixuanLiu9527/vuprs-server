@@ -7,7 +7,7 @@
     #include <arpa/inet.h>
 #endif
 
-#include "arm_fpga_bf_collab.h"
+#include "collaboration_configs.h"
 #include "nlohmann/json.hpp"
 
 #define SERVER_CMD__INVALID__STR "invalid"
@@ -47,9 +47,7 @@ namespace vuprs
      */
     struct ServerCommandInformation
     {
-        vuprs::ARM_FPGA_BF_Config config;  /* config info */
-        vuprs::ARM_FPGA_BF_Config_MASK configMask;  /* mask of config info, which indicates which config parameters are valid and should be updated */
-
+        vuprs::CollaborationBeamformerConfig config;  /* config info */
         vuprs::ScanningConfig scanningConfig;  /* scanning config info, which is used when cmd is SERVER_CMD__SCAN_FOR_POSITION_POWER */
 
         vuprs::ServerCommand cmd;
@@ -91,7 +89,7 @@ namespace vuprs
      * 
      * @param config Current algorithm parameters.
      */
-    std::string PROTOCOL_MakeServerParameterResponse(const vuprs::ARM_FPGA_BF_Config &config);
+    std::string PROTOCOL_MakeServerParameterResponse(const vuprs::CollaborationBeamformerConfig &config);
 
     std::string PROTOCOL_MakeServerScanningResponse(const vuprs::ScanningConfig &scanningConfig, 
         double minScanPowerDB, double maxScanPowerDB, 

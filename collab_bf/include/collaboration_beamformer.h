@@ -1,5 +1,5 @@
-#ifndef ARM_FPGA_BF_COLLAB_H
-#define ARM_FPGA_BF_COLLAB_H
+#ifndef COLLABORATION_BEAMFORMER_H
+#define COLLABORATION_BEAMFORMER_H
 
 #include <mutex>
 #include <queue>
@@ -10,95 +10,10 @@
 #include "beam_former.h"
 #include "fir.h"
 #include "fpga_api.h"
-
-#define DEFAULT_SCANNING_POINTS_IN_HALF 100
-#define DEFAULT_SCANNING_ALTITUDE_MIN 15.0
-#define DEFAULT_SCANNING_WAVE_VELOCITY 346.0
+#include "collaboration_configs.h"
 
 namespace vuprs
 {
-    struct ARM_FPGA_BF_Config
-    {
-        double fs;  /* sampling frequency (unit: Hz), the valid range is [10, 120000] Hz */
-
-        double bf_target__alt;  /* altitude (unit: degree) of beam former pointing target */
-        double bf_target__az;  /* azimuth (unit: degree) of beam former pointing target */
-
-        double bf_waveVelocity;  /* wave velocity (m/s). e.g. 346.0 for speed of sound in air */
-
-        double bf_freq__lower;  /* lower boundary of beam former work frequency (unit: Hz), the valid range is [10, 120000] Hz */
-        double bf_freq__upper;  /* upper boundary of beam former work frequency (unit: Hz), the valid range is [10, 120000] Hz */
-
-        int bf_cov_snapshotsWindowSize;  /* Snapshots window size (to fit covariance matrix) */
-        double bf_cov_freqAverageIndex;  /* frequency average index (to fit covariance matrix) */
-
-        uint32_t dma__bufferSize;  /* AXI DMA descriptor buffer size in bytes */
-        uint32_t dma__bufferCount;  /* AXI DMA descriptor buffer count */
-
-        uint32_t queue__circularBufferQueueSizeMAX;  /* MAX size of circular buffer data queue */
-        uint32_t queue__resultQueueSizeMAX;  /* MAX size of result data queue */
-
-        ARM_FPGA_BF_Config() {this->SetDefault();}
-
-        void SetDefault();
-    };
-
-    struct ARM_FPGA_BF_Config_MASK
-    {
-        bool m_fs;
-
-        bool m_bf_target__alt;
-        bool m_bf_target__az;
-
-        bool m_bf_waveVelocity;
-
-        bool m_bf_freq__lower;
-        bool m_bf_freq__upper;
-
-        bool m_bf_cov_snapshotsWindowSize;
-        bool m_bf_cov_freqAverageIndex;
-
-        bool m_dma__bufferSize;
-        bool m_dma__bufferCount;
-
-        bool m_queue__circularBufferQueueSizeMAX;
-        bool m_queue__resultQueueSizeMAX;
-
-        ARM_FPGA_BF_Config_MASK() {this->Reset();}
-
-        void Reset();
-    };
-
-    struct ScanningConfig
-    {
-        int pointsInHalf;
-        double alt_min;
-        bool needRegeneratePositionPoints;
-
-        ScanningConfig(): 
-        pointsInHalf(DEFAULT_SCANNING_POINTS_IN_HALF), 
-        alt_min(DEFAULT_SCANNING_ALTITUDE_MIN), 
-        needRegeneratePositionPoints(true) {}
-    };
-
-    struct ScanResult
-    {
-        std::vector<uint16_t> scanResult;  /* scan result in power, unit: dB */
-        double minPowerDB;  /* minimum power in dB for scan result */
-        double maxPowerDB;  /* maximum power in dB for scan result */
-    };
-
-    bool _Check_ARM_FPGA_BF_Config_Valid(vuprs::FPGAController *controller, const vuprs::ARM_FPGA_BF_Config &config);
-
-    /**
-     * @brief Merge newConfig to config according to configMask.
-     * 
-     * @param config original config, will be updated after merging.
-     * @param newConfig new config, will be merged to original config according to configMask
-     * @param configMask config mask, indicate which field in newConfig will be merged to original config. true: merge, false: not merge.
-     */
-    void Merge_ARM_FPGA_BF_Config(vuprs::ARM_FPGA_BF_Config *config, const vuprs::ARM_FPGA_BF_Config &newConfig, const vuprs::ARM_FPGA_BF_Config_MASK &configMask);
-
     /**
      * @brief ARM FPGA Collaboration Beamformer.
      * 
@@ -112,14 +27,14 @@ namespace vuprs
      * 
      * @note Usage:
      * @note --- ---
-     * @note Step 1: Create ARM_FPGA_CollaborationBeamformer obj.
+     * @note Step 1: Create CollaborationBeamformer obj.
      * @note Step 2: Call InitCollaborationBeamformer() to initialize FPGA controller and algorithm.
      * @note Step 3: Call BindBeamformer() to bind beam forming algorithm (optional, if not called, default algorithm DCRCB will be used).
      * @note Step 4: Call RUN() to start beam former.
      * @note Step 5: Call ReadResultFromQueue() to read result from queue.
      * @note Step 6: Call STOP() to stop & reset beam former.
      */
-    class ARM_FPGA_CollaborationBeamformer
+    class CollaborationBeamformer
     {
         private:
 
@@ -135,7 +50,7 @@ namespace vuprs
             /**
              * @brief Start beam former (hardware & algorithm).
              */
-            bool StartBeamformerWithConfiguration(const ARM_FPGA_BF_Config &config);
+            bool StartBeamformerWithConfiguration(const vuprs::CollaborationBeamformerConfig &config);
 
             /**
              * @brief Reset FPGA.
@@ -240,8 +155,10 @@ namespace vuprs
 
         public:
 
-            ARM_FPGA_CollaborationBeamformer();
-            ~ARM_FPGA_CollaborationBeamformer();
+            CollaborationBeamformer();
+            ~CollaborationBeamformer();
+
+        /* ------ Part 1: Initialization ------ */
 
             /**
              * @brief Initialize FPGA controller & Beamforming algorithm.
@@ -260,25 +177,52 @@ namespace vuprs
             void BindBeamformer(std::unique_ptr<vuprs::WidebandBeamformerTemplate> beamformer = nullptr);
 
             /**
+             * @brief Indicate config done.
+             * 
+             * @retval true: config done;
+             * @retval false: config not complete.
+             */
+            bool ConfigDone() const;
+
+        /* ------ Part 1: Control (Run & Stop) ------ */
+
+            /**
              * @brief Indicate beam former has started.
+             * 
+             * @note Tread safety.
              * 
              * @retval true: beam former is running;
              * @retval false: beam former is not running.
              */
-            bool IS_RUN() const;
+            bool isRun() const;
 
             /**
              * @brief Start beam former with configuration.
              * 
-             * @param config ARM_FPGA_BF_Config struct.
+             * @note Tread safety.
+             * 
+             * @param config CollaborationBeamformerConfig struct.
              * 
              * @retval true: success.
              * @retval false: failed.
              */
-            bool RUN(const ARM_FPGA_BF_Config &config);
+            bool run(const CollaborationBeamformerConfig &config);
+
+            /**
+             * @brief Stop & reset beam former.
+             * 
+             * @note Tread safety.
+             */
+            void stop();
+
+        /* ------ Part 2: Control (for algorithms) ------ */
+
+        /* - Part 2.1: Pointing position control of beamforming - */
 
             /**
              * @brief Change target direct of the beam former.
+             * 
+             * @note Tread safety.
              * 
              * @note The function can be called when the beam former is running, 
              * @note and the direction of beamformer will be changed in real time.
@@ -289,40 +233,31 @@ namespace vuprs
              */
             bool ReDirect(double alt, double az, double waveVelocity);
 
-            /**
-             * @brief Indicate new result data input.
-             * 
-             * @retval true: new result data input;
-             * @retval false: no new result data input.
-             */
-            bool NewResultDataInput() const;
-
-            /**
-             * @brief Indicate new array signal input.
-             * 
-             * @retval true: new array signal input;
-             * @retval false: no new array signal input.
-             */
-            bool NewArraySignalInput() const;
-
-            /**
-             * @brief Indicate new scan points input.
-             * 
-             * @retval true: new scan points input;
-             * @retval false: no new scan points input.
-             */
-            bool NewScanPowerInput() const;
+        /* - Part 2.2: Scan control - */
 
             /**
              * @brief Set scan enable.
              * 
+             * @note Tread safety.
+             * 
              * @param enable true: enable scan; false: disable scan.
              */
             void ScanSwitch(bool enable);
+
+            /**
+             * @brief Indicate scan enable.
+             * 
+             * @note Tread safety.
+             * 
+             * @retval true: scan enabled;
+             * @retval false: scan disabled.
+             */
             bool ScanSwitch() const;
 
             /**
              * @brief Set scan options.
+             * 
+             * @note Tread safety.
              * 
              * @param pointsInHalf scanning points in half of the scanning area (altitude: 0-90 degree, azimuth: -180-180 degree).
              * @param alt_min minimum altitude (unit: degree) of scanning area.
@@ -330,28 +265,72 @@ namespace vuprs
              */
             void ScanOptions(int pointsInHalf, double alt_min, double waveVelocity);
 
+        /* ------ Part 3: Data Input/Output ------ */
+
+        /* - Part 3.1: Beamforming result data Input/Output - */
+
+            /**
+             * @brief Indicate new result data input.
+             * 
+             * @note Tread safety.
+             * 
+             * @retval true: new result data input;
+             * @retval false: no new result data input.
+             */
+            bool HasResult() const;
+
             /**
              * @brief Read result from result queue.
+             * 
+             * @note Tread safety.
              * 
              * @param result pointer to vector to store the result.
              * 
              * @retval true: success.
              * @retval false: failed.
              */
-            bool ReadResultFromQueue(std::vector<uint32_t> *result);
+            bool ReadResult(std::vector<uint32_t> *result);
+
+        /* - Part 3.2: Array signal data Input/Output - */
+
+            /**
+             * @brief Indicate new array signal input.
+             * 
+             * @note Tread safety.
+             * 
+             * @retval true: new array signal input;
+             * @retval false: no new array signal input.
+             */
+            bool HasArraySignal() const;
 
             /**
              * @brief Read array signal from output array signal queue.
+             * 
+             * @note Tread safety.
              * 
              * @param signalData pointer to SignalData struct to store the array signal.
              * 
              * @retval true: success.
              * @retval false: failed.
              */
-            bool ReadArraySignalFromQueue(vuprs::SignalData *signalData);
+            bool ReadArraySignal(vuprs::SignalData *signalData);
+
+        /* - Part 3.3: Scan power data Input/Output - */
+
+            /**
+             * @brief Indicate new scan points input.
+             * 
+             * @note Tread safety.
+             * 
+             * @retval true: new scan points input;
+             * @retval false: no new scan points input.
+             */
+            bool HasScanPower() const;
 
             /**
              * @brief Read scan power from scan power queue.
+             * 
+             * @note Tread safety.
              * 
              * @param scanPower pointer to vector to store the scan power (in dB).
              * @param maxPowerDB pointer to maximum power value in dB.
@@ -360,20 +339,7 @@ namespace vuprs
              * @retval true: success.
              * @retval false: failed.
              */
-            bool ReadScanPowerFromQueue(std::vector<uint16_t> *scanPower, double *maxPowerDB, double *minPowerDB);
-
-            /**
-             * @brief Stop & reset beam former.
-             */
-            void STOP();
-
-            /**
-             * @brief Indicate config done.
-             * 
-             * @retval true: config done;
-             * @retval false: config not complete.
-             */
-            bool ConfigDone() const;
+            bool ReadScanPower(std::vector<uint16_t> *scanPower, double *maxPowerDB, double *minPowerDB);
 
             EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };

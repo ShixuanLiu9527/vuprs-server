@@ -266,7 +266,7 @@ void vuprs::LinuxServer::Run()
 
         /* Start beam former */
 
-        vuprs::ARM_FPGA_BF_Config config;
+        vuprs::CollaborationBeamformerConfig config;
 
         {
             std::lock_guard<std::mutex> lock(this->mut_bf_config);  /* LOCK */
@@ -275,7 +275,7 @@ void vuprs::LinuxServer::Run()
         
         {
             std::lock_guard<std::mutex> lock(this->mut_bf);  /* LOCK */
-            this->beamformer.RUN(config);
+            this->beamformer.run(config);
         }
     }
     else
@@ -290,7 +290,7 @@ void vuprs::LinuxServer::Stop()
 
     {
         std::lock_guard<std::mutex> lock(this->mut_bf);  /* LOCK */
-        this->beamformer.STOP();
+        this->beamformer.stop();
     }
 
     /* Stop server */
@@ -381,13 +381,13 @@ void vuprs::LinuxServer::THREAD__Send()
                 {
                     case static_cast<uint32_t>(vuprs::ServerCommand::SERVER_CMD__GET_NEW_DATA):
                     {
-                        status = this->beamformer.ReadResultFromQueue(&resultToSend);
+                        status = this->beamformer.ReadResult(&resultToSend);
                         sendDataSize = resultToSend.size() * sizeof(uint32_t);
                         break;
                     }
                     case static_cast<uint32_t>(vuprs::ServerCommand::SERVER_CMD__SCAN_FOR_POSITION_POWER):
                     {
-                        status = this->beamformer.ReadScanPowerFromQueue(&scanResultToSend, &maxScanPowerDB, &minScanPowerDB);
+                        status = this->beamformer.ReadScanPower(&scanResultToSend, &maxScanPowerDB, &minScanPowerDB);
                         sendDataSize = scanResultToSend.size() * sizeof(uint16_t);
                         break;
                     }
@@ -462,7 +462,7 @@ void vuprs::LinuxServer::THREAD__Send()
         {
             try
             {
-                vuprs::ARM_FPGA_BF_Config config;
+                vuprs::CollaborationBeamformerConfig config;
                 {
                     std::lock_guard<std::mutex> lock(this->mut_bf_config);  /* LOCK */
                     config = this->beamFormerConfig;
@@ -490,7 +490,7 @@ void vuprs::LinuxServer::THREAD__Send()
 void vuprs::LinuxServer::THREAD__Control()
 {
     vuprs::ServerCommandInformation _cmdINFO;
-    vuprs::ARM_FPGA_BF_Config config;
+    vuprs::CollaborationBeamformerConfig config;
     vuprs::ScanningConfig scanningConfig;
     bool operationStatus = false;
     bool needResponseInThisThread = true;
@@ -546,8 +546,8 @@ void vuprs::LinuxServer::THREAD__Control()
                 case vuprs::ServerCommand::SERVER_CMD__RESET:  /* use this.config */
                 {
                     std::lock_guard<std::mutex> lock(this->mut_bf);  /* LOCK */
-                    this->beamformer.STOP();
-                    this->beamformer.RUN(config);
+                    this->beamformer.stop();
+                    this->beamformer.run(config);
                     break;
                 }
                 case vuprs::ServerCommand::SERVER_CMD__CHANGE_BEAMFORMER:
@@ -556,22 +556,22 @@ void vuprs::LinuxServer::THREAD__Control()
                     {
                         std::lock_guard<std::mutex> lock(this->mut_bf);  /* LOCK */
                         this->beamformer.BindBeamformer(std::make_unique<vuprs::Beamformer_DCRCB>());
-                        this->beamformer.STOP();
-                        this->beamformer.RUN(config);
+                        this->beamformer.stop();
+                        this->beamformer.run(config);
                     }
                     else if (_cmdINFO.beamformer_name == "cbf")
                     {
                         std::lock_guard<std::mutex> lock(this->mut_bf);  /* LOCK */
                         this->beamformer.BindBeamformer(std::make_unique<vuprs::Beamformer_CBF>());
-                        this->beamformer.STOP();
-                        this->beamformer.RUN(config);
+                        this->beamformer.stop();
+                        this->beamformer.run(config);
                     }
                     else if (_cmdINFO.beamformer_name == "mvdr")
                     {
                         std::lock_guard<std::mutex> lock(this->mut_bf);  /* LOCK */
                         this->beamformer.BindBeamformer(std::make_unique<vuprs::Beamformer_MVDR>());
-                        this->beamformer.STOP();
-                        this->beamformer.RUN(config);
+                        this->beamformer.stop();
+                        this->beamformer.run(config);
                     }
                     else
                     {
@@ -583,7 +583,7 @@ void vuprs::LinuxServer::THREAD__Control()
                 {
                     {
                         std::lock_guard<std::mutex> lock(this->mut_bf_config);  /* LOCK */
-                        vuprs::Merge_ARM_FPGA_BF_Config(&this->beamFormerConfig, _cmdINFO.config, _cmdINFO.configMask);
+                        this->beamFormerConfig += _cmdINFO.config;  /* Merge config */
                         config = this->beamFormerConfig;
                     }
                     std::lock_guard<std::mutex> lock(this->mut_bf);  /* LOCK */
@@ -593,13 +593,13 @@ void vuprs::LinuxServer::THREAD__Control()
                 case vuprs::ServerCommand::SERVER_CMD__START:  /* use this.config */
                 {
                     std::lock_guard<std::mutex> lock(this->mut_bf);  /* LOCK */
-                    this->beamformer.RUN(config);
+                    this->beamformer.run(config);
                     break;
                 }
                 case vuprs::ServerCommand::SERVER_CMD__STOP: 
                 {
                     std::lock_guard<std::mutex> lock(this->mut_bf);  /* LOCK */
-                    this->beamformer.STOP();
+                    this->beamformer.stop();
                     break;
                 }
                 case vuprs::ServerCommand::SERVER_CMD__SCAN_FOR_POSITION_POWER:
@@ -653,12 +653,12 @@ void vuprs::LinuxServer::THREAD__Control()
                 {
                     {
                         std::lock_guard<std::mutex> lock(this->mut_bf_config);  /* LOCK */
-                        vuprs::Merge_ARM_FPGA_BF_Config(&this->beamFormerConfig, _cmdINFO.config, _cmdINFO.configMask);
+                        this->beamFormerConfig += _cmdINFO.config;  /* Merge config */
                         config = this->beamFormerConfig;
                     }
                     std::lock_guard<std::mutex> lock(this->mut_bf);  /* LOCK */
-                    this->beamformer.STOP();
-                    this->beamformer.RUN(config);
+                    this->beamformer.stop();
+                    this->beamformer.run(config);
                     break;
                 }
                 default:

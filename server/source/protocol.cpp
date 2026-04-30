@@ -48,7 +48,7 @@ bool vuprs::PROTOCOL_ParseCommandFromMessage(const std::string &message, vuprs::
 	if (cmd == nullptr) return false;
 	if (message.empty()) return false;
 
-	cmd->configMask.Reset();
+	cmd->config.ResetMask();
 
 	try
 	{
@@ -98,8 +98,8 @@ bool vuprs::PROTOCOL_ParseCommandFromMessage(const std::string &message, vuprs::
 			cmd->config.bf_target__alt = alt;
 			cmd->config.bf_target__az = az;
 			
-			cmd->configMask.m_bf_target__alt = true;
-			cmd->configMask.m_bf_target__az = true;
+			cmd->config.mask.m_bf_target__alt = true;
+			cmd->config.mask.m_bf_target__az = true;
 
 			return true;
 		}
@@ -155,42 +155,42 @@ bool vuprs::PROTOCOL_ParseCommandFromMessage(const std::string &message, vuprs::
 				double fs = 0.0;
 				vuprs::__JsonStringParseFLOAT<double>(&fs, params, "fs", true);
 				cmd->config.fs = fs;
-				cmd->configMask.m_fs = true;
+				cmd->config.mask.m_fs = true;
 			}
 			if (params.contains("wave_velocity"))
 			{
 				double waveVelocity = 0.0;
 				vuprs::__JsonStringParseFLOAT<double>(&waveVelocity, params, "wave_velocity", true);
 				cmd->config.bf_waveVelocity = waveVelocity;
-				cmd->configMask.m_bf_waveVelocity = true;
+				cmd->config.mask.m_bf_waveVelocity = true;
 			}
 			if (params.contains("lower_frequency"))
 			{
 				double lowerFreq = 0.0;
 				vuprs::__JsonStringParseFLOAT<double>(&lowerFreq, params, "lower_frequency", true);
 				cmd->config.bf_freq__lower = lowerFreq;
-				cmd->configMask.m_bf_freq__lower = true;
+				cmd->config.mask.m_bf_freq__lower = true;
 			}
 			if (params.contains("upper_frequency"))
 			{
 				double upperFreq = 0.0;
 				vuprs::__JsonStringParseFLOAT<double>(&upperFreq, params, "upper_frequency", true);
 				cmd->config.bf_freq__upper = upperFreq;
-				cmd->configMask.m_bf_freq__upper = true;
+				cmd->config.mask.m_bf_freq__upper = true;
 			}
 			if (params.contains("snapshot_window_size"))
 			{
 				int snapshotWindowSize = 0;
 				vuprs::__JsonStringParseFLOAT<int>(&snapshotWindowSize, params, "snapshot_window_size", true);
 				cmd->config.bf_cov_snapshotsWindowSize = snapshotWindowSize;
-				cmd->configMask.m_bf_cov_snapshotsWindowSize = true;
+				cmd->config.mask.m_bf_cov_snapshotsWindowSize = true;
 			}
 			if (params.contains("covariance_average_index"))
 			{
 				double covarianceAverageIndex = 0.0;
 				vuprs::__JsonStringParseFLOAT<double>(&covarianceAverageIndex, params, "covariance_average_index", true);
 				cmd->config.bf_cov_freqAverageIndex = covarianceAverageIndex;
-				cmd->configMask.m_bf_cov_freqAverageIndex = true;
+				cmd->config.mask.m_bf_cov_freqAverageIndex = true;
 			}
 
 			return true;
@@ -233,7 +233,7 @@ std::string vuprs::PROTOCOL_MakeServerOperationResponse(const vuprs::ServerComma
 	return response.dump();
 }
 
-std::string vuprs::PROTOCOL_MakeServerResultDataResponse(const std::string &info = "", bool operationStatus)
+std::string vuprs::PROTOCOL_MakeServerResultDataResponse(const std::string &info, bool operationStatus)
 {
 	nlohmann::json response;
 	response["response_cmd"] = SERVER_CMD__GET_NEW_DATA__STR;
@@ -243,7 +243,7 @@ std::string vuprs::PROTOCOL_MakeServerResultDataResponse(const std::string &info
 	return response.dump();
 }
 
-std::string vuprs::PROTOCOL_MakeServerParameterResponse(const vuprs::ARM_FPGA_BF_Config &config)
+std::string vuprs::PROTOCOL_MakeServerParameterResponse(const vuprs::CollaborationBeamformerConfig &config)
 {
 	/*
 		{
@@ -273,7 +273,7 @@ std::string vuprs::PROTOCOL_MakeServerParameterResponse(const vuprs::ARM_FPGA_BF
 
 std::string vuprs::PROTOCOL_MakeServerScanningResponse(const vuprs::ScanningConfig &scanningConfig, 
         double minScanPowerDB, double maxScanPowerDB, 
-        const std::string &info = "", bool operationStatus)
+        const std::string &info, bool operationStatus)
 {
 	/*
 		{
