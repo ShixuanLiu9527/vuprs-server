@@ -8,9 +8,9 @@ XDMA__KERNEL_DIR="/home/lsx/source/linux/rk356x_linux/kernel"
 
 # ------------------------------------------------------------------------------------------------
 
-RED='\033[31m'
-GREEN='\033[32m'
-BLUE='\033[34m'
+RED='\033[1;31m'
+GREEN='\033[1;32m'
+BLUE='\033[1;34m'
 NC='\033[0m'  # No Color
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"  # Current dir

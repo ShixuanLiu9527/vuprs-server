@@ -143,7 +143,7 @@ namespace vuprs
      * @param controller FPGA controller.
      * @param runEnable true: enable run, false: disable run.
      */
-    bool FPGA_API__FIR__RuningControl(vuprs::FPGAController *controller, bool runEnable);
+    bool FPGA_API__FIR__RunningControl(vuprs::FPGAController *controller, bool runEnable);
 
     /* ----------------------------------------------------------------------------- */
     /* ------------------------------------ DDR ------------------------------------ */
@@ -253,7 +253,21 @@ namespace vuprs
         vuprs::AXI_DMA_ScatterGatherDescriptor *currentDescriptor, 
         vuprs::AXI_DMA_ScatterGatherDescriptor *previousDescriptor,
         vuprs::AXI_DMA_ScatterGatherDescriptor *nextDescriptor);
-
+    
+    /**
+     * @brief Read current descriptor address.
+     * 
+     * @note Controller must be configured in advance.
+     * @note The API function will read the current descriptor address from AXI DMA register,
+     * 
+     * @param controller FPGA controller.
+     * @param currentDescriptor current descriptor address.
+     * 
+     * @retval true: success.
+     * @retval false: failed.
+     */
+    bool FPGA_API__DMA__ReadCurrentDescriptor(vuprs::FPGAController *controller, uint32_t *currentDescriptor);
+    
     /**
      * @brief Set timeout for interrupt detection in AXI DMA.
      * 
@@ -265,7 +279,7 @@ namespace vuprs
      * 
      * @throw std::runtime_error
      */
-    bool FPGA_API_DMA__SetTimeoutForInterrupt(vuprs::FPGAController *controller, uint32_t timeout_ms);
+    bool FPGA_API__DMA__SetTimeoutForInterrupt(vuprs::FPGAController *controller, uint32_t timeout_ms);
 }
 
 #endif

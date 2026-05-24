@@ -163,7 +163,7 @@ bool vuprs::CollaborationBeamformer::StartBeamformerWithConfiguration(const Coll
         descriptorUpdateCycle_us = static_cast<int>(1000000 * static_cast<double>(config.dma__bufferSize) / config.fs);
     }
 
-    this->interruptWaitTime_us = descriptorUpdateCycle_us / 10;
+    this->interruptWaitTime_us = descriptorUpdateCycle_us / 20;
     this->circularBufferWaitTime_us = descriptorUpdateCycle_us / 5;
 
     /* Get sampling frequency */
@@ -196,7 +196,7 @@ bool vuprs::CollaborationBeamformer::StartBeamformerWithConfiguration(const Coll
 
     /* Set timeout for DMA interrupt (timeout = interrupt wait time / 100) */
 
-    retval &= vuprs::FPGA_API_DMA__SetTimeoutForInterrupt(&this->controller, this->interruptWaitTime_us / (1000 * 100));
+    // retval &= vuprs::FPGA_API__DMA__SetTimeoutForInterrupt(&this->controller, this->interruptWaitTime_us / (1000 * 100));
 
     /* FPGA: STEP 1 - Config DMA */
 
@@ -208,7 +208,7 @@ bool vuprs::CollaborationBeamformer::StartBeamformerWithConfiguration(const Coll
 
     /* FPGA: STEP 3 - Enable FIR */
 
-    retval &= vuprs::FPGA_API__FIR__RuningControl(&this->controller, true);
+    retval &= vuprs::FPGA_API__FIR__RunningControl(&this->controller, true);
     
     /* FPGA: STEP 4 - Update FIR coefficients with 0 */
 
@@ -451,25 +451,35 @@ void vuprs::CollaborationBeamformer::THREAD__ScanPowerCalculation()
 void vuprs::CollaborationBeamformer::THREAD__ListenDMAInterrupt()
 {
     uint32_t r_val;
+    bool isFirstChange = true;
+
     while (this->system_run)
     {
         try
         {
-            vuprs::FPGA_API__DMA__GetAndClearInterruptFlag(&this->controller, &r_val);
-
-            #if ARM_FPGA_BF_COLLAB_CPP__DEBUG_PRINT
-                printf("[debug] DMA interrupt flag = %d\n", r_val);
-            #endif
+            vuprs::FPGA_API__DMA__ReadCurrentDescriptor(&this->controller, &r_val);
+            if (r_val != this->dmaCurDesc.load())
+            {
+                this->dmaCurDesc.store(r_val);
+                if (!isFirstChange)
+                {
+                    #if ARM_FPGA_BF_COLLAB_CPP__DEBUG_PRINT
+                        printf("[debug] DMA interrupt detected, current desc = 0x%X\n", r_val);
+                    #endif
+                    this->dmaDescriptorIRQ = true;
+                    this->dmaInterruptCV.notify_one();
+                }
+                else
+                {
+                    isFirstChange = false;  /* Skip the first change since it's just the initial value */
+                }
+            }
         }
         catch(const std::exception& e)
         {
             std::cout << "Error in [CollaborationBeamformer::THREAD__ListenDMAInterrupt] Error: " << e.what() << std::endl;
         }
-        if (r_val == 0x01)
-        {
-            this->dmaDescriptorIRQ = true;
-            this->dmaInterruptCV.notify_one();
-        }
+
         if (!this->system_run) break;  /* Jump out */
 
         std::this_thread::sleep_for(std::chrono::microseconds(this->interruptWaitTime_us));
@@ -509,40 +519,43 @@ void vuprs::CollaborationBeamformer::THREAD__ReadResult()
 
         if (!hasInterrupt) continue;
 
-        /* Read DDR */
-        
-        try
+        /* Get previous descriptor */
+
+        if (vuprs::MatchDescriptor(_refDescriptors, this->dmaCurDesc.load(), 
+                &currentDescriptor, &previousDescriptor, &nextDescriptor))
         {
-            /* Get previous descriptor */
-
-            vuprs::FPGA_API__DMA__GetCurrentDescriptor(&this->controller, _refDescriptors, 
-                &currentDescriptor, &previousDescriptor, &nextDescriptor);
-
-            /* Read previous buffer (previous of current) */
-
-            vuprs::FPGA_API__DDR__ReadDDR(&this->controller, &buffer, 
-                previousDescriptor.BUFFER_ADDRESS, previousDescriptor.ALIGNMENT_2_BUFFER_SIZE);
-
-            /* Convert buffer to vector */
-
-            result = buffer.to_vector<uint32_t>();
-
-            /* Push to queue */
-
+            try
             {
-                std::lock_guard<std::mutex> lock(this->mut_dma);  /* LOCK */
-                this->resultQueue.push_back(result);
-                if (this->resultQueue.size() > this->resultQueueSizeMAX)
-                {
-                    this->resultQueue.pop_front();  /* Pop the oldest data to avoid overflow */
-                }
-            }
+                /* Read previous buffer (previous of current) from DDR */
 
-            this->newResultDataInput = true;
+                vuprs::FPGA_API__DDR__ReadDDR(&this->controller, &buffer, 
+                    previousDescriptor.BUFFER_ADDRESS, previousDescriptor.ALIGNMENT_2_BUFFER_SIZE);
+
+                /* Convert buffer to vector */
+
+                result = buffer.to_vector<uint32_t>();
+
+                /* Push data to queue */
+
+                {
+                    std::lock_guard<std::mutex> lock(this->mut_dma);  /* LOCK */
+                    this->resultQueue.push_back(result);
+                    if (this->resultQueue.size() > this->resultQueueSizeMAX)
+                    {
+                        this->resultQueue.pop_front();  /* Pop the oldest data to avoid overflow */
+                    }
+                }
+
+                this->newResultDataInput = true;
+            }
+            catch(const std::exception& e)
+            {
+                std::cout << "Error in [CollaborationBeamformer::THREAD__ReadResult] " << e.what() << std::endl;
+            }
         }
-        catch(const std::exception& e)
+        else
         {
-            std::cout << "Error in [CollaborationBeamformer::THREAD__ReadResult] " << e.what() << std::endl;
+            std::cout << "Warning in [CollaborationBeamformer::THREAD__ReadResult] Cannot match current descriptor address to any in the reference list." << std::endl;
         }
     }
 }

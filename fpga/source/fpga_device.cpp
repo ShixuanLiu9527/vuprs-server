@@ -122,6 +122,49 @@ void vuprs::CreateDMAScatterGatherDescriptorChain(std::vector<vuprs::AXI_DMA_Sca
     }
 }
 
+bool vuprs::MatchDescriptor(const std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> &descriptorList, uint32_t currentDescriptorAddr,
+    vuprs::AXI_DMA_ScatterGatherDescriptor *curDesc,
+    vuprs::AXI_DMA_ScatterGatherDescriptor *nextDesc,
+    vuprs::AXI_DMA_ScatterGatherDescriptor *prevDesc)
+{
+    uint32_t nextAddr, previousAddr;
+    bool find_cur = false, find_next = false, find_prev = false;
+
+    if (curDesc == nullptr || nextDesc == nullptr || prevDesc == nullptr)
+    {
+        throw std::runtime_error("in [vuprs::MatchDescriptor] target descriptor is NULL.");
+    }
+
+    for (auto &desc: descriptorList)
+    {
+        if (desc.ALIGNMENT_0_CURRENT_ADDR == currentDescriptorAddr)
+        {
+            nextAddr = desc.NXTDESC;
+            previousAddr = desc.ALIGNMENT_1_PREVIOUS_ADDR;
+            *curDesc = desc;
+            find_cur = true;
+            break;
+        }
+    }
+    for (auto &desc: descriptorList)
+    {
+        if (desc.ALIGNMENT_0_CURRENT_ADDR == nextAddr)
+        {
+            *nextDesc = desc;
+            find_next = true;
+            if (find_prev) break;
+        }
+        if (desc.ALIGNMENT_0_CURRENT_ADDR == previousAddr)
+        {
+            *prevDesc = desc;
+            find_prev = true;
+            if (find_next) break;
+        }
+    }
+
+    return find_cur && find_next && find_prev;
+}
+
 /* ---------------------------------------------------------------------- */
 /* ---------------------------- ADC Controller -------------------------- */
 /* ---------------------------------------------------------------------- */

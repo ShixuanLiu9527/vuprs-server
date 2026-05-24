@@ -76,6 +76,23 @@ namespace vuprs
     void CreateDMAScatterGatherDescriptorChain(std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> *descriptorList, 
         const vuprs::AXI_DMA_SGDescriptor_Config &config);
 
+    /**
+     * @brief Match AXI DMA Scatter/Gather Descriptor in the descriptor list by current descriptor address.
+     * 
+     * @param descriptorList The descriptor list to be matched.
+     * @param currentDescriptorAddr The current descriptor address to be matched.
+     * @param curDesc Output parameter, the matched current descriptor.
+     * @param nextDesc Output parameter, the matched next descriptor.
+     * @param prevDesc Output parameter, the matched previous descriptor.
+     * 
+     * @return true if match successfully, false if no matched descriptor found.
+     * @throw std::runtime_error
+     */
+    bool MatchDescriptor(const std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> &descriptorList, uint32_t currentDescriptorAddr,
+                        vuprs::AXI_DMA_ScatterGatherDescriptor *curDesc,
+                        vuprs::AXI_DMA_ScatterGatherDescriptor *nextDesc,
+                        vuprs::AXI_DMA_ScatterGatherDescriptor *prevDesc);
+
     enum class AXI_DMA__Registers
     {
         SG_CTL,  /* [3:0]: SG_CACHE, [7:4]: Reserved, [11:8]: SG_USER, [31:12]: Reserved */

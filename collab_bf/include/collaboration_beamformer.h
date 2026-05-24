@@ -92,6 +92,8 @@ namespace vuprs
 
             /* DMA Interrupt */
 
+            std::atomic<uint32_t> dmaCurDesc{0xFFFFFFFF};  /* current descriptor address, initialized to an invalid value */
+
             std::mutex mut_dma;  /* DMA Interrupt mutex lock */
             std::condition_variable dmaInterruptCV;  /* DMA Interrupt condition var, [controlled by mut_dma] */
 

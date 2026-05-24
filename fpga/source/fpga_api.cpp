@@ -389,11 +389,11 @@ bool vuprs::FPGA_API__FIR__ResetFIR(vuprs::FPGAController *controller)
     return operateStatus;
 }
 
-bool vuprs::FPGA_API__FIR__RuningControl(vuprs::FPGAController *controller, bool runEnable)
+bool vuprs::FPGA_API__FIR__RunningControl(vuprs::FPGAController *controller, bool runEnable)
 {
     if (!controller->ConfigDown())
     {
-        throw std::runtime_error("in [vuprs::FPGA_API__FIR__RuningControl] FPGA Controller not configured in advance.");
+        throw std::runtime_error("in [vuprs::FPGA_API__FIR__RunningControl] FPGA Controller not configured in advance.");
     }
 
     bool operateStatus = true;
@@ -586,31 +586,11 @@ bool vuprs::FPGA_API__DMA__GetCurrentDescriptor(vuprs::FPGAController *controlle
     uint32_t r_val = INVALID_SG_DESCRIPTOR_POINTER + 1;
     uint32_t nextAddr, previousAddr;
 
-    operateStatus &= controller->dev__AXI_DMA.ReadSingleRegister(vuprs::AXI_DMA__Registers::S2MM_CURDESC, &r_val);
-
+    operateStatus &= vuprs::FPGA_API__DMA__ReadCurrentDescriptor(controller, &r_val);
+    
     /* Match */
 
-    for (auto &descriptor: referenceDescriptors)
-    {
-        if (descriptor.ALIGNMENT_0_CURRENT_ADDR == r_val)
-        {
-            *currentDescriptor = descriptor;
-            nextAddr = descriptor.NXTDESC;
-            previousAddr = descriptor.ALIGNMENT_1_PREVIOUS_ADDR;
-            found = true;
-        }
-    }
-    for (auto &descriptor: referenceDescriptors)
-    {
-        if (descriptor.ALIGNMENT_0_CURRENT_ADDR == nextAddr)
-        {
-            *nextDescriptor = descriptor;
-        }
-        if (descriptor.ALIGNMENT_0_CURRENT_ADDR == previousAddr)
-        {
-            *previousDescriptor = descriptor;
-        }
-    }
+    operateStatus &= vuprs::MatchDescriptor(referenceDescriptors, r_val, currentDescriptor, nextDescriptor, previousDescriptor);
 
     if (!found)
     {
@@ -620,11 +600,31 @@ bool vuprs::FPGA_API__DMA__GetCurrentDescriptor(vuprs::FPGAController *controlle
     return operateStatus;
 }
 
-bool vuprs::FPGA_API_DMA__SetTimeoutForInterrupt(vuprs::FPGAController *controller, uint32_t timeout_ms)
+bool vuprs::FPGA_API__DMA__ReadCurrentDescriptor(vuprs::FPGAController *controller, uint32_t *currentDescriptor)
 {
     if (!controller->ConfigDown())
     {
-        throw std::runtime_error("in [vuprs::FPGA_API_DMA__SetTimeoutForInterrupt] FPGA Controller not configured in advance.");
+        throw std::runtime_error("in [vuprs::FPGA_API__DMA__ReadCurrentDescriptor] FPGA Controller not configured in advance.");
+    }
+    if (currentDescriptor == nullptr)
+    {
+        throw std::runtime_error("in [vuprs::FPGA_API__DMA__ReadCurrentDescriptor] CURRENT_DESCRIPTOR is NULL.");
+    }
+
+    bool operateStatus = true;
+    uint32_t r_val;
+
+    operateStatus &= controller->dev__AXI_DMA.ReadSingleRegister(vuprs::AXI_DMA__Registers::S2MM_CURDESC, &r_val);
+    *currentDescriptor = r_val;
+
+    return operateStatus;
+}
+
+bool vuprs::FPGA_API__DMA__SetTimeoutForInterrupt(vuprs::FPGAController *controller, uint32_t timeout_ms)
+{
+    if (!controller->ConfigDown())
+    {
+        throw std::runtime_error("in [vuprs::FPGA_API__DMA__SetTimeoutForInterrupt] FPGA Controller not configured in advance.");
     }
 
     controller->dev__AXI_DMA.SetInterruptTimeout(timeout_ms);

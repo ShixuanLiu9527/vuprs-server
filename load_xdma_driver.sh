@@ -4,9 +4,9 @@ XDMA_DRIVER_MODULE=./xdma.ko
 
 # Remove the existing xdma kernel module
 
-RED='\033[31m'
-GREEN='\033[32m'
-BLUE='\033[34m'
+RED='\033[1;31m'
+GREEN='\033[1;32m'
+BLUE='\033[1;34m'
 NC='\033[0m'
 
 lsmod | grep xdma  # List module and find xdma
