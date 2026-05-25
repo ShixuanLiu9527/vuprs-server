@@ -20,16 +20,16 @@ BACKUP_FILE="${NETWORK_INTERFACES_CONFIG}.bak_vuprs"  # Reserved
 
 if [ ! -f "${BACKUP_FILE}" ]; then
     cp "${NETWORK_INTERFACES_CONFIG}" "${BACKUP_FILE}"
-    echo "${GREEN}Reserve network interfaces to file: ${BACKUP_FILE}${NC}"
+    echo -e "${GREEN}Reserve network interfaces to file: ${BACKUP_FILE}${NC}"
 fi
 
 # Change static IP
 
 echo "Config options:"
-echo "  Static IP: ${BLUE}${STATIC_IP}${NC}"
-echo "  Netmask: ${BLUE}${NETMASK}${NC}"
-echo "  Gateway: ${BLUE}${GATEWAY}${NC}"
-echo "  DNS: ${BLUE}${DNS}${NC}"
+echo -e "  Static IP: ${BLUE}${STATIC_IP}${NC}"
+echo -e "  Netmask: ${BLUE}${NETMASK}${NC}"
+echo -e "  Gateway: ${BLUE}${GATEWAY}${NC}"
+echo -e "  DNS: ${BLUE}${DNS}${NC}"
 
 cat > "${NETWORK_INTERFACES_CONFIG}" <<EOF
 auto lo
@@ -43,38 +43,38 @@ iface ${INTERFACE} inet static
     dns-nameservers ${DNS}
 EOF
 
-echo "${GREEN}Successfully save config to ${NETWORK_INTERFACES_CONFIG}${NC}"
-echo "${BLUE}Restart ethernet ...${NC}"
+echo -e "${GREEN}Successfully save config to ${NETWORK_INTERFACES_CONFIG}${NC}"
+echo -e "${BLUE}Restart ethernet ...${NC}"
 
 # Restart network
 
 if command -v systemctl &> /dev/null; then
     if systemctl restart networking; then
-        echo "${GREEN}Network restarted successfully (systemctl)${NC}"
+        echo -e "${GREEN}Network restarted successfully (systemctl)${NC}"
     else
-        echo "${RED}Failed to restart network with systemctl${NC}"
+        echo -e "${RED}Failed to restart network with systemctl${NC}"
         exit 1
     fi
 elif [ -f /etc/init.d/networking ]; then
     if /etc/init.d/networking restart; then
-        echo "${GREEN}Network restarted successfully (init.d)${NC}"
+        echo -e "${GREEN}Network restarted successfully (init.d)${NC}"
     else
-        echo "${RED}Failed to restart network with init.d${NC}"
+        echo -e "${RED}Failed to restart network with init.d${NC}"
         exit 1
     fi
 else
-    echo "${RED}Cannot restart network automatically.${NC}"
-    echo "${YELLOW}Please reboot the system manually.${NC}"
+    echo -e "${RED}Cannot restart network automatically.${NC}"
+    echo -e "${YELLOW}Please reboot the system manually.${NC}"
 fi
-echo "${BLUE}Please wait for network to restart...${NC}"
+echo -e "${BLUE}Please wait for network to restart...${NC}"
 sleep 2
-echo "${BLUE}Verifying IP address...${NC}"
+echo -e "${BLUE}Verifying IP address...${NC}"
 CURRENT_IP=$(ip -4 addr show ${INTERFACE} 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -1)
 
 if [ "$CURRENT_IP" = "$STATIC_IP" ]; then
-    echo "${GREEN}IP successfully set to ${STATIC_IP}${NC}"
+    echo -e "${GREEN}IP successfully set to ${STATIC_IP}${NC}"
 else
-    echo "${RED}IP verification failed. Current IP: ${CURRENT_IP:-'none'}${NC}"
+    echo -e "${RED}IP verification failed. Current IP: ${CURRENT_IP:-'none'}${NC}"
 fi
 
-echo "${GREEN}Ethernet config DONE.${NC}"
+echo -e "${GREEN}Ethernet config DONE.${NC}"

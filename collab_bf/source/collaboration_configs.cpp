@@ -11,7 +11,7 @@ void vuprs::CollaborationBeamformerConfig::SetDefault()
     this->bf_cov_snapshotsWindowSize = 50;  /* Snapshots window size (to fit covariance matrix) */
     this->bf_cov_freqAverageIndex = 0.8;  /* frequency average index (to fit covariance matrix) */
     this->dma__bufferSize = 32768;  /* AXI DMA descriptor buffer size */
-    this->dma__bufferCount = 10;  /* AXI DMA descriptor buffer count */
+    this->dma__bufferCount = 20;  /* AXI DMA descriptor buffer count */
     this->queue__circularBufferQueueSizeMAX = 10;
     this->queue__resultQueueSizeMAX = 10;
 }

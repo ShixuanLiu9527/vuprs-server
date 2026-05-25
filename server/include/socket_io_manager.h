@@ -4,6 +4,9 @@
 #include <mutex>
 #include <memory>
 #include <cstring>
+#include <algorithm>
+#include <cctype>
+#include <string>
 
 #ifdef __linux__
     #include <unistd.h>

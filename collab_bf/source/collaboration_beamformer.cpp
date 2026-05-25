@@ -3,6 +3,8 @@
 #define ARM_FPGA_BF_COLLAB_CPP__DEBUG_PRINT false  /* print something @ debug mode */
 #define ARM_FPGA_BF_COLLAB_CPP__DEBUG_SAVE false  /* save data @ debug mode */
 
+#define CIRCULAR_BUFFER_DEBUG_FILENAME "../signals/signal.csv"
+
 vuprs::CollaborationBeamformer::CollaborationBeamformer()
 {
     this->configdone = false;
@@ -164,7 +166,13 @@ bool vuprs::CollaborationBeamformer::StartBeamformerWithConfiguration(const Coll
     }
 
     this->interruptWaitTime_us = descriptorUpdateCycle_us / 20;
-    this->circularBufferWaitTime_us = descriptorUpdateCycle_us / 5;
+    this->circularBufferWaitTime_us = descriptorUpdateCycle_us / 20;
+
+#if ARM_FPGA_BF_COLLAB_CPP__DEBUG_PRINT
+    printf("DMA descriptor update cycle: %d us\n", descriptorUpdateCycle_us);
+    printf("DMA interrupt wait time: %d us\n", this->interruptWaitTime_us.load());
+    printf("Circular buffer interrupt wait time: %d us\n", this->circularBufferWaitTime_us.load());
+#endif
 
     /* Get sampling frequency */
 
@@ -196,7 +204,7 @@ bool vuprs::CollaborationBeamformer::StartBeamformerWithConfiguration(const Coll
 
     /* Set timeout for DMA interrupt (timeout = interrupt wait time / 100) */
 
-    // retval &= vuprs::FPGA_API__DMA__SetTimeoutForInterrupt(&this->controller, this->interruptWaitTime_us / (1000 * 100));
+    // retval &= vuprs::FPGA_API__DMA__SetTimeoutForInterrupt(&this->controller, this->interruptWaitTime_us.load() / (1000 * 100));
 
     /* FPGA: STEP 1 - Config DMA */
 
@@ -665,7 +673,7 @@ void vuprs::CollaborationBeamformer::THREAD__AlgorithmCalculation()
             this->arraySignalQueue.pop_front();
 
             #if ARM_FPGA_BF_COLLAB_CPP__DEBUG_SAVE
-                signal.ToCSV("../signals/signal.csv");
+                signal.ToCSV(CIRCULAR_BUFFER_DEBUG_FILENAME);
             #endif
 
             /* Push data to Beam forming algorithm */

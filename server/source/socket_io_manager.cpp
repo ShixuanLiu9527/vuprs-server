@@ -180,6 +180,11 @@ bool vuprs::CheckFrameFormat(const vuprs::SocketReceiveData &data, const std::st
     if (header.empty() || tailer.empty()) return false;
     
     std::string dataString(data.buf, data.receiveBytes);
+
+    dataString.erase(std::remove_if(dataString.begin(), dataString.end(), 
+        [](unsigned char ch) { 
+            return ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t';
+        }), dataString.end());
     
     if (dataString.size() < header.size() + tailer.size()) return false;
     if (dataString.compare(0, header.size(), header) != 0) return false;
