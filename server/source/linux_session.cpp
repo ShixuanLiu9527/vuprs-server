@@ -1,5 +1,7 @@
 #include "linux_session.h"
 
+#define LINUX_SESSION_CPP__DEBUG_PRINT false  /* print something @ debug mode */
+
 vuprs::LinuxSession::LinuxSession(const std::string &frameHeader, const std::string &frameTailer)
 {
     this->running = false;
@@ -145,6 +147,9 @@ void vuprs::LinuxSession::ReceiveLoop()
             
                 if (this->messageHandler != nullptr)
                 {
+                #if LINUX_SESSION_CPP__DEBUG_PRINT
+                    std::cout << "[session][" << clientInfo << "] received message: " << message << std::endl;
+                #endif
                     this->messageHandler(this->socketIOManager, message);  /* Call user function */
                 }
                 else

@@ -285,6 +285,7 @@ void vuprs::CollaborationBeamformer::stop()
     
     this->algorithmCV.notify_all();
     this->dmaInterruptCV.notify_all();
+    this->scanCV.notify_all();
 
     for (auto &f: this->threads)
     {
@@ -453,6 +454,8 @@ void vuprs::CollaborationBeamformer::THREAD__ScanPowerCalculation()
                 this->scanResultQueue.pop_front();  /* Pop the oldest data to avoid overflow */
             }
         }
+
+        this->newScanPointsInput = true;
     }
 }
 

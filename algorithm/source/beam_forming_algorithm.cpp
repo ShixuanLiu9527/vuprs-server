@@ -1,5 +1,7 @@
 #include "beam_forming_algorithm.h"
 
+#define BEAM_FORMING_ALGORITHM_DEBUG_PRINT false
+
 void vuprs::SetIterationConfigDefault(IterationConfig *config)
 {
     config->func = nullptr;
@@ -339,7 +341,13 @@ void vuprs::CholeskyDecomposition(const Eigen::Matrix<Eigen::dcomplex, -1, -1> &
     }
     Eigen::Matrix<double, -1, 1> gamma;
     Eigen::Matrix<Eigen::dcomplex, -1, -1> U;  /* R = U * gamma * U.H */
+#if BEAM_FORMING_ALGORITHM_DEBUG_PRINT
+    std::cout << "[cholesky decomposition] start eigenvalue decomposition." << std::endl;
+#endif
     vuprs::EigenvalueDecomposition(covMatrix, &gamma, &U);
+#if BEAM_FORMING_ALGORITHM_DEBUG_PRINT
+    std::cout << "[cholesky decomposition] done." << std::endl;
+#endif
     *G = U * gamma.cwiseSqrt().asDiagonal();  /* R = U * gamma * U.H = B * B.H */
 }
 

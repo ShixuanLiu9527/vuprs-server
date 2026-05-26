@@ -1,5 +1,7 @@
 #include "beam_former_template.h"
 
+#define BEAM_FORMER_TEMPLATE_DEBUG_PRINT false
+
 vuprs::WidebandBeamformerTemplate::WidebandBeamformerTemplate()
 {
     this->threadPool = std::make_unique<vuprs::ThreadPool>(std::thread::hardware_concurrency());
@@ -367,6 +369,10 @@ bool vuprs::WidebandBeamformerTemplate::ScanForPositionPower(
 
     std::mutex mut_total;  /* Mutex for totalPower */
     std::vector<std::future<void>> futures;
+
+#if BEAM_FORMER_TEMPLATE_DEBUG_PRINT
+    std::cout << "[ScanForPositionPower] Start scanning for position power. Scan points: " << k << ", Frequency points: " << f_count << ", Element counts: " << M << std::endl;
+#endif
 
     for (int i = 0; i < f_count; i++)
     {

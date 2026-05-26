@@ -246,7 +246,7 @@ data tailer: [TAILER]
 {
     "cmd": "change_algorithm_parameters",
     "params": {
-        "fs": "40000.0",
+        "fs": "40000.0"
     }
 }
 [TAILER]
@@ -295,7 +295,7 @@ data tailer: [TAILER]
     "cmd": "power_scan",
     "params": {
         "points": "70",
-        "min_alt": "15.0"
+        "alt_min": "15.0"
     }
 }
 [TAILER]

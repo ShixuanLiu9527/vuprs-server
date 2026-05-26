@@ -239,7 +239,7 @@ std::string vuprs::PROTOCOL_MakeServerResultDataResponse(const std::string &info
 	response["response_cmd"] = SERVER_CMD__GET_NEW_DATA__STR;
 	response["operation_status"] = operationStatus ? "done" : "failed";
 	response["info"] = info;
-	response["params"]["data_format"] = "uint16_t";
+	response["params"]["data_format"] = "uint32_t";
 	return response.dump();
 }
 

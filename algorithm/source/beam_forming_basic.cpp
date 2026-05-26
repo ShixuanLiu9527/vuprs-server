@@ -414,7 +414,7 @@ Eigen::Matrix<Eigen::dcomplex, -1, -1> vuprs::BeamFormingScanArray::GetImagTimed
 
     int k = alt.size();
     int M = this->elementArray.size();
-    Eigen::Matrix<Eigen::dcomplex, -1, -1> res;
+    Eigen::Matrix<Eigen::dcomplex, -1, -1> res(M, k);
     std::complex<double> j(0, 1);
     Eigen::Matrix<double, 3, 1> pointingVector;
     Eigen::Matrix<double, -1, -1> elementPositionMatrix(M, 3);
