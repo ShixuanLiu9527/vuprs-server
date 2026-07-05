@@ -405,3 +405,9 @@ void vuprs::FibonacciGrid(int nInHalf, std::vector<double> *alt, std::vector<dou
         az->push_back(_az);
     }
 }
+
+double vuprs::ConditionNumber(const Eigen::Matrix<Eigen::dcomplex, -1, -1> &R)
+{
+    Eigen::JacobiSVD<Eigen::Matrix<Eigen::dcomplex, -1, -1>> svd(R);
+    return svd.singularValues()(0) / svd.singularValues()(svd.singularValues().size() - 1);
+}

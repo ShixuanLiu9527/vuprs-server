@@ -13,6 +13,8 @@
 
 #include "fftw3.h"  /* Use FFTW for processing */
 
+#define PI 3.14159265358979323846
+
 namespace vuprs
 {
     class FFTWManagerComplex
@@ -25,6 +27,7 @@ namespace vuprs
             std::atomic<uint64_t> fft_points;  /* data size = N */
             fftw_complex *fft_input, *fft_output;  /* input & output memory */
             fftw_plan fft_plan;  /* FFT plan */
+            fftw_plan ifft_plan;  /* IFFT plan */
 
             void SetDFTDirection(bool forward = true);
 
@@ -259,6 +262,30 @@ namespace vuprs
         }
         return signal.cwiseProduct(vuprs::GetWindow(type, signal.rows()));
     }
+
+    template<typename T>
+    void ifftshift(std::vector<T> *vec)
+    {
+        if (vec == nullptr || vec->size() <= 1) return;
+        size_t N = vec->size();
+        size_t shift = N / 2;
+        std::rotate(vec->begin(), vec->begin() + shift, vec->end());
+    }
+
+    template<typename T>
+    void ifftshift(Eigen::Matrix<T, -1, 1> *vec)
+    {
+        if (vec == nullptr || vec->size() <= 1) return;
+        Eigen::Index N = vec->size();
+        Eigen::Index shift = N / 2;
+        Eigen::Matrix<T, -1, 1> temp(N);
+        temp.head(N - shift) = vec->tail(N - shift);
+        temp.tail(shift) = vec->head(shift);
+        *vec = temp;
+    }
+
+    void ApplyBandpassWindow(Eigen::Matrix<Eigen::dcomplex, -1, 1>* Hd, double f_low, double f_high, 
+                             double fs, int N, double trans_width = -1.0);
 }
 
 #endif

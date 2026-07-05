@@ -28,23 +28,24 @@ void vuprs::BeamFormingElement::AddWindowForSignal()
     /* Add window */
 
     vuprs::stdVector2eigenVector<Eigen::dcomplex>(this->elementSignalTimeDomain, &this->windowedSignal_eigen);
+    Eigen::dcomplex mean = this->windowedSignal_eigen.mean();  /* - average */
+    this->windowedSignal_eigen.array() -= mean;
     vuprs::AddWindow<Eigen::dcomplex>(&this->windowedSignal_eigen, vuprs::WindowType::SIG_WINDOW__HAMMING);
 }
 
 bool vuprs::BeamFormingElement::RunDFT()
 {
     this->AddWindowForSignal();
-
-    int currentSize = this->windowedSignal_eigen.rows();
-    if (currentSize == 0)
+    int N = this->windowedSignal_eigen.rows();
+    if (N == 0)
     {
         throw std::runtime_error("in [BeamFormingElement::PrepareForDFT] Failed to allocate FFTW memory (data size = 0).");
     }
 
-    this->fftManager.SetParameters(currentSize, true);
-    if (this->elementSignalFrequencyDomain_eigen.rows() != currentSize)
+    this->fftManager.SetParameters(N, true);
+    if (this->elementSignalFrequencyDomain_eigen.rows() != N)
     {
-        this->elementSignalFrequencyDomain_eigen.resize(currentSize, 1);
+        this->elementSignalFrequencyDomain_eigen.resize(N, 1);
     }
     this->fftManager.DoDFT(this->windowedSignal_eigen.data(), this->elementSignalFrequencyDomain_eigen.data());
     vuprs::CutTheFirstHalf(&this->elementSignalFrequencyDomain_eigen);
@@ -457,7 +458,7 @@ bool vuprs::BeamFormingScanArray::empty() const
 /* ------------------------------------------------ Tool functions ----------------------------------------------- */
 /* --------------------------------------------------------------------------------------------------------------- */
 
-bool vuprs::SaveToCSV(const std::vector<double> &data, const std::string filename)
+bool vuprs::SaveToCSV(const std::vector<double> &data, const std::string &filename)
 {
     if (data.empty())
     {
@@ -487,7 +488,41 @@ bool vuprs::SaveToCSV(const std::vector<double> &data, const std::string filenam
     return true;
 }
 
-bool vuprs::SaveToCSV_complex(const std::vector<std::complex<double>> &data, const std::string filename)
+bool vuprs::SaveToCSV(const std::vector<std::vector<double>>& data, const std::string& filename)
+{
+    if (data.empty()) return true;
+
+    size_t rowCount = data[0].size();
+    for (size_t i = 1; i < data.size(); ++i) 
+    {
+        if (data[i].size() != rowCount) return false;
+    }
+
+    std::string dir;
+    vuprs::SplitFile(filename, &dir, nullptr, nullptr);
+    if (!dir.empty() && !vuprs::PathExist(dir)) 
+    {
+        vuprs::MakeDir(dir);
+    }
+
+    std::ofstream file(filename);
+    if (!file.is_open()) return false;
+
+    for (size_t r = 0; r < rowCount; ++r) 
+    {
+        for (size_t c = 0; c < data.size(); ++c) 
+        {
+            file << data[c][r];
+            if (c + 1 < data.size()) file << ",";
+        }
+        file << "\n";
+    }
+
+    file.close();
+    return true;
+}
+
+bool vuprs::SaveToCSV_complex(const std::vector<std::complex<double>> &data, const std::string &filename)
 {
     if (data.empty())
     {
@@ -519,14 +554,14 @@ bool vuprs::SaveToCSV_complex(const std::vector<std::complex<double>> &data, con
     return true;
 }
 
-bool vuprs::SaveToCSV(const Eigen::Matrix<double, -1, 1> &data, const std::string filename)
+bool vuprs::SaveToCSV(const Eigen::Matrix<double, -1, 1> &data, const std::string &filename)
 {
     std::vector<double> _data;
     vuprs::eigenVector2stdVector<double>(data, &_data);
     vuprs::SaveToCSV(_data, filename);
 }
 
-bool vuprs::SaveToCSV_complex(const Eigen::Matrix<Eigen::dcomplex, -1, 1> &data, const std::string filename)
+bool vuprs::SaveToCSV_complex(const Eigen::Matrix<Eigen::dcomplex, -1, 1> &data, const std::string &filename)
 {
     std::vector<std::complex<double>> _data;
     vuprs::eigenVector2stdVector<std::complex<double>>(data, &_data);

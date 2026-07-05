@@ -8,7 +8,7 @@ void vuprs::CollaborationBeamformerConfig::SetDefault()
     this->bf_waveVelocity = 346.0;
     this->bf_freq__lower = 100.0;  /* lower boundary of beam former work frequency (unit: Hz) */
     this->bf_freq__upper = 5000.0;  /* upper boundary of beam former work frequency (unit: Hz) */
-    this->bf_cov_snapshotsWindowSize = 50;  /* Snapshots window size (to fit covariance matrix) */
+    this->bf_cov_snapshotsWindowSize = 200;  /* Snapshots window size (to fit covariance matrix) >= 200 */
     this->bf_cov_freqAverageIndex = 0.8;  /* frequency average index (to fit covariance matrix) */
     this->dma__bufferSize = 32768;  /* AXI DMA descriptor buffer size */
     this->dma__bufferCount = 20;  /* AXI DMA descriptor buffer count */

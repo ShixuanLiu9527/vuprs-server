@@ -5,11 +5,13 @@
 #include <cmath>
 #include <vector>
 #include <stdexcept>
+#include <iostream>
 
 /**
  * @note ADC data format: Q15
  * @note FIR Coefficients: Q31
  * @note Beam forming result: Q16.16
+ * @note FIR scale: Q16.16
  */
 
 namespace vuprs
@@ -119,7 +121,7 @@ namespace vuprs
         
         if (coefficientSize == 0)
         {
-            throw std::runtime_error("in [ScaledFIRCoefficient_DOUBLE_TO_Q31_UINT32] Input FIR coefficient is empty.");
+            throw std::runtime_error("in " + std::string(__func__) + " Input FIR coefficient is empty.");
         }
 
         output->resize(coefficientSize);
@@ -150,6 +152,20 @@ namespace vuprs
         for (uint64_t i = 0; i < coefficientSize; i++)
         {
             (*output)[i] = Q31__DOUBLE_TO_UINT32(input[i] / maxAbsCoef);
+        }
+    }
+
+    void inline FIRResult_Q16_TO_DOUBLE(const std::vector<uint32_t> &input, std::vector<double> *output)
+    {
+        uint64_t _size = input.size();
+        if (_size == 0)
+        {
+            throw std::runtime_error("in [FIRResult_Q16_TO_DOUBLE] Input FIR result is empty.");
+        }
+        output->resize(_size);
+        for (uint64_t i = 0; i < _size; i++)
+        {
+            (*output)[i] = Q16__UINT32_TO_DOUBLE(input[i]);
         }
     }
 }

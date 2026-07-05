@@ -65,90 +65,62 @@ bool vuprs::FIRCalculator::SolveCoeffUseExpectedFrequencyResponse(const Eigen::M
     {
         throw std::runtime_error("in [FIRCalculator::SolveCoeffUseExpectedFrequencyResponse] Config not complete.");
     }
-
     int M = response.rows();  /* M */
     int N_2_plus_1 = response.cols();  /* N/2+1 */
     int N = (N_2_plus_1 - 1) * 2;  /* N */
-    
-    if (N_2_plus_1 < this->firLength)
+    if (N < this->firLength)
     {
         throw std::runtime_error("in [FIRCalculator::SolveCoeffUseExpectedFrequencyResponse] Too little response for solving.");
     }
 
-    if (this->lastSignalPoints != N)
-    {
-        vuprs::Get_FIR_EXPMatrix(this->firLength, N, &this->matrixE, false);
-        this->lastSignalPoints = N;
-    }
-
-    Eigen::Matrix<double, -1, 1> W_vec;
-
-    W_vec.resize(N_2_plus_1, 1);   /* length = N / 2 + 1 */
-    W_vec.setOnes();
-    
-    W_vec *= 0.01;
-    
-    for (int i = 0; i < N_2_plus_1; i++)  /* for positive frequency */
-    {
-        double fk = fs * i / N;
-        if (fk >= this->freqRange_l && fk <= this->freqRange_u)
-        {
-            W_vec(i, 0) = 1.0;
-        }
-    }
-
-    vuprs::CompleteSymmetric(&W_vec);  /* Montage */
-
-    if (W_vec.rows() != N)
-    {
-        throw std::runtime_error("in [FIRCalculator::SolveCoeffUseExpectedFrequencyResponse] Internal error.");
-    }
-
-    Eigen::Matrix<Eigen::dcomplex, -1, -1> EH = this->matrixE.adjoint();  /* E.H */
-    Eigen::Matrix<Eigen::dcomplex, -1, -1> W_E = W_vec.asDiagonal() * this->matrixE;  /* W * E */
-    Eigen::Matrix<Eigen::dcomplex, -1, -1> EH_W_E = EH * W_E;  /* E.H * W * E */
-    Eigen::Matrix<Eigen::dcomplex, -1, -1> EH_W = EH * W_vec.asDiagonal();  /* E.H * W */
-    
     this->firCoefficient.resize(M);
+    for (auto &val: this->firCoefficient) val.resize(this->firLength);
 
-    for (auto &val: this->firCoefficient)
-    {
-        val.resize(this->firLength);
-    }
-
-    this->maxAbsCoefficient = 0;
+    this->maxAbsCoefficient = -10000.0;
     
     std::vector<std::future<void>> futures;
+    std::vector<vuprs::FFTWManagerComplex> fftManagers(M);
     futures.reserve(M);
-
+    for (auto &manager: fftManagers) manager.SetParameters(N, false);  /* set to: N & ifft */
     for (int i = 0; i < M; i++)
     {
-        futures.emplace_back(this->threadPool->enqueue([this, i, &response, &channelName, &EH_W, &EH_W_E](){
-
+        futures.emplace_back(this->threadPool->enqueue([&, i](){
             Eigen::Matrix<Eigen::dcomplex, -1, 1> Hd = response.row(i).transpose();
-            vuprs::CompleteConjugateSymmetric(&Hd);
-
-            Eigen::Matrix<Eigen::dcomplex, -1, 1> EH_W_Hd = EH_W * Hd;
-            Eigen::Matrix<Eigen::dcomplex, -1, 1> h = EH_W_E.ldlt().solve(EH_W_Hd);
-
-            Eigen::Matrix<double, -1, 1> h_real = h.real();
-
+            /* Remap: element FIR coef to channel FIR coef */
             int dstIndex = vuprs::FindValueInVec(vuprs::ADC_CHANNEL_ADDR_MAP, channelName[i]);
-            
-            vuprs::eigenVector2stdVector<double>(h_real, &this->firCoefficient[dstIndex]);
+            Eigen::Matrix<Eigen::dcomplex, -1, 1> h(N, 1);
+            std::vector<double> h_real_vec;
+            /* add filter */
+            vuprs::ApplyBandpassWindow(&Hd, this->freqRange_l, this->freqRange_u, fs, N);
+            /* N/2+1 to N */
+            vuprs::CompleteConjugateSymmetric(&Hd);
+            /* IFFT */
+            fftManagers[i].DoDFT(Hd.data(), h.data());
+            h /= (double)N;
+            /* Get Real */
+            Eigen::Matrix<double, -1, 1> h_real = h.real();
+            /* IFFT shift */
+            vuprs::ifftshift(&h_real);
+            /* resize to L */
+            Eigen::Index start = (N - this->firLength) / 2;
+            Eigen::Matrix<double, -1, 1> h_cut = h_real.segment(start, this->firLength);
+            /* Add window */
+            vuprs::AddWindow<double>(&h_cut, vuprs::WindowType::SIG_WINDOW__HANN);
+            /* convert to std::vector */
+            vuprs::eigenVector2stdVector<double>(h_cut, &h_real_vec);
+            /* reverse FIR coef */
+            std::reverse(h_real_vec.begin(), h_real_vec.end());
 
+            /* dump */
             double channelMaxCoefficient = h_real.array().abs().maxCoeff();
             {
                 std::unique_lock<std::mutex> lock(this->mtx);  /* LOCK */
-                if (channelMaxCoefficient > this->maxAbsCoefficient)
-                {
-                    this->maxAbsCoefficient = channelMaxCoefficient;
-                }
+                this->maxAbsCoefficient = std::max(channelMaxCoefficient, this->maxAbsCoefficient);
+                this->firCoefficient[dstIndex] = h_real_vec;
             }
         }));
     }
     for (auto &f : futures) f.get();
-
     return true;
 }
 

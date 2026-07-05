@@ -27,7 +27,6 @@ data tailer: "[TAILER]"
 | :--- | :--- | :--- | :--- |
 | Change beamformer | 修改波束形成算法 | {"cmd":"change_beam_former","params":{"beamformer":"mvdr"}} | {"response_cmd":"change_beam_former","operation_status":"done"} |
 
-
 ### 2.3 波束指向指令
 | Command | description | client to server | server response |
 | :--- | :--- | :--- | :--- |
@@ -39,9 +38,9 @@ data tailer: "[TAILER]"
 ### 2.4 波束形成器使能控制指令
 | Command | description | client to server | server response |
 | :--- | :--- | :--- | :--- |
-| Start | 开启波束形成器 | {"cmd":"start","params":{}} | {"response_cmd":"start","operation_status":"done"} |
-| Stop | 关闭波束形成器 | {"cmd":"stop","params":{}} | {"response_cmd":"stop","operation_status":"done"} |
-| Reset | 用于重启波束形成器 | {"cmd":"reset","params":{}} | {"response_cmd":"reset","operation_status":"done"} |
+| Start beamformer | 开启波束形成器 | {"cmd":"start_beamformer","params":{}} | {"response_cmd":"start_beamformer","operation_status":"done"} |
+| Stop beamformer | 关闭波束形成器 | {"cmd":"stop_beamformer","params":{}} | {"response_cmd":"stop","operation_status":"done"} |
+| Restart beamformer | 重启波束形成器 | {"cmd":"restart_beamformer","params":{}} | {"response_cmd":"restart_beamformer","operation_status":"done"} |
 
 ### 2.5 算法参数控制指令
 | Command | description | client to server | server response |
@@ -69,7 +68,8 @@ data tailer: "[TAILER]"
 ### 2.7 获取空间能量扫描数据
 | Command | description | client to server | server response |
 | :--- | :--- | :--- | :--- |
-| Power Scan | 开启扫描/获取空间能量扫描结果 | {"cmd":"power_scan","params":{"points":"70","alt_min":"15.0"}} | `response 1st`: {"response_cmd":"power_scan","operation_status":"done","params":{"points":"70","alt_min":"15.0","max_power":"12.04046","min_power": "-15.00231","data_format":"uint16_t"}}<br>`response 2nd`: binary data |
+| Scan control | 开启/关闭空间能量扫描 | {"cmd":"scan_control","params":{"status":"on"}} | {"response_cmd":"scan_control","operation_status":"done", "params": {"status": "on"}} |
+| Get scan data | 获取空间能量扫描结果 | {"cmd":"power_scan","params":{"points":"70","alt_min":"15.0"}} | `response 1st`: {"response_cmd":"power_scan","operation_status":"done","params":{"points":"70","alt_min":"15.0","max_power":"12.04046","min_power": "-15.00231","data_format":"uint16_t"}}<br>`response 2nd`: binary data |
 
 *Note 1: "alt_min" 代表扫描的最低高度角.*  
 *Note 2: "points" 代表半球上斐波那契点的一半, 客户端和服务端必须使用相同的扫描点生成函数, 否则数据无法对齐.*  

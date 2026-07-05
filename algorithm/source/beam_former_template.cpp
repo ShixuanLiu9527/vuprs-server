@@ -139,15 +139,12 @@ void vuprs::WidebandBeamformerTemplate::UpdateCovarianceMatrix()
         throw std::runtime_error("in [WidebandBeamformerTemplate::UpdateCovarianceMatrix] Data points in snapshot != latest");
     }
 
-    Eigen::Matrix<Eigen::dcomplex, -1, 1> snapshotFreqSignal;
-    Eigen::Matrix<Eigen::dcomplex, -1, -1> snapshotCovMatrix;
-
     /* Update mean covariance matrix */
 
     for (int i = 0; i < dataPoints; i++)
     {
-        snapshotFreqSignal = this->snap_signalMatrix_freqDomain.col(i);
-        snapshotCovMatrix = snapshotFreqSignal * snapshotFreqSignal.adjoint();
+        Eigen::Matrix<Eigen::dcomplex, -1, 1> snapshotFreqSignal = this->snap_signalMatrix_freqDomain.col(i);  /* each col of Snapshot Signal Matrix */
+        Eigen::Matrix<Eigen::dcomplex, -1, -1> snapshotCovMatrix = snapshotFreqSignal * snapshotFreqSignal.adjoint();  /* cov matrix for each frequency band */
         if (this->firstSnapshot)
         {
             this->mean_covMatrix[i] = snapshotCovMatrix;
@@ -160,17 +157,18 @@ void vuprs::WidebandBeamformerTemplate::UpdateCovarianceMatrix()
     }
 
     /* Update estimate covariance matrix */
-
-    this->estimate_covMatrix[0] = this->mean_covMatrix[0];
-
-    for (int i = 1; i < dataPoints - 1; i++)
+    
+    for (int i = 0; i < dataPoints; i++)
     {
+        if (i <= 1 || i == dataPoints - 1)
+        {
+            this->estimate_covMatrix[i] = this->mean_covMatrix[i];
+            continue;
+        }
         this->estimate_covMatrix[i] = this->ADJACENT_FREQ_AVERAGE_INDEX_1 * this->mean_covMatrix[i - 1] + \
                                       this->ADJACENT_FREQ_AVERAGE_INDEX * this->mean_covMatrix[i] + \
                                       this->ADJACENT_FREQ_AVERAGE_INDEX_1 * this->mean_covMatrix[i + 1];
     }
-
-    this->estimate_covMatrix[dataPoints - 1] = this->mean_covMatrix[dataPoints - 1];
 
     this->is_covMatrixEmpty = false;
     this->firstSnapshot = false;
@@ -219,33 +217,25 @@ void vuprs::WidebandBeamformerTemplate::GetFIRExpectedFrequencyResponse(Eigen::M
     {
         throw std::runtime_error("in [WidebandBeamformerTemplate::GetFIRExpectedFrequencyResponse] No signal input.");
     }
-    
     if (!considerPredelay)
     {
         *dst = this->resultWeightVectors;
         return;
     }
-
-    uint64_t arraySize = this->array.elementArray.size();
-    Eigen::Matrix<Eigen::dcomplex, 1, -1> j_2_pi_fk = this->signalFrequencyList_complex.transpose() * 2.0 * PI;
-    Eigen::Matrix<Eigen::dcomplex, 1, -1> exp_j_2_pi_fk_Tm;  /* exp(j * 2 * pi * fk * Tm) */
-    double Tm;
-
-    dst->resize(this->resultWeightVectors.rows(), this->resultWeightVectors.cols());
+    uint64_t M = this->array.elementArray.size();
+    /* [T1, T2, ..., TM] */
+    Eigen::Map<const Eigen::VectorXd> Tm_vec(this->elementPredelayTime.data(), M);
+    /* [ exp(j*2*pi*fk*Tm) ] */
+    Eigen::Matrix<Eigen::dcomplex, -1, -1> exp_arg = (Tm_vec * this->signalFrequencyList_complex.transpose() * 2.0 * PI).array().exp();
+    /* w*(fk) x exp(j*2*pi*fk*Tm) */
+    *dst = this->resultWeightVectors.array().conjugate() * exp_arg.array();
     *channelName = this->elementChannelName;
-    
-    for (uint64_t i = 0; i < arraySize; i++)
+    /* set 0 & nyquist to real */
+    int nyquist_idx = dst->cols() - 1; 
+    for (int m = 0; m < dst->rows(); m++)
     {
-        Tm = this->elementPredelayTime[i];
-
-        /* exp(j2*pi*fk*Tm) */
-
-        exp_j_2_pi_fk_Tm = j_2_pi_fk * Tm;
-        exp_j_2_pi_fk_Tm = exp_j_2_pi_fk_Tm.array().exp().matrix();
-        
-        /* Hd(fk) = conj(w(fk)) * exp(j*2*pi*fk*Tm), k = 0, 1, ..., N/2 + 1 */
-
-        dst->row(i) = this->resultWeightVectors.row(i).array().conjugate() * exp_j_2_pi_fk_Tm.array();
+        (*dst)(m, 0) = (*dst)(m, 0).real();
+        (*dst)(m, nyquist_idx) = (*dst)(m, nyquist_idx).real();
     }
 }
 
@@ -266,44 +256,26 @@ void vuprs::WidebandBeamformerTemplate::UpdateElementPredelay_externalFS(
 
     /* Calculate predelay */
 
-    uint64_t arraySize = this->array.elementArray.size();
+    uint64_t M = this->array.elementArray.size();
     double Ts = 1.0 / fs;
+    int minPredelayCount = INT_MAX;
 
-    for (uint64_t i = 0; i < arraySize; i++)
+    for (uint64_t i = 0; i < M; i++)
     {
-        if (includeFIRGroupDelay)
-        {
-            this->elementPredelayCount[i] = -std::round(
-                this->array.elementArray[i].timeDelay / Ts + (firLength - 1.0) / 2.0
-            );
-        }
-        else
-        {
-            this->elementPredelayCount[i] = -std::round(this->array.elementArray[i].timeDelay / Ts);
-        }
+        this->elementPredelayCount[i] = includeFIRGroupDelay? \
+            -std::round(this->array.elementArray[i].timeDelay / Ts + (firLength - 1.0) / 2.0): \
+            -std::round(this->array.elementArray[i].timeDelay / Ts);
+        minPredelayCount = std::min(this->elementPredelayCount[i], minPredelayCount);
+    }
+    for (uint64_t i = 0; i < M; i++)
+    {
+        this->elementPredelayCount[i] -= minPredelayCount;
         this->elementPredelayTime[i] = this->elementPredelayCount[i] * Ts;
     }
 
     *elementPredelayTime = this->elementPredelayTime;
     *elementPredelayCount = this->elementPredelayCount;
     *channelName = this->elementChannelName;
-
-    int minPredelay = (*elementPredelayCount)[0];
-
-    /* find min predelay count */
-
-    for (uint64_t i = 0; i < arraySize; i++)
-    {
-        if ((*elementPredelayCount)[i] < minPredelay)
-        {
-            minPredelay = (*elementPredelayCount)[i];
-        }
-    }
-    for (uint64_t i = 0; i < arraySize; i++)
-    {
-        (*elementPredelayCount)[i] -= minPredelay;
-        (*elementPredelayTime)[i] = (*elementPredelayCount)[i] * Ts;
-    }
 }
 
 void vuprs::WidebandBeamformerTemplate::UpdateAndGetElementPredelay(
@@ -457,20 +429,20 @@ void vuprs::WidebandBeamformerTemplate::CalculateBeamforming()
         throw std::runtime_error("in [WidebandBeamformerTemplate::CalculateBeamforming] Cannot calculate beam forming at that time.");
     }
 
-    int numFreqs = this->estimate_covMatrix.size();
+    int numFreqs = this->estimate_covMatrix.size();  /* = N / 2 + 1 */
     if (numFreqs == 0) return;
-    
-    int numElements = this->array.elementArray.size();
-    this->resultWeightVectors.resize(numElements, numFreqs);
-    
+    int M = this->array.elementArray.size();
     std::vector<std::future<void>> futures;
+
+    this->resultWeightVectors.resize(M, numFreqs);
     futures.reserve(numFreqs);
-    
     for (int i = 0; i < numFreqs; i++)
     {
-        if (i == 0 || i == numFreqs - 1)  /* X(0) & X(N/2) */
+        if (i == 0 || i == numFreqs - 1)  /* for DC & Nyquist frequency */
         {
-            this->resultWeightVectors.col(i) *= 0;
+            Eigen::Matrix<Eigen::dcomplex, -1, 1> ps = this->steeringVectors.col(i);  /* ps */
+            this->resultWeightVectors.col(i) = ps / M;
+            this->resultWeightVectors.col(i).imag().setZero();
             continue;
         }
         futures.emplace_back(this->threadPool->enqueue(

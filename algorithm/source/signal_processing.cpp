@@ -491,3 +491,44 @@ Eigen::Matrix<double, -1, 1> vuprs::GetWindow(vuprs::WindowType type, int signal
     }
     return w;
 }
+
+void vuprs::ApplyBandpassWindow(Eigen::Matrix<Eigen::dcomplex, -1, 1>* Hd, double f_low, double f_high, 
+                                double fs, int N, double trans_width) 
+{
+    int K = Hd->rows();
+    if (K <= 1) return;
+    double df = fs / (double)N;
+    if (trans_width < 0) trans_width = 10.0 * df;
+    if (f_low - trans_width < 0) trans_width = f_low;
+    if (f_high + trans_width > fs / 2.0) trans_width = fs / 2.0 - f_high;
+    if (trans_width < 1e-12) trans_width = 1e-12;
+    for (int k = 1; k < K; ++k) 
+    {
+        double f = k * df;
+        double gain = 0.0;
+        if (f < (f_low - trans_width))
+        {
+            gain = 0.0;
+        }
+        else if (f < f_low)
+        {
+            double t = (f - (f_low - trans_width)) / trans_width;
+            gain = 0.5 * (1.0 - std::cos(PI * t));
+        } 
+        else if (f <= f_high) 
+        {
+            gain = 1.0;
+        } 
+        else if (f <= (f_high + trans_width))
+        {
+            double t = (f - f_high) / trans_width;
+            gain = 0.5 * (1.0 + std::cos(PI * t));
+        } 
+        else
+        {
+            gain = 0.0;
+        }
+        (*Hd)(k) *= gain;
+    }
+    if (K > 0) (*Hd)(K - 1).imag(0.0);
+}

@@ -14,8 +14,6 @@
 
 #include "signal_processing.h"
 
-#define PI 3.14159265358979323846
-
 namespace vuprs
 {
     struct IterationConfig
@@ -258,6 +256,8 @@ namespace vuprs
 
      */
     void FibonacciGrid(int nInHalf, std::vector<double> *alt, std::vector<double> *az, double alt_min);
+
+    double ConditionNumber(const Eigen::Matrix<Eigen::dcomplex, -1, -1> &R);
 }
 
 #endif

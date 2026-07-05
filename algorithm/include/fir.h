@@ -50,7 +50,7 @@ namespace vuprs
              * 
              * @note Target response size = M x (N/2+1), M = element size & FIR banks, N = signal points.
              * 
-             * @param response target response.
+             * @param response target response (N/2+1).
              * @param channelName corresponding channel name for [response].
              * @param fs sampling frequency.
              * 

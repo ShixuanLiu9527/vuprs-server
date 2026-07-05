@@ -4,6 +4,8 @@
 #define ARM_FPGA_BF_COLLAB_CPP__DEBUG_SAVE false  /* save data @ debug mode */
 
 #define CIRCULAR_BUFFER_DEBUG_FILENAME "../signals/signal.csv"
+#define FIR_RESULT_DEBUG_FILENAME "../signals/bf_result.csv"
+#define FIR_COEF_DEBUG_FILENAME "../signals/fir_coef.csv"
 
 vuprs::CollaborationBeamformer::CollaborationBeamformer()
 {
@@ -503,6 +505,7 @@ void vuprs::CollaborationBeamformer::THREAD__ReadResult()
     std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> _refDescriptors;
     vuprs::AlignedBufferDMA buffer;
     std::vector<uint32_t> result;
+    std::vector<double> result_d;
     bool hasInterrupt;
 
     {
@@ -545,6 +548,10 @@ void vuprs::CollaborationBeamformer::THREAD__ReadResult()
                 /* Convert buffer to vector */
 
                 result = buffer.to_vector<uint32_t>();
+            #if ARM_FPGA_BF_COLLAB_CPP__DEBUG_SAVE
+                vuprs::FIRResult_Q16_TO_DOUBLE(result, &result_d);
+                vuprs::SaveToCSV(result_d, FIR_RESULT_DEBUG_FILENAME);
+            #endif
 
                 /* Push data to queue */
 
@@ -643,7 +650,7 @@ void vuprs::CollaborationBeamformer::THREAD__AlgorithmCalculation()
     bool hasInterrupt, fpgaOperationStatus;
     vuprs::SignalData signal;
     Eigen::Matrix<Eigen::dcomplex, -1, -1> firExpectedFrequencyResponse;  /* Expected frequency response of FIR filter bank */
-    std::vector<std::vector<double>> firCoefficients;  /* Coefficient of FIR filter bank */
+    std::vector<std::vector<double>> firCoefficients;  /* Coefficient of FIR filter bank, [channel][point] */
     std::vector<std::string> channelName;  /* Channel name */
 
     while(this->system_run)
@@ -709,8 +716,10 @@ void vuprs::CollaborationBeamformer::THREAD__AlgorithmCalculation()
 
         try
         {
+            #if ARM_FPGA_BF_COLLAB_CPP__DEBUG_SAVE
+                vuprs::SaveToCSV(firCoefficients, FIR_COEF_DEBUG_FILENAME);
+            #endif
             fpgaOperationStatus &= vuprs::FPGA_API__FIR__SetCoefficients(&this->controller, &firCoefficients, this->fir.MaxAbsoluteFIRCoefficient());
-
             #if ARM_FPGA_BF_COLLAB_CPP__DEBUG_PRINT
                 printf("[debug] max FIR coefficient = %.8f\n", this->fir.MaxAbsoluteFIRCoefficient());
             #endif
