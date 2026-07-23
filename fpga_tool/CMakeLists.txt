@@ -23,13 +23,13 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${PROJECT_ROOT}/3rdparty/
     ${PROJECT_ROOT}/3rdparty/eigen
-    ${PROJECT_ROOT}/fpga/include
-    ${PROJECT_ROOT}/system_tools/include
+    ${PROJECT_ROOT}/fpga
+    ${PROJECT_ROOT}/system_tools
 )
 
 file(GLOB_RECURSE FPGA_TOOL_SRC "${CMAKE_CURRENT_SOURCE_DIR}/source/*.cpp")
-file(GLOB_RECURSE FPGA_SRC "${PROJECT_ROOT}/fpga/source/*.cpp")
-file(GLOB_RECURSE SYS_TOOL_SRC "${PROJECT_ROOT}/system_tools/source/*.cpp")
+file(GLOB_RECURSE FPGA_SRC "${PROJECT_ROOT}/fpga/*.cpp")
+file(GLOB_RECURSE SYS_TOOL_SRC "${PROJECT_ROOT}/system_tools/*.cpp")
 
 message(STATUS "FPGA_TOOL_SRC: ${FPGA_TOOL_SRC}")
 message(STATUS "FPGA_SRC: ${FPGA_SRC}")
