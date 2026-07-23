@@ -22,39 +22,39 @@ XDMA_OUTPUT_DIR="${SCRIPT_DIR}/build/xdma"
 build_xdma()
 {
     echo ""
-    echo "${BLUE}XDMA driver setting:${NC}"
-    echo "  ARCH: ${GREEN}${XDMA__ARCH}${NC}"
-    echo "  CROSS_COMPILE: ${GREEN}${XDMA__CROSS_COMPILE}${NC}"
-    echo "  Kernel dir: ${GREEN}${XDMA__KERNEL_DIR}${NC}"
+    echo -e "${BLUE}XDMA driver setting:${NC}"
+    echo -e "  ARCH: ${GREEN}${XDMA__ARCH}${NC}"
+    echo -e "  CROSS_COMPILE: ${GREEN}${XDMA__CROSS_COMPILE}${NC}"
+    echo -e "  Kernel dir: ${GREEN}${XDMA__KERNEL_DIR}${NC}"
     echo ""
 
-    echo "${BLUE}Build XDMA Driver...${NC}"
+    echo -e "${BLUE}Build XDMA Driver...${NC}"
     cd "${XDMA_SOURCE_DIR}" || exit 1
-    echo "${BLUE}Make all...${NC}"
+    echo -e "${BLUE}Make all...${NC}"
     make all ARCH="${XDMA__ARCH}" CROSS_COMPILE="${XDMA__CROSS_COMPILE}" BUILDSYSTEM_DIR="${XDMA__KERNEL_DIR}"
 
     if [ ! -f "${XDMA_SOURCE_DIR}/xdma.ko" ]; then
-        echo "${RED}file not found: ${file}${NC}"
-        echo "${RED}Build XDMA Driver FAILED${NC}"
+        echo -e "${RED}file not found: ${file}${NC}"
+        echo -e "${RED}Build XDMA Driver FAILED${NC}"
         exit 1
     fi
 
     cp "${XDMA_SOURCE_DIR}/xdma.ko" "${XDMA_OUTPUT_DIR}/xdma.ko" 2>/dev/null || echo "xdma.ko not found"
-    echo "${GREEN}Build XDMA Driver DONE${NC}"
+    echo -e "${GREEN}Build XDMA Driver DONE${NC}"
 }
 
 build_server()
 {
-    echo "${BLUE}Build Server & Tool...${NC}"
+    echo -e "${BLUE}Build Server & Tool...${NC}"
     cd "${BUILD_OUTPUT}" || exit 1
     cmake .. -DCMAKE_TOOLCHAIN_FILE=../rk3568_toolchain.cmake
     make
-    echo "${GREEN}Build Server & Tool DONE${NC}"
+    echo -e "${GREEN}Build Server & Tool DONE${NC}"
 }
 
 clean_xdma()
 {
-    echo "${BLUE}Cleaning...${NC}"
+    echo -e "${BLUE}Cleaning...${NC}"
     cd "${XDMA_SOURCE_DIR}" || exit 1
     make clean ARCH="${XDMA__ARCH}" CROSS_COMPILE="${XDMA__CROSS_COMPILE}" BUILDSYSTEM_DIR="${XDMA__KERNEL_DIR}"
 }
@@ -86,33 +86,33 @@ case "$1" in
     all)
         build_xdma
         build_server
-        echo "${GREEN}You can find the output in ./build${NC}"
+        echo -e "${GREEN}You can find the output in ./build${NC}"
         ;;
     
     xdma)
         build_xdma
-        echo "${GREEN}You can find the output in ./build${NC}"
+        echo -e "${GREEN}You can find the output in ./build${NC}"
         ;;
     
     server)
         build_server
-        echo "${GREEN}You can find the output in ./build${NC}"
+        echo -e "${GREEN}You can find the output in ./build${NC}"
         ;;
     
     clean-all)
         clean_xdma
         clean_server
-        echo "${GREEN}Clean DONE${NC}"
+        echo -e "${GREEN}Clean DONE${NC}"
         ;;
 
     clean-xdma)
         clean_xdma
-        echo "${GREEN}Clean DONE${NC}"
+        echo -e "${GREEN}Clean DONE${NC}"
         ;;
 
     clean-server)
         clean_server
-        echo "${GREEN}Clean DONE${NC}"
+        echo -e "${GREEN}Clean DONE${NC}"
         ;;
     
     *)

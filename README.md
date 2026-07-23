@@ -49,6 +49,7 @@ XDMA__KERNEL_DIR="/home/lsx/source/linux/rk356x_linux/kernel"
 
 在项目根目录运行 `build.sh` 脚本:  
 ```bash
+sudo source ./env.sh
 sudo sh ./build.sh all  # 编译全部 (XDMA 驱动, Server 和 FPGA-Tool)
 ```
 其他使用方法请查看 `build.sh` 的帮助信息:  

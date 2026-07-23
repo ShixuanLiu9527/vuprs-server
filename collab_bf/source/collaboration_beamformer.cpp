@@ -3,9 +3,9 @@
 #define ARM_FPGA_BF_COLLAB_CPP__DEBUG_PRINT false  /* print something @ debug mode */
 #define ARM_FPGA_BF_COLLAB_CPP__DEBUG_SAVE false  /* save data @ debug mode */
 
-#define CIRCULAR_BUFFER_DEBUG_FILENAME "../signals/signal.csv"
-#define FIR_RESULT_DEBUG_FILENAME "../signals/bf_result.csv"
-#define FIR_COEF_DEBUG_FILENAME "../signals/fir_coef.csv"
+#define CIRCULAR_BUFFER_DEBUG_FILENAME "./signals/signal.csv"
+#define FIR_RESULT_DEBUG_FILENAME "./signals/bf_result.csv"
+#define FIR_COEF_DEBUG_FILENAME "./signals/fir_coef.csv"
 
 vuprs::CollaborationBeamformer::CollaborationBeamformer()
 {

@@ -438,7 +438,12 @@ void vuprs::WidebandBeamformerTemplate::CalculateBeamforming()
     futures.reserve(numFreqs);
     for (int i = 0; i < numFreqs; i++)
     {
-        if (i == 0 || i == numFreqs - 1)  /* for DC & Nyquist frequency */
+        if (i == 0) 
+        {
+            this->resultWeightVectors.col(i) *= 0;
+            continue;
+        }
+        else if (i == numFreqs - 1)  /* for Nyquist frequency */
         {
             Eigen::Matrix<Eigen::dcomplex, -1, 1> ps = this->steeringVectors.col(i);  /* ps */
             this->resultWeightVectors.col(i) = ps / M;

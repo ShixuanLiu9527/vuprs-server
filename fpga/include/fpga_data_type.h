@@ -16,6 +16,7 @@
 
 namespace vuprs
 {
+    constexpr double FPGA_TYPE_EPS = 1e-18;
     constexpr double Q15_FIXED_SCALE_16BIT = 32768.0;  /* 2^15 */
     constexpr double Q31_FIXED_SCALE_32BIT = 2147483648.0;  /* 2^31 */
     constexpr double Q16_FIXED_SCALE_32BIT = 65536.0;  /* 2^16 */
@@ -65,10 +66,16 @@ namespace vuprs
      */
     uint32_t inline Q31__DOUBLE_TO_UINT32(double VAL)
     {
-        if (VAL >= FPGA_Q31_MAX) return 0x7FFFFFFF;
-        if (VAL <= FPGA_Q31_MIN) return 0x80000000;
-
-        return static_cast<uint32_t>(static_cast<int32_t>(std::round(VAL * vuprs::Q31_FIXED_SCALE_32BIT)));
+        if (!std::isfinite(VAL)) 
+        {
+            throw std::runtime_error("Q31 conversion: input is NaN or Inf");
+        }
+        if ((VAL + FPGA_TYPE_EPS) >= FPGA_Q31_MAX) return 0x7FFFFFFF;
+        if ((VAL - FPGA_TYPE_EPS) <= FPGA_Q31_MIN) return 0x80000000;
+        double _val = std::round(VAL * vuprs::Q31_FIXED_SCALE_32BIT);
+        if ((_val + FPGA_TYPE_EPS) >= 2147483647.0) return 0x7FFFFFFF;
+        if ((_val - FPGA_TYPE_EPS) <= -2147483648.0) return 0x80000000;
+        return static_cast<uint32_t>(static_cast<int32_t>(_val));
     }
 
     /**
@@ -90,10 +97,16 @@ namespace vuprs
      */
     uint32_t inline Q16__DOUBLE_TO_UINT32(double VAL)
     {
-        if (VAL >= FPGA_Q16_MAX) return 0x7FFFFFFF;
-        if (VAL <= FPGA_Q16_MIN) return 0x80000000;
-
-        return static_cast<uint32_t>(static_cast<int32_t>(std::round(VAL * vuprs::Q16_FIXED_SCALE_32BIT)));
+        if (!std::isfinite(VAL)) 
+        {
+            throw std::runtime_error("Q16 conversion: input is NaN or Inf");
+        }
+        if ((VAL + FPGA_TYPE_EPS) >= FPGA_Q16_MAX) return 0x7FFFFFFF;
+        if ((VAL - FPGA_TYPE_EPS) <= FPGA_Q16_MIN) return 0x80000000;
+        double _val = std::round(VAL * vuprs::Q16_FIXED_SCALE_32BIT);
+        if ((_val + FPGA_TYPE_EPS) >= 2147483647.0) return 0x7FFFFFFF;
+        if ((_val - FPGA_TYPE_EPS) <= -2147483648.0) return 0x80000000;
+        return static_cast<uint32_t>(static_cast<int32_t>(_val));
     }
 
     /**
@@ -118,12 +131,10 @@ namespace vuprs
     void inline ScaledFIRCoefficient_DOUBLE_TO_Q31_UINT32(const std::vector<double> &input_scaled, std::vector<uint32_t> *output)
     {
         uint64_t coefficientSize = input_scaled.size();
-        
         if (coefficientSize == 0)
         {
             throw std::runtime_error("in " + std::string(__func__) + " Input FIR coefficient is empty.");
         }
-
         output->resize(coefficientSize);
         for (uint64_t i = 0; i < coefficientSize; i++)
         {
@@ -143,12 +154,16 @@ namespace vuprs
     void inline FIRCoefficient_DOUBLE_TO_Q31_UINT32(const std::vector<double> &input, std::vector<uint32_t> *output, double maxAbsCoef)
     {
         uint64_t coefficientSize = input.size();
-
         if (coefficientSize == 0)
         {
             throw std::runtime_error("in [FIRCoefficient_DOUBLE_TO_Q31_UINT32] Input FIR coefficient is empty.");
         }
         output->resize(coefficientSize);
+        if (abs(maxAbsCoef - 0.0) < FPGA_TYPE_EPS) 
+        {
+            memset(output->data(), 0, coefficientSize * sizeof(uint32_t));
+            return;
+        }
         for (uint64_t i = 0; i < coefficientSize; i++)
         {
             (*output)[i] = Q31__DOUBLE_TO_UINT32(input[i] / maxAbsCoef);

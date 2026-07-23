@@ -76,8 +76,7 @@ bool vuprs::FIRCalculator::SolveCoeffUseExpectedFrequencyResponse(const Eigen::M
     this->firCoefficient.resize(M);
     for (auto &val: this->firCoefficient) val.resize(this->firLength);
 
-    this->maxAbsCoefficient = -10000.0;
-    
+    this->maxAbsCoefficient = 0.0;
     std::vector<std::future<void>> futures;
     std::vector<vuprs::FFTWManagerComplex> fftManagers(M);
     futures.reserve(M);
@@ -106,13 +105,14 @@ bool vuprs::FIRCalculator::SolveCoeffUseExpectedFrequencyResponse(const Eigen::M
             Eigen::Matrix<double, -1, 1> h_cut = h_real.segment(start, this->firLength);
             /* Add window */
             vuprs::AddWindow<double>(&h_cut, vuprs::WindowType::SIG_WINDOW__HANN);
+            h_cut.array() -= h_cut.mean();  /* Delete DC gain */
             /* convert to std::vector */
             vuprs::eigenVector2stdVector<double>(h_cut, &h_real_vec);
             /* reverse FIR coef */
             std::reverse(h_real_vec.begin(), h_real_vec.end());
 
             /* dump */
-            double channelMaxCoefficient = h_real.array().abs().maxCoeff();
+            double channelMaxCoefficient = h_cut.array().abs().maxCoeff();
             {
                 std::unique_lock<std::mutex> lock(this->mtx);  /* LOCK */
                 this->maxAbsCoefficient = std::max(channelMaxCoefficient, this->maxAbsCoefficient);

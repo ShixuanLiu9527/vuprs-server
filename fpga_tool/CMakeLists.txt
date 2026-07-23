@@ -21,6 +21,8 @@ include_directories(
     ${PROJECT_ROOT}
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${PROJECT_ROOT}/3rdparty/
+    ${PROJECT_ROOT}/3rdparty/eigen
     ${PROJECT_ROOT}/fpga/include
     ${PROJECT_ROOT}/system_tools/include
 )

@@ -479,6 +479,7 @@ bool vuprs::SaveToCSV(const std::vector<double> &data, const std::string &filena
         return false;
     }
     
+    file << std::fixed << std::setprecision(20);
     for (const auto &value : data)
     {
         file << value << "\n";
@@ -508,6 +509,7 @@ bool vuprs::SaveToCSV(const std::vector<std::vector<double>>& data, const std::s
     std::ofstream file(filename);
     if (!file.is_open()) return false;
 
+    file << std::fixed << std::setprecision(20);
     for (size_t r = 0; r < rowCount; ++r) 
     {
         for (size_t c = 0; c < data.size(); ++c) 
@@ -544,7 +546,7 @@ bool vuprs::SaveToCSV_complex(const std::vector<std::complex<double>> &data, con
     }
     
     file << "real,imag\n";
-    
+    file << std::fixed << std::setprecision(20);
     for (const auto &value : data)
     {
         file << value.real() << "," << value.imag() << "\n";

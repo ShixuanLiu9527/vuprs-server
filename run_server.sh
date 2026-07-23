@@ -16,7 +16,8 @@ NC='\033[0m'  # No Color
 
 XDMA_DRIVER_NAME="./xdma.ko"
 SERVER_NAME="./server"
-SHARED_LIB_DIR="./fftw3"
+FFTW_LIB_DIR="./fftw3"
+RKNPU2_LIB_DIR="./rknpu2"
 
 # Make sure only root user can use this script.
 
@@ -37,8 +38,8 @@ if [ ! -f "${SERVER_NAME}" ]; then
     exit 1
 fi
 
-if [ ! -d "${SHARED_LIB_DIR}" ]; then
-    echo -e "${RED}support shared dir: ${SHARED_LIB_DIR} not found.${NC}"
+if [ ! -d "${FFTW_LIB_DIR}" ]; then
+    echo -e "${RED}support shared dir: ${FFTW_LIB_DIR} not found.${NC}"
     exit 1
 fi
 
@@ -97,7 +98,8 @@ sleep 1
 
 # ----------------------- Change environment path --------------------------
 
-export LD_LIBRARY_PATH="${SHARED_LIB_DIR}":$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH="${FFTW_LIB_DIR}":$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH="${RKNPU2_LIB_DIR}":$LD_LIBRARY_PATH
 
 # ----------------------- Start server -------------------------------------
 

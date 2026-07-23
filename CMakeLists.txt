@@ -17,21 +17,24 @@ else()
     add_compile_options(-O3 -march=native)
 endif()
 
-add_subdirectory(eigen)
-add_subdirectory(fftw3)
+add_subdirectory(3rdparty/eigen)
+add_subdirectory(3rdparty/fftw3)
 add_subdirectory(fpga_tool)
 
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty
+    ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/nlohmann
+    ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/eigen
+    ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/fftw3
+    ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/fftw3/api
+    ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/rknpu2/librknn_api/include
     ${CMAKE_CURRENT_SOURCE_DIR}/fpga/include
     ${CMAKE_CURRENT_SOURCE_DIR}/server/include
     ${CMAKE_CURRENT_SOURCE_DIR}/logger/include
     ${CMAKE_CURRENT_SOURCE_DIR}/algorithm/include
     ${CMAKE_CURRENT_SOURCE_DIR}/collab_bf/include
     ${CMAKE_CURRENT_SOURCE_DIR}/system_tools/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/eigen
-    ${CMAKE_CURRENT_SOURCE_DIR}/fftw3
-    ${CMAKE_CURRENT_SOURCE_DIR}/fftw3/api
 )
 
 file(GLOB_RECURSE FPGA_SRC "${CMAKE_CURRENT_SOURCE_DIR}/fpga/source/*.cpp")
@@ -41,6 +44,11 @@ file(GLOB_RECURSE ALGORITHM_SRC "${CMAKE_CURRENT_SOURCE_DIR}/algorithm/source/*.
 file(GLOB_RECURSE SERVER_SRC "${CMAKE_CURRENT_SOURCE_DIR}/server/source/*.cpp")
 file(GLOB_RECURSE COLLAB_BF_SRC "${CMAKE_CURRENT_SOURCE_DIR}/collab_bf/source/*.cpp")
 
-add_executable(server main.cpp ${FPGA_SRC} ${SYS_TOOL_SRC} ${LOGGER_SRC} ${ALGORITHM_SRC} ${SERVER_SRC} ${COLLAB_BF_SRC})
-
-target_link_libraries(server PRIVATE Threads::Threads m fftw3)
+add_executable(server main.cpp 
+    ${FPGA_SRC} 
+    ${SYS_TOOL_SRC} 
+    ${LOGGER_SRC} 
+    ${ALGORITHM_SRC} 
+    ${SERVER_SRC} 
+    ${COLLAB_BF_SRC})
+target_link_libraries(server PRIVATE Threads::Threads m fftw3 rknnrt)
