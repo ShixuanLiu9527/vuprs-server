@@ -1,4 +1,5 @@
-#include "aligned_buffer.h"
+#include "system_tools/aligned_buffer.h"
+#include "logger/log_manager.h"
 
 /* --------------------------------------------------------------------------------------------------------------- */
 /* ---------------------------------------- Aligned Data Structure ----------------------------------------------- */
@@ -13,9 +14,9 @@ vuprs::AlignedBuffer::AlignedBuffer()
 
 bool vuprs::AlignedBuffer::malloc(uint64_t byteSize)
 {
-    void* _allocated;
-    
-    this->release();  /* free all */
+    void *_allocated;
+
+    this->release(); /* free all */
 
 #ifdef _WIN32
 
@@ -41,7 +42,7 @@ bool vuprs::AlignedBuffer::malloc(uint64_t byteSize)
         this->release();
         return false;
     }
-    else  /* Check aligned result */
+    else /* Check aligned result */
     {
         uintptr_t allocated_check = reinterpret_cast<uintptr_t>(_allocated);
         if (allocated_check % __DEFAULT_ALIGNMENT_BYTES__ != 0)
@@ -81,7 +82,7 @@ void vuprs::AlignedBuffer::set_capacity(const uint64_t &capacity)
     this->byteCapacity = capacity;
 }
 
-void vuprs::AlignedBuffer::set_allocated(void* allocated)
+void vuprs::AlignedBuffer::set_allocated(void *allocated)
 {
     this->allocated = allocated;
 }
@@ -95,7 +96,7 @@ void vuprs::AlignedBuffer::release()
         _aligned_free(this->allocated);
 
 #else
-        
+
         free(this->allocated);
 
 #endif
@@ -106,9 +107,9 @@ void vuprs::AlignedBuffer::release()
     this->allocated = nullptr;
 }
 
-uint64_t vuprs::AlignedBuffer::size() const 
-{ 
-    return this->byteSize; 
+uint64_t vuprs::AlignedBuffer::size() const
+{
+    return this->byteSize;
 }
 
 uint64_t vuprs::AlignedBuffer::capacity() const
@@ -116,14 +117,14 @@ uint64_t vuprs::AlignedBuffer::capacity() const
     return this->byteCapacity;
 }
 
-void* vuprs::AlignedBuffer::data() const 
-{ 
-    return this->allocated; 
+void *vuprs::AlignedBuffer::data() const
+{
+    return this->allocated;
 }
 
-bool vuprs::AlignedBuffer::is_allocated() const 
-{ 
-    return this->allocated != nullptr; 
+bool vuprs::AlignedBuffer::is_allocated() const
+{
+    return this->allocated != nullptr;
 }
 
 bool vuprs::AlignedBuffer::to_file(const std::string &fileName)
@@ -137,14 +138,11 @@ bool vuprs::AlignedBuffer::to_file(const std::string &fileName, const uint64_t &
     {
         return false;
     }
-    if (fileName.empty())
-    {
-        throw std::runtime_error("in [AlignedBuffer::to_file] Empty filename.");
-    }
+    PARAM_CHECK(!fileName.empty(), "system_tools", " in [AlignedBuffer::to_file] Empty filename.");
 
     int file_fd = -1;
     ssize_t currentWriteBytes = 0, seekPosition = -1;
-    
+
     uint64_t targetWriteBytes = (writeBytes == 0) ? this->byteSize : std::min(this->byteSize, writeBytes);
 
     /* Open file */
@@ -166,7 +164,7 @@ bool vuprs::AlignedBuffer::to_file(const std::string &fileName, const uint64_t &
 
     seekPosition = lseek(file_fd, fileOffset, SEEK_SET);
 
-    if (static_cast<uint64_t>(seekPosition) != fileOffset || seekPosition == (off_t) - 1 || seekPosition < 0)
+    if (static_cast<uint64_t>(seekPosition) != fileOffset || seekPosition == (off_t)-1 || seekPosition < 0)
     {
         close(file_fd);
         return false;
@@ -187,7 +185,7 @@ bool vuprs::AlignedBuffer::to_file(const std::string &fileName, const uint64_t &
 bool vuprs::AlignedBuffer::from_file(const std::string &fileName)
 {
     struct stat file_stat;
-    if (stat(fileName.c_str(), &file_stat) == -1) 
+    if (stat(fileName.c_str(), &file_stat) == -1)
     {
         return false;
     }
@@ -204,10 +202,7 @@ bool vuprs::AlignedBuffer::from_file(const std::string &fileName)
 
 bool vuprs::AlignedBuffer::from_file(const std::string &fileName, const uint64_t &fileOffset, uint64_t loadBytes)
 {
-    if (fileName.empty())
-    {
-        throw std::runtime_error("in [AlignedBuffer::from_file] Empty filename.");
-    }
+    PARAM_CHECK(!fileName.empty(), "system_tools", " in [AlignedBuffer::from_file] Empty filename.");
     if (loadBytes == 0)
     {
         return false;
@@ -218,7 +213,7 @@ bool vuprs::AlignedBuffer::from_file(const std::string &fileName, const uint64_t
 
     /* malloc */
 
-    if(!this->malloc(loadBytes))
+    if (!this->malloc(loadBytes))
     {
         this->release();
         return false;
@@ -241,7 +236,7 @@ bool vuprs::AlignedBuffer::from_file(const std::string &fileName, const uint64_t
 
     seekPosition = lseek(file_fd, fileOffset, SEEK_SET);
 
-    if (static_cast<uint64_t>(seekPosition) != fileOffset || seekPosition == (off_t) - 1 || seekPosition < 0)
+    if (static_cast<uint64_t>(seekPosition) != fileOffset || seekPosition == (off_t)-1 || seekPosition < 0)
     {
         close(file_fd);
         return false;
@@ -254,16 +249,16 @@ bool vuprs::AlignedBuffer::from_file(const std::string &fileName, const uint64_t
         close(file_fd);
         return false;
     }
-    
+
     close(file_fd);
     return true;
 }
 
 bool vuprs::AlignedBufferDMA::malloc(uint64_t byteSize)
 {
-    void* _allocated;
-    
-    this->release();  /* free all */
+    void *_allocated;
+
+    this->release(); /* free all */
 
 #ifdef _WIN32
 
@@ -289,7 +284,7 @@ bool vuprs::AlignedBufferDMA::malloc(uint64_t byteSize)
         this->release();
         return false;
     }
-    else  /* Check aligned result */
+    else /* Check aligned result */
     {
         uintptr_t allocated_check = reinterpret_cast<uintptr_t>(_allocated);
         if (allocated_check % __XDMA_DMA_ALIGNMENT_BYTES__ != 0)
@@ -308,9 +303,9 @@ bool vuprs::AlignedBufferDMA::malloc(uint64_t byteSize)
 
 bool vuprs::AlignedBufferServer::malloc(uint64_t byteSize)
 {
-    void* _allocated;
-    
-    this->release();  /* free all */
+    void *_allocated;
+
+    this->release(); /* free all */
 
 #ifdef _WIN32
 
@@ -336,7 +331,7 @@ bool vuprs::AlignedBufferServer::malloc(uint64_t byteSize)
         this->release();
         return false;
     }
-    else  /* Check aligned result */
+    else /* Check aligned result */
     {
         uintptr_t allocated_check = reinterpret_cast<uintptr_t>(_allocated);
         if (allocated_check % __SERVER_ALIGNMENT_BYTES__ != 0)

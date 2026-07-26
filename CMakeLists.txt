@@ -53,6 +53,6 @@ add_executable(server main.cpp
     ${ALGORITHM_SRC} 
     ${SERVER_SRC} 
     ${COLLAB_BF_SRC})
-target_include_directories(server PRIVATE 
+target_link_directories(server PRIVATE 
 ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/rknpu2/librknn_api/aarch64)
 target_link_libraries(server PRIVATE Threads::Threads m fftw3 rknnrt)

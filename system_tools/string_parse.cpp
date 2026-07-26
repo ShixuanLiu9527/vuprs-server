@@ -1,4 +1,5 @@
-#include "string_parse.h"
+#include "system_tools/string_parse.h"
+#include "logger/log_manager.h"
 
 uint64_t vuprs::ParseHexFromString(const std::string &dataString, bool *status)
 {
@@ -13,7 +14,7 @@ uint64_t vuprs::ParseHexFromString(const std::string &dataString, bool *status)
     {
         return 0;
     }
-    
+
     std::transform(hexString.begin(), hexString.end(), hexString.begin(), ::toupper);
 
     try
@@ -42,8 +43,7 @@ uint64_t vuprs::ParseHexFromString(const std::string &dataString, bool *status)
         {
             return 0;
         }
-
-    } 
+    }
     catch (...)
     {
         return 0;
@@ -118,13 +118,15 @@ uint64_t vuprs::ParseNumberFromString(const std::string &dataString, bool *statu
     bool parseStatus = false;
     uint64_t parseData;
 
-    if (status != nullptr) (*status) = false;
+    if (status != nullptr)
+        (*status) = false;
 
     parseData = vuprs::ParseHexFromString(dataString, &parseStatus);
 
     if (parseStatus)
     {
-        if (status != nullptr) (*status) = true;
+        if (status != nullptr)
+            (*status) = true;
         return parseData;
     }
 
@@ -132,7 +134,8 @@ uint64_t vuprs::ParseNumberFromString(const std::string &dataString, bool *statu
 
     if (parseStatus)
     {
-        if (status != nullptr) (*status) = true;
+        if (status != nullptr)
+            (*status) = true;
         return parseData;
     }
 
@@ -148,14 +151,14 @@ std::string vuprs::Number2HexString(const uint64_t &num)
 
 void vuprs::__JsonParseString(std::string *target, const nlohmann::json &json, const std::string &item, bool required)
 {
-    if (target == nullptr) throw std::runtime_error("in [__JsonParseString] Target cannot be NULL.");
+    PARAM_CHECK(target != nullptr, "system_tools", " in [__JsonParseString] Target cannot be NULL.");
     if (json.contains(item))
     {
         *target = json[item].get<std::string>();
     }
     else if (required)
     {
-        throw std::runtime_error("in [__JsonParseString] Item: " + item + " not found.");
+        PARAM_CHECK(false, "system_tools", " in [__JsonParseString] Item: " + item + " not found.");
     }
 }
 

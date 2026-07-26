@@ -1,1 +1,1 @@
-#include "launch_npu.h"
+#include "algorithm/inference/launch_npu.h"

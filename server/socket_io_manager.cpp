@@ -1,8 +1,7 @@
-#include "socket_io_manager.h"
-
 #include <errno.h>
 #include <chrono>
 #include <thread>
+#include "server/socket_io_manager.h"
 
 static constexpr int kSocketSendTimeoutMs = 500;
 static constexpr int kSocketRecvTimeoutMs = 100;
@@ -16,7 +15,7 @@ static bool SetSocketTimeoutOption(int fd, int option, int timeoutMs)
     return setsockopt(fd, SOL_SOCKET, option, &tv, sizeof(tv)) == 0;
 }
 
-bool vuprs::SendAllWithRetry(int fd, const char* data, size_t bytes)
+bool vuprs::SendAllWithRetry(int fd, const char *data, size_t bytes)
 {
     if (fd < 0 || data == nullptr || bytes == 0)
     {
@@ -79,8 +78,8 @@ bool vuprs::SocketIOManager::SendMessage(const std::string &message)
     {
         return true;
     }
-    
-    std::lock_guard<std::mutex> lock(this->mut);  /* LOCK */
+
+    std::lock_guard<std::mutex> lock(this->mut); /* LOCK */
 
     return vuprs::SendAllWithRetry(this->client_fd, message.data(), message.size());
 }
@@ -92,9 +91,9 @@ bool vuprs::SocketIOManager::SendBuffer(const vuprs::AlignedBufferDMA &buffer)
         return false;
     }
 
-    const char* data_ptr = reinterpret_cast<const char*>(buffer.data());
+    const char *data_ptr = reinterpret_cast<const char *>(buffer.data());
 
-    std::lock_guard<std::mutex> lock(this->mut);  /* LOCK */
+    std::lock_guard<std::mutex> lock(this->mut); /* LOCK */
 
     return vuprs::SendAllWithRetry(this->client_fd, data_ptr, static_cast<size_t>(buffer.size()));
 }
@@ -110,7 +109,7 @@ void vuprs::SocketIOManager::ReceiveMessage(const std::string &tailer, vuprs::So
 
     vuprs::SetSocketReceiveDataToDefault(data);
 
-    std::lock_guard<std::mutex> lock(this->mut);  /* LOCK */
+    std::lock_guard<std::mutex> lock(this->mut); /* LOCK */
 
     if (this->client_fd < 0)
     {
@@ -119,11 +118,11 @@ void vuprs::SocketIOManager::ReceiveMessage(const std::string &tailer, vuprs::So
         return;
     }
 
-    while (data->receiveBytes < __SOCKET_RECEIVE_BUFFER_SIZE_BYTES__) 
+    while (data->receiveBytes < __SOCKET_RECEIVE_BUFFER_SIZE_BYTES__)
     {
         recvReturn = recv(this->client_fd, data->buf + data->receiveBytes, __SOCKET_RECEIVE_BUFFER_SIZE_BYTES__ - data->receiveBytes, 0);
-        
-        if (recvReturn > 0)  /* Successfully received */
+
+        if (recvReturn > 0) /* Successfully received */
         {
             data->receiveBytes += recvReturn;
             std::string_view receivedData(data->buf, data->receiveBytes);
@@ -132,14 +131,15 @@ void vuprs::SocketIOManager::ReceiveMessage(const std::string &tailer, vuprs::So
                 break;
             }
         }
-        else if (recvReturn == 0)  /* Closed */
+        else if (recvReturn == 0) /* Closed */
         {
             data->is_connect = false;
             break;
         }
-        else  /* Error occurred */
+        else /* Error occurred */
         {
-            if (errno == EINTR) continue;
+            if (errno == EINTR)
+                continue;
             if (errno == EWOULDBLOCK || errno == EAGAIN)
             {
                 data->is_timeout = true;
@@ -153,7 +153,7 @@ void vuprs::SocketIOManager::ReceiveMessage(const std::string &tailer, vuprs::So
 
 void vuprs::SocketIOManager::CloseSocket()
 {
-    std::lock_guard<std::mutex> lock(this->mut);  /* LOCK */
+    std::lock_guard<std::mutex> lock(this->mut); /* LOCK */
 
     if (this->client_fd >= 0)
     {
@@ -176,21 +176,28 @@ std::string vuprs::ParseClientInformationFromSocketaddr(const sockaddr_in &clien
 
 bool vuprs::CheckFrameFormat(const vuprs::SocketReceiveData &data, const std::string &header, const std::string &tailer, std::string *result)
 {
-    if (!result) return false;
-    if (header.empty() || tailer.empty()) return false;
-    
+    if (!result)
+        return false;
+    if (header.empty() || tailer.empty())
+        return false;
+
     std::string dataString(data.buf, data.receiveBytes);
 
-    dataString.erase(std::remove_if(dataString.begin(), dataString.end(), 
-        [](unsigned char ch) { 
-            return ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t';
-        }), dataString.end());
-    
-    if (dataString.size() < header.size() + tailer.size()) return false;
-    if (dataString.compare(0, header.size(), header) != 0) return false;
-    if (dataString.compare(dataString.size() - tailer.size(), tailer.size(), tailer) != 0) return false;
-    
-    *result = dataString;  /* do not cut */
+    dataString.erase(std::remove_if(dataString.begin(), dataString.end(),
+                                    [](unsigned char ch)
+                                    {
+                                        return ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t';
+                                    }),
+                     dataString.end());
+
+    if (dataString.size() < header.size() + tailer.size())
+        return false;
+    if (dataString.compare(0, header.size(), header) != 0)
+        return false;
+    if (dataString.compare(dataString.size() - tailer.size(), tailer.size(), tailer) != 0)
+        return false;
+
+    *result = dataString; /* do not cut */
     return true;
 }
 

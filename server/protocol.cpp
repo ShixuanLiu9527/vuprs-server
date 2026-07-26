@@ -1,52 +1,54 @@
-#include "protocol.h"
+#include "server/protocol.h"
 
 static std::string __ServerCommandToString(vuprs::ServerCommand cmd)
 {
 	switch (cmd)
 	{
-		case vuprs::ServerCommand::SERVER_CMD__RESET:
-		{
-			return SERVER_CMD__RESET__STR;
-		}
-		case vuprs::ServerCommand::SERVER_CMD__REDIRECT:
-		{
-			return SERVER_CMD__REDIRECT__STR;
-		}
-		case vuprs::ServerCommand::SERVER_CMD__CHANGE_BEAMFORMER:
-		{
-			return SERVER_CMD__CHANGE_BEAMFORMER__STR;
-		}
-		case vuprs::ServerCommand::SERVER_CMD__CHANGE_ALG_PARAM:
-		{
-			return SERVER_CMD__CHANGE_ALG_PARAM__STR;
-		}
-		case vuprs::ServerCommand::SERVER_CMD__STOP:
-		{
-			return SERVER_CMD__STOP__STR;
-		}
-		case vuprs::ServerCommand::SERVER_CMD__START:
-		{
-			return SERVER_CMD__START__STR;
-		}
-		case vuprs::ServerCommand::SERVER_CMD__GET_NEW_DATA:
-		{
-			return SERVER_CMD__GET_NEW_DATA__STR;
-		}
-		case vuprs::ServerCommand::SERVER_CMD__ACK:
-		{
-			return SERVER_CMD__ACK__STR;
-		}
-		default:
-		{
-			return SERVER_CMD__INVALID__STR;
-		}
+	case vuprs::ServerCommand::SERVER_CMD__RESET:
+	{
+		return SERVER_CMD__RESET__STR;
+	}
+	case vuprs::ServerCommand::SERVER_CMD__REDIRECT:
+	{
+		return SERVER_CMD__REDIRECT__STR;
+	}
+	case vuprs::ServerCommand::SERVER_CMD__CHANGE_BEAMFORMER:
+	{
+		return SERVER_CMD__CHANGE_BEAMFORMER__STR;
+	}
+	case vuprs::ServerCommand::SERVER_CMD__CHANGE_ALG_PARAM:
+	{
+		return SERVER_CMD__CHANGE_ALG_PARAM__STR;
+	}
+	case vuprs::ServerCommand::SERVER_CMD__STOP:
+	{
+		return SERVER_CMD__STOP__STR;
+	}
+	case vuprs::ServerCommand::SERVER_CMD__START:
+	{
+		return SERVER_CMD__START__STR;
+	}
+	case vuprs::ServerCommand::SERVER_CMD__GET_NEW_DATA:
+	{
+		return SERVER_CMD__GET_NEW_DATA__STR;
+	}
+	case vuprs::ServerCommand::SERVER_CMD__ACK:
+	{
+		return SERVER_CMD__ACK__STR;
+	}
+	default:
+	{
+		return SERVER_CMD__INVALID__STR;
+	}
 	}
 }
 
 bool vuprs::PROTOCOL_ParseCommandFromMessage(const std::string &message, vuprs::ServerCommandInformation *cmd)
 {
-	if (cmd == nullptr) return false;
-	if (message.empty()) return false;
+	if (cmd == nullptr)
+		return false;
+	if (message.empty())
+		return false;
 
 	cmd->config.ResetMask();
 
@@ -54,7 +56,8 @@ bool vuprs::PROTOCOL_ParseCommandFromMessage(const std::string &message, vuprs::
 	{
 		nlohmann::json root = nlohmann::json::parse(message);
 
-		if (!root.contains("cmd") || !root["cmd"].is_string()) return false;
+		if (!root.contains("cmd") || !root["cmd"].is_string())
+			return false;
 
 		std::string command = root["cmd"].get<std::string>();
 
@@ -70,11 +73,14 @@ bool vuprs::PROTOCOL_ParseCommandFromMessage(const std::string &message, vuprs::
 		}
 		else if (command == SERVER_CMD__CHANGE_BEAMFORMER__STR)
 		{
-			if (!root.contains("params") || !root["params"].is_object()) return false;
-			if (!root["params"].contains("beamformer") || !root["params"]["beamformer"].is_string()) return false;
+			if (!root.contains("params") || !root["params"].is_object())
+				return false;
+			if (!root["params"].contains("beamformer") || !root["params"]["beamformer"].is_string())
+				return false;
 
 			const std::string beamformerName = root["params"]["beamformer"].get<std::string>();
-			if (beamformerName != "mvdr" && beamformerName != "cbf" && beamformerName != "dcrcb") return false;
+			if (beamformerName != "mvdr" && beamformerName != "cbf" && beamformerName != "dcrcb")
+				return false;
 
 			cmd->cmd = vuprs::ServerCommand::SERVER_CMD__CHANGE_BEAMFORMER;
 			cmd->beamformer_name = beamformerName;
@@ -82,8 +88,10 @@ bool vuprs::PROTOCOL_ParseCommandFromMessage(const std::string &message, vuprs::
 		}
 		else if (command == SERVER_CMD__REDIRECT__STR)
 		{
-			if (!root.contains("params") || !root["params"].is_object()) return false;
-			if (!root["params"].contains("alt") || !root["params"].contains("az")) return false;
+			if (!root.contains("params") || !root["params"].is_object())
+				return false;
+			if (!root["params"].contains("alt") || !root["params"].contains("az"))
+				return false;
 
 			double alt = 0.0;
 			double az = 0.0;
@@ -97,7 +105,7 @@ bool vuprs::PROTOCOL_ParseCommandFromMessage(const std::string &message, vuprs::
 
 			cmd->config.bf_target__alt = alt;
 			cmd->config.bf_target__az = az;
-			
+
 			cmd->config.mask.m_bf_target__alt = true;
 			cmd->config.mask.m_bf_target__az = true;
 
@@ -105,9 +113,12 @@ bool vuprs::PROTOCOL_ParseCommandFromMessage(const std::string &message, vuprs::
 		}
 		else if (command == SERVER_CMD__SCAN_FOR_POSITION_POWER__STR)
 		{
-			if (!root.contains("params") || !root["params"].is_object()) return false;
-			if (!root["params"].contains("points") || !root["params"]["points"].is_string()) return false;
-			if (!root["params"].contains("alt_min") || !root["params"]["alt_min"].is_string()) return false;
+			if (!root.contains("params") || !root["params"].is_object())
+				return false;
+			if (!root["params"].contains("points") || !root["params"]["points"].is_string())
+				return false;
+			if (!root["params"].contains("alt_min") || !root["params"]["alt_min"].is_string())
+				return false;
 
 			int pointsInHalf = 0;
 			double alt_min = 0.0;
@@ -117,8 +128,10 @@ bool vuprs::PROTOCOL_ParseCommandFromMessage(const std::string &message, vuprs::
 			vuprs::__JsonStringParseINT<int>(&pointsInHalf, params, "points", true);
 			vuprs::__JsonStringParseFLOAT<double>(&alt_min, params, "alt_min", true);
 
-			if (alt_min < 0.0 || alt_min > 90.0) return false;
-			if (pointsInHalf <= 0) return false;
+			if (alt_min < 0.0 || alt_min > 90.0)
+				return false;
+			if (pointsInHalf <= 0)
+				return false;
 
 			cmd->cmd = vuprs::ServerCommand::SERVER_CMD__SCAN_FOR_POSITION_POWER;
 
@@ -133,15 +146,15 @@ bool vuprs::PROTOCOL_ParseCommandFromMessage(const std::string &message, vuprs::
 			/*
 				[HEADER]
 				{
-				    "cmd": "change_algorithm_parameters",
-				    "params": {
-				        "fs": "40000.0",
-				        "wave_velocity": "346.0", 
-				        "lower_frequency": "100.0",
-				        "upper_frequency": "4000.0",
-				        "snapshot_window_size": "100",
-				        "covariance_average_index": "0.8"
-				    }
+					"cmd": "change_algorithm_parameters",
+					"params": {
+						"fs": "40000.0",
+						"wave_velocity": "346.0",
+						"lower_frequency": "100.0",
+						"upper_frequency": "4000.0",
+						"snapshot_window_size": "100",
+						"covariance_average_index": "0.8"
+					}
 				}
 				[TAILER]
 			*/
@@ -247,16 +260,16 @@ std::string vuprs::PROTOCOL_MakeServerParameterResponse(const vuprs::Collaborati
 {
 	/*
 		{
-		    "response_cmd": "read_algorithm_parameters",
-		    "operation_status": "done",
-		    "params": {
-		        "fs": "40000.0",
-		        "wave_velocity": "346.0", 
-		        "lower_frequency": "100.0",
-		        "upper_frequency": "4000.0",
-		        "snapshot_window_size": "100",
-		        "covariance_average_index": "0.8"
-		    }
+			"response_cmd": "read_algorithm_parameters",
+			"operation_status": "done",
+			"params": {
+				"fs": "40000.0",
+				"wave_velocity": "346.0",
+				"lower_frequency": "100.0",
+				"upper_frequency": "4000.0",
+				"snapshot_window_size": "100",
+				"covariance_average_index": "0.8"
+			}
 		}
 	*/
 	nlohmann::json response;
@@ -271,21 +284,21 @@ std::string vuprs::PROTOCOL_MakeServerParameterResponse(const vuprs::Collaborati
 	return response.dump();
 }
 
-std::string vuprs::PROTOCOL_MakeServerScanningResponse(const vuprs::ScanningConfig &scanningConfig, 
-        double minScanPowerDB, double maxScanPowerDB, 
-        const std::string &info, bool operationStatus)
+std::string vuprs::PROTOCOL_MakeServerScanningResponse(const vuprs::ScanningConfig &scanningConfig,
+													   double minScanPowerDB, double maxScanPowerDB,
+													   const std::string &info, bool operationStatus)
 {
 	/*
 		{
-		    "response_cmd": "power_scan",
-		    "operation_status": "done",
-		    "params": {
-		        "points": "70",
-		        "min_alt": "15.0",
-		        "max_power": "12.04046",
-		        "min_power": "-15.00231",
-		        "data_format": "uint16_t"
-		    }
+			"response_cmd": "power_scan",
+			"operation_status": "done",
+			"params": {
+				"points": "70",
+				"min_alt": "15.0",
+				"max_power": "12.04046",
+				"min_power": "-15.00231",
+				"data_format": "uint16_t"
+			}
 		}
 	*/
 	nlohmann::json response;

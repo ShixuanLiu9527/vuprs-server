@@ -1,53 +1,47 @@
 #ifndef BEAM_FORMER_H
 #define BEAM_FORMER_H
 
-#include "beam_former_template.h"
+#include "algorithm/bf/beam_former_template.h"
 
 namespace vuprs
 {
-    class Beamformer_DCRCB: public vuprs::WidebandBeamformerTemplate
+    class Beamformer_DCRCB : public vuprs::WidebandBeamformerTemplate
     {
-        protected:
+    protected:
+        void CalculateBeamformingForOneFreq(int freqIndex) override;
 
-            void CalculateBeamformingForOneFreq(int freqIndex) override;
+    public:
+        Beamformer_DCRCB();
 
-        public:
+        ~Beamformer_DCRCB();
 
-            Beamformer_DCRCB();
-
-            ~Beamformer_DCRCB();
-
-            EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+        EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };
 
-    class Beamformer_CBF: public vuprs::WidebandBeamformerTemplate
+    class Beamformer_CBF : public vuprs::WidebandBeamformerTemplate
     {
-        protected:
+    protected:
+        void CalculateBeamformingForOneFreq(int freqIndex) override;
 
-            void CalculateBeamformingForOneFreq(int freqIndex) override;
+    public:
+        Beamformer_CBF();
 
-        public:
+        ~Beamformer_CBF();
 
-            Beamformer_CBF();
-
-            ~Beamformer_CBF();
-
-            EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+        EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };
 
-    class Beamformer_MVDR: public vuprs::WidebandBeamformerTemplate
+    class Beamformer_MVDR : public vuprs::WidebandBeamformerTemplate
     {
-        protected:
+    protected:
+        void CalculateBeamformingForOneFreq(int freqIndex) override;
 
-            void CalculateBeamformingForOneFreq(int freqIndex) override;
+    public:
+        Beamformer_MVDR();
 
-        public:
+        ~Beamformer_MVDR();
 
-            Beamformer_MVDR();
-
-            ~Beamformer_MVDR();
-
-            EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+        EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };
 }
 

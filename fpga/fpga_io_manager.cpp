@@ -1,12 +1,10 @@
-#include "fpga_io_manager.h"
+#include "fpga/fpga_io_manager.h"
+#include "logger/log_manager.h"
 
 vuprs::FPGA_IOManagerBase::FPGA_IOManagerBase(const std::string &deviceFilename)
 {
     this->fd = -1;
-    if (!this->Open(deviceFilename))
-    {
-        throw std::runtime_error("in [FPGA_IOManagerBase::FPGA_IOManagerBase] Cannot open device file: " + deviceFilename);
-    }
+    RUNTIME_CHECK(this->Open(deviceFilename), "fpga", " in [FPGA_IOManagerBase::FPGA_IOManagerBase] Cannot open device file: " + deviceFilename);
 }
 
 vuprs::FPGA_IOManagerBase::FPGA_IOManagerBase()
@@ -23,7 +21,7 @@ vuprs::FPGA_IOManagerBase::~FPGA_IOManagerBase()
 void vuprs::FPGA_IOManagerBase::Close() noexcept
 {
     {
-        std::lock_guard<std::mutex> lock(this->mut);  /* LOCK */
+        std::lock_guard<std::mutex> lock(this->mut); /* LOCK */
 
         if (this->IsOpen())
         {
@@ -42,7 +40,7 @@ std::string vuprs::FPGA_IOManagerBase::GetDeviceFilename() const
 bool vuprs::FPGA_IOManagerBase::Open(const std::string &deviceFilename) noexcept
 {
     {
-        std::lock_guard<std::mutex> lock(this->mut);  /* LOCK */
+        std::lock_guard<std::mutex> lock(this->mut); /* LOCK */
 
         if (this->IsOpen())
         {
@@ -53,10 +51,10 @@ bool vuprs::FPGA_IOManagerBase::Open(const std::string &deviceFilename) noexcept
             this->Close();
         }
 
-        this->deviceFilename = deviceFilename; 
-        this->fd = ::open(deviceFilename.c_str(), this->OpenFlags());  /* For FPGA */
+        this->deviceFilename = deviceFilename;
+        this->fd = ::open(deviceFilename.c_str(), this->OpenFlags()); /* For FPGA */
 
-        if (!this->IsOpen()) 
+        if (!this->IsOpen())
         {
             this->Close();
             return false;
@@ -82,16 +80,13 @@ vuprs::FPGA_IOManagerForDevice::FPGA_IOManagerForDevice(const std::string &devic
 {
     this->isMemoryMapped = false;
     this->fd = -1;
-    if (!this->Open(deviceFilename))
-    {
-        throw std::runtime_error("in [FPGA_IOManagerForDevice::FPGA_IOManagerForDevice] Cannot open device file: " + deviceFilename);
-    }
+    RUNTIME_CHECK(this->Open(deviceFilename), "fpga", " in [FPGA_IOManagerForDevice::FPGA_IOManagerForDevice] Cannot open device file: " + deviceFilename);
 }
 
 vuprs::FPGA_IOManagerForDevice::~FPGA_IOManagerForDevice()
 {
     {
-        std::lock_guard<std::mutex> lock(this->mut);  /* LOCK */
+        std::lock_guard<std::mutex> lock(this->mut); /* LOCK */
         this->MemoryUnmap();
     }
 }
@@ -111,10 +106,7 @@ bool vuprs::FPGA_IOManagerForDevice::MemoryMap()
     if (this->IsOpen() && !this->isMemoryMapped)
     {
         this->mmap_base = ::mmap(0, __XDMA_AXI_LITE_MMAP_SIZE__, PROT_READ | PROT_WRITE, MAP_SHARED, this->fd, 0);
-        if (this->mmap_base == MAP_FAILED)
-        {
-            throw std::runtime_error("in [FPGA_IOManagerForDevice::MemoryMap] Failed to map with mmap size = " + std::to_string(__XDMA_AXI_LITE_MMAP_SIZE__));
-        }
+        RUNTIME_CHECK(this->mmap_base != MAP_FAILED, "fpga", " in [FPGA_IOManagerForDevice::MemoryMap] Failed to map with mmap size = " + std::to_string(__XDMA_AXI_LITE_MMAP_SIZE__));
         this->isMemoryMapped = true;
         return true;
     }
@@ -133,28 +125,22 @@ bool vuprs::FPGA_IOManagerForDevice::MemoryUnmap()
     return false;
 }
 
-bool vuprs::FPGA_IOManagerForDevice::RegisterIO(uint32_t* ioValue, uint32_t absoluteAddress, bool isRead)
+bool vuprs::FPGA_IOManagerForDevice::RegisterIO(uint32_t *ioValue, uint32_t absoluteAddress, bool isRead)
 {
-    if (!this->IsOpen())
-    {
-        throw std::runtime_error("in [FPGA_IOManagerForDevice::RegisterIO] FPGA device file is not opened.");
-    }
-    if (ioValue == nullptr)
-    {
-        throw std::runtime_error("in [FPGA_IOManagerForDevice::RegisterIO] iovalue is NULL.");
-    }
+    RUNTIME_CHECK(this->IsOpen(), "fpga", " in [FPGA_IOManagerForDevice::RegisterIO] FPGA device file is not opened.");
+    PARAM_CHECK(ioValue != nullptr, "fpga", " in [FPGA_IOManagerForDevice::RegisterIO] iovalue is NULL.");
 
-    uint8_t* _mmap_base;
+    uint8_t *_mmap_base;
 
     {
-        std::lock_guard<std::mutex> lock(this->mut);  /* LOCK */
+        std::lock_guard<std::mutex> lock(this->mut); /* LOCK */
         _mmap_base = (uint8_t *)this->mmap_base;
     }
 
     try
     {
         volatile uint32_t *reg_addr = (volatile uint32_t *)(_mmap_base + absoluteAddress);
-        if (isRead) 
+        if (isRead)
         {
             *ioValue = ltohl(*reg_addr);
         }
@@ -163,35 +149,27 @@ bool vuprs::FPGA_IOManagerForDevice::RegisterIO(uint32_t* ioValue, uint32_t abso
             *reg_addr = htoll(*ioValue);
         }
     }
-    catch(const std::exception& e)
+    catch (const std::exception &e)
     {
-        throw std::runtime_error("in [FPGA_IOManagerForDevice::RegisterIO] Memory operating failed.");
+        RUNTIME_CHECK(false, "fpga", " in [FPGA_IOManagerForDevice::RegisterIO] Memory operating failed.");
     }
     return true;
 }
 
 bool vuprs::FPGA_IOManagerForDevice::RegisterListIO(std::vector<uint32_t> *ioValueList, const std::vector<uint32_t> &absoluteAddressList, bool isRead)
 {
-    if (!this->IsOpen())
-    {
-        throw std::runtime_error("in [FPGA_IOManagerForDevice::RegisterListIO] FPGA device file is not opened.");
-    }
-    if (ioValueList == nullptr)
-    {
-        throw std::runtime_error("in [FPGA_IOManagerForDevice::RegisterListIO] iovalue is NULL.");
-    }
-    if (ioValueList->size() != absoluteAddressList.size() && !isRead)
-    {
-        throw std::runtime_error("in [FPGA_IOManagerForDevice::RegisterListIO] ioValueList.size() != absoluteAddressList.size()");
-    }
+    RUNTIME_CHECK(this->IsOpen(), "fpga", " in [FPGA_IOManagerForDevice::RegisterListIO] FPGA device file is not opened.");
+    PARAM_CHECK(ioValueList != nullptr, "fpga", " in [FPGA_IOManagerForDevice::RegisterListIO] iovalue is NULL.");
+    PARAM_CHECK(isRead || ioValueList->size() == absoluteAddressList.size(), "fpga", " in [FPGA_IOManagerForDevice::RegisterListIO] ioValueList.size() != absoluteAddressList.size()");
     int registerNumer = absoluteAddressList.size();
 
-    if (isRead) ioValueList->resize(registerNumer);
+    if (isRead)
+        ioValueList->resize(registerNumer);
 
-    uint8_t* _mmap_base;
+    uint8_t *_mmap_base;
 
     {
-        std::lock_guard<std::mutex> lock(this->mut);  /* LOCK */
+        std::lock_guard<std::mutex> lock(this->mut); /* LOCK */
         _mmap_base = (uint8_t *)this->mmap_base;
     }
 
@@ -200,19 +178,19 @@ bool vuprs::FPGA_IOManagerForDevice::RegisterListIO(std::vector<uint32_t> *ioVal
         for (int i = 0; i < registerNumer; i++)
         {
             volatile uint32_t *reg_addr = (volatile uint32_t *)(_mmap_base + absoluteAddressList[i]);
-            if (isRead) 
+            if (isRead)
             {
                 (*ioValueList)[i] = ltohl(*reg_addr);
             }
-            else 
+            else
             {
                 *reg_addr = htoll((*ioValueList)[i]);
             }
         }
     }
-    catch(const std::exception &e)
+    catch (const std::exception &e)
     {
-        throw std::runtime_error("in [FPGA_IOManagerForDevice::RegisterListIO] Memory operating failed.");
+        RUNTIME_CHECK(false, "fpga", " in [FPGA_IOManagerForDevice::RegisterListIO] Memory operating failed.");
     }
     return true;
 }
@@ -227,10 +205,7 @@ vuprs::FPGA_IOManagerForMemory::FPGA_IOManagerForMemory()
 vuprs::FPGA_IOManagerForMemory::FPGA_IOManagerForMemory(const std::string &deviceFilename)
 {
     this->fd = -1;
-    if (!this->Open(deviceFilename))
-    {
-        throw std::runtime_error("in [FPGA_IOManagerForMemory::FPGA_IOManagerForMemory] Cannot open device file: " + deviceFilename);
-    }
+    RUNTIME_CHECK(this->Open(deviceFilename), "fpga", " in [FPGA_IOManagerForMemory::FPGA_IOManagerForMemory] Cannot open device file: " + deviceFilename);
 }
 
 vuprs::FPGA_IOManagerForMemory::~FPGA_IOManagerForMemory()
@@ -248,29 +223,20 @@ bool vuprs::FPGA_IOManagerForMemory::OperationAfterOpened()
     return true;
 }
 
-bool vuprs::FPGA_IOManagerForMemory::BufferIO(void* source, uint32_t absoluteAddress, uint32_t transferBytes, bool isRead)
+bool vuprs::FPGA_IOManagerForMemory::BufferIO(void *source, uint32_t absoluteAddress, uint32_t transferBytes, bool isRead)
 {
-    if (!this->IsOpen())
-    {
-        throw std::runtime_error("in [FPGA_IOManagerForMemory::BufferIO] FPGA device file is not opened.");
-    }
-    if (source == nullptr)
-    {
-        throw std::runtime_error("in [FPGA_IOManagerForMemory::BufferIO] source is NULL.");
-    }
+    RUNTIME_CHECK(this->IsOpen(), "fpga", " in [FPGA_IOManagerForMemory::BufferIO] FPGA device file is not opened.");
+    PARAM_CHECK(source != nullptr, "fpga", " in [FPGA_IOManagerForMemory::BufferIO] source is NULL.");
 
     /* Seek to offset relative to AXI-Full base address in FPGA */
 
     int ioBytes;
 
     {
-        std::lock_guard<std::mutex> lock(this->mut);  /* LOCK */
+        std::lock_guard<std::mutex> lock(this->mut); /* LOCK */
 
         off_t currentOffset = ::lseek(this->fd, absoluteAddress, SEEK_SET);
-        if (static_cast<uint64_t>(currentOffset) != absoluteAddress || currentOffset < 0 || currentOffset == (off_t) - 1)
-        {
-            throw std::runtime_error("in [FPGA_IOManagerForMemory::BufferIO] Seek error.");
-        }
+        RUNTIME_CHECK(static_cast<uint64_t>(currentOffset) == absoluteAddress && currentOffset >= 0 && currentOffset != (off_t)-1, "fpga", " in [FPGA_IOManagerForMemory::BufferIO] Seek error.");
         if (isRead)
         {
             ioBytes = ::read(this->fd, source, transferBytes);
@@ -280,7 +246,7 @@ bool vuprs::FPGA_IOManagerForMemory::BufferIO(void* source, uint32_t absoluteAdd
             ioBytes = ::write(this->fd, source, transferBytes);
         }
     }
-    
+
     return static_cast<uint64_t>(ioBytes) == transferBytes;
 }
 
@@ -294,21 +260,18 @@ vuprs::FPGA_IOManagerForInterrput::FPGA_IOManagerForInterrput()
 vuprs::FPGA_IOManagerForInterrput::FPGA_IOManagerForInterrput(const std::string &deviceFilename)
 {
     this->fd = -1;
-    if (!this->Open(deviceFilename))
-    {
-        throw std::runtime_error("in [FPGA_IOManagerForInterrput::FPGA_IOManagerForInterrput] Cannot open device file: " + deviceFilename);
-    }
+    RUNTIME_CHECK(this->Open(deviceFilename), "fpga", " in [FPGA_IOManagerForInterrput::FPGA_IOManagerForInterrput] Cannot open device file: " + deviceFilename);
 }
 
 bool vuprs::FPGA_IOManagerForInterrput::SetTimeout(uint32_t timeout_ms)
 {
     if (timeout_ms < 1)
     {
-        timeout_ms = 1;  /* set min timeout to 1 ms */
+        timeout_ms = 1; /* set min timeout to 1 ms */
     }
     else if (timeout_ms > 1000)
     {
-        timeout_ms = 1000;  /* set max timeout to 1 s */
+        timeout_ms = 1000; /* set max timeout to 1 s */
     }
 
     this->timeout_ms = timeout_ms;
@@ -332,10 +295,7 @@ bool vuprs::FPGA_IOManagerForInterrput::OperationAfterOpened()
 
 bool vuprs::FPGA_IOManagerForInterrput::ReadEvent(uint32_t *readValue)
 {
-    if (!this->IsOpen())
-    {
-        throw std::runtime_error("in [FPGA_IOManagerForInterrput::ReadEvent] FPGA device file is not opened.");
-    }
+    RUNTIME_CHECK(this->IsOpen(), "fpga", " in [FPGA_IOManagerForInterrput::ReadEvent] FPGA device file is not opened.");
 
     *readValue = 0;
 
@@ -344,30 +304,24 @@ bool vuprs::FPGA_IOManagerForInterrput::ReadEvent(uint32_t *readValue)
 
     timeval timeout;
     timeout.tv_sec = 0;
-    timeout.tv_usec = this->timeout_ms * 1000;  /* timeout = timeout_ms ms */
+    timeout.tv_usec = this->timeout_ms * 1000; /* timeout = timeout_ms ms */
 
     {
-        std::lock_guard<std::mutex> lock(this->mut);  /* LOCK */
+        std::lock_guard<std::mutex> lock(this->mut); /* LOCK */
 
         FD_SET(this->fd, &read_fds);
-        
-        int selectResult = ::select(this->fd + 1, &read_fds, nullptr, nullptr, &timeout);  /* wait for interrupt */
 
-        if (selectResult < 0)  /* error */
-        {
-            throw std::runtime_error("in [FPGA_IOManagerForInterrput::ReadEvent] Select error (return -1).");
-        }
-        if (selectResult == 0)  /* timeout */
-        {
-            *readValue = 0;  /* indicate no interrupt */
-            return true;  /* return true for timeout */
-        }
-        if (!FD_ISSET(this->fd, &read_fds))  /* no interrupt */
-        {
-            throw std::runtime_error("in [FPGA_IOManagerForInterrput::ReadEvent] No interrupt detected after select.");
-        }
+        int selectResult = ::select(this->fd + 1, &read_fds, nullptr, nullptr, &timeout); /* wait for interrupt */
 
-        int ioBytes = ::read(this->fd, readValue, sizeof(uint32_t));  /* read interrupt event (1: interrupt detected, 0: no interrupt) */
+        RUNTIME_CHECK(selectResult >= 0, "fpga", " in [FPGA_IOManagerForInterrput::ReadEvent] Select error (return -1).");
+        if (selectResult == 0) /* timeout */
+        {
+            *readValue = 0; /* indicate no interrupt */
+            return true;    /* return true for timeout */
+        }
+        RUNTIME_CHECK(FD_ISSET(this->fd, &read_fds), "fpga", " in [FPGA_IOManagerForInterrput::ReadEvent] No interrupt detected after select.");
+
+        int ioBytes = ::read(this->fd, readValue, sizeof(uint32_t)); /* read interrupt event (1: interrupt detected, 0: no interrupt) */
         return static_cast<uint64_t>(ioBytes) == sizeof(uint32_t);
     }
 }

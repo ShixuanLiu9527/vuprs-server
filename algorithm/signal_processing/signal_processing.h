@@ -10,8 +10,8 @@
 #include <Eigen/Dense>
 #include <atomic>
 #include <mutex>
-
-#include "fftw3.h"  /* Use FFTW for processing */
+#include "logger/log_manager.h"
+#include "3rdparty/fftw3/api/fftw3.h"
 
 #define PI 3.14159265358979323846
 
@@ -19,47 +19,45 @@ namespace vuprs
 {
     class FFTWManagerComplex
     {
-        private:
+    private:
+        static std::mutex fftw_mtx; /* global lock */
 
-            static std::mutex fftw_mtx;  /* global lock */
+        std::atomic<bool> fft_forward;        /* true: DFT backward, false: DFT forward */
+        std::atomic<uint64_t> fft_points;     /* data size = N */
+        fftw_complex *fft_input, *fft_output; /* input & output memory */
+        fftw_plan fft_plan;                   /* FFT plan */
+        fftw_plan ifft_plan;                  /* IFFT plan */
 
-            std::atomic<bool> fft_forward;  /* true: DFT backward, false: DFT forward */
-            std::atomic<uint64_t> fft_points;  /* data size = N */
-            fftw_complex *fft_input, *fft_output;  /* input & output memory */
-            fftw_plan fft_plan;  /* FFT plan */
-            fftw_plan ifft_plan;  /* IFFT plan */
+        void SetDFTDirection(bool forward = true);
 
-            void SetDFTDirection(bool forward = true);
+        void SetDFTPoints(uint64_t N);
 
-            void SetDFTPoints(uint64_t N);
+    public:
+        FFTWManagerComplex();
 
-        public:
+        ~FFTWManagerComplex();
 
-            FFTWManagerComplex();
+        FFTWManagerComplex(const FFTWManagerComplex &other) = delete;
+        FFTWManagerComplex &operator=(const FFTWManagerComplex &other) = delete;
 
-            ~FFTWManagerComplex();
+        FFTWManagerComplex(FFTWManagerComplex &&other) noexcept;
+        FFTWManagerComplex &operator=(FFTWManagerComplex &&other) noexcept;
 
-            FFTWManagerComplex(const FFTWManagerComplex& other) = delete;
-            FFTWManagerComplex& operator=(const FFTWManagerComplex& other) = delete;
-        
-            FFTWManagerComplex(FFTWManagerComplex&& other) noexcept;
-            FFTWManagerComplex& operator=(FFTWManagerComplex&& other) noexcept;
+        /**
+         * @brief Set DFT manager parameters.
+         *
+         * @param points signal points for DFT.
+         * @param forward true: time domain --> frequency domain, false: frequency domain --> time domain.
+         */
+        void SetParameters(uint64_t points, bool forward);
 
-            /**
-             * @brief Set DFT manager parameters.
-             * 
-             * @param points signal points for DFT.
-             * @param forward true: time domain --> frequency domain, false: frequency domain --> time domain.
-             */
-            void SetParameters(uint64_t points, bool forward);
-
-            /**
-             * @brief Run DFT.
-             * 
-             * @param input input data buffer.
-             * @param output output data buffer.
-             */
-            void DoDFT(const void* input, void *output);
+        /**
+         * @brief Run DFT.
+         *
+         * @param input input data buffer.
+         * @param output output data buffer.
+         */
+        void DoDFT(const void *input, void *output);
     };
 
     /**
@@ -68,15 +66,12 @@ namespace vuprs
     template <typename T>
     void eigenVector2stdVector(const Eigen::Matrix<T, -1, 1> &eigenvector, std::vector<T> *stdvector)
     {
-        if (eigenvector.rows() == 0) 
+        if (eigenvector.rows() == 0)
         {
             stdvector->clear();
             return;
         }
-        if (eigenvector.cols() != 1)
-        {
-            throw std::runtime_error("Invalid shape of eigen (expected: Nx1)");
-        }
+        PARAM_CHECK(eigenvector.cols() == 1, "signal_processing", " Invalid shape of eigen (expected: Nx1)");
         stdvector->assign(eigenvector.data(), eigenvector.data() + eigenvector.size());
     }
 
@@ -86,16 +81,13 @@ namespace vuprs
     template <typename T>
     void eigenRow2stdVector(const Eigen::Matrix<T, 1, -1> &eigenrow, std::vector<T> *stdvector)
     {
-        if (eigenrow.cols() == 0) 
+        if (eigenrow.cols() == 0)
         {
             stdvector->clear();
             return;
         }
-        if (eigenrow.rows() != 1)
-        {
-            throw std::runtime_error("Invalid shape of eigen (expected: 1xN)");
-        }
-        
+        PARAM_CHECK(eigenrow.rows() == 1, "signal_processing", " Invalid shape of eigen (expected: 1xN)");
+
         stdvector->assign(eigenrow.data(), eigenrow.data() + eigenrow.size());
     }
 
@@ -105,7 +97,7 @@ namespace vuprs
     template <typename T>
     void stdVector2eigenVector(const std::vector<T> &stdvector, Eigen::Matrix<T, -1, 1> *eigenvector)
     {
-        if (stdvector.empty()) 
+        if (stdvector.empty())
         {
             eigenvector->resize(0);
             return;
@@ -119,7 +111,7 @@ namespace vuprs
     template <typename T>
     void stdVector2eigenRow(const std::vector<T> &stdvector, Eigen::Matrix<T, 1, -1> *eigenrow)
     {
-        if (stdvector.empty()) 
+        if (stdvector.empty())
         {
             eigenrow->resize(1, 0);
             return;
@@ -129,33 +121,33 @@ namespace vuprs
 
     /**
      * @brief Do FFT.
-     * 
+     *
      * @note Use FFTW3.
-     * 
+     *
      * @param inputData the input data.
      * @param outputData the output data.
      * @param inverse true: IDFT, false: DFT.
-     * 
+     *
      * @throw std::runtime_error when input data is empty.
      */
     void FFT(const std::vector<std::complex<double>> &inputData, std::vector<std::complex<double>> *outputData, bool inverse = false);
 
     /**
      * @brief Do FFT.
-     * 
+     *
      * @note Use FFTW3.
-     * 
+     *
      * @param inputData the input data.
      * @param outputData the output data.
      * @param inverse true: IDFT, false: DFT.
-     * 
+     *
      * @throw std::runtime_error when input data is empty.
      */
     void FFT(const Eigen::Matrix<Eigen::dcomplex, -1, 1> &inputData, Eigen::Matrix<Eigen::dcomplex, -1, 1> *outputData, bool inverse = false);
 
     /**
      * @brief Cut half size (return size = N / 2 + 1).
-     * 
+     *
      * @note input: [1, 2, 3, 4, 5, 6]
      * @note output: [1, 2, 3, 4]
      */
@@ -163,7 +155,7 @@ namespace vuprs
 
     /**
      * @brief Cut half size (return size = N / 2 + 1).
-     * 
+     *
      * @note input: [1, 2, 3, 4, 5, 6]
      * @note output: [1, 2, 3, 4]
      */
@@ -171,42 +163,42 @@ namespace vuprs
 
     /**
      * @brief In-place conjugate symmetric completion (for IDFT).
-     * 
+     *
      * @note output.size = (input.size - 1) * 2
      * @note input: [1j, 2j, 3j, 4j]
      * @note output: [1j, 2j, 3j, 4j, -3j, -2j]
-     * 
+     *
      * @param inputData input data.
      */
     void CompleteConjugateSymmetric(std::vector<std::complex<double>> *inputData);
 
     /**
      * @brief In-place conjugate symmetric completion (for IDFT).
-     * 
+     *
      * @note output.size = (input.size - 1) * 2
      * @note input: [1j, 2j, 3j, 4j]
      * @note output: [1j, 2j, 3j, 4j, -3j, -2j]
-     * 
+     *
      * @param inputData input data.
      */
     void CompleteConjugateSymmetric(Eigen::Matrix<Eigen::dcomplex, -1, 1> *inputData);
 
     /**
      * @brief In-place conjugate symmetric completion.
-     * 
+     *
      * @note output.size = (input.size - 1) * 2
      * @note input: [1, 2, 3, 4]
      * @note output: [1, 2, 3, 4, 3, 2]
-     * 
+     *
      * @param inputData input data.
      */
     void CompleteSymmetric(Eigen::Matrix<double, -1, 1> *inputData);
 
     /**
      * @brief Frequency vector.
-     * 
+     *
      * @note [f_1 * j, f_2 * j, ..., f_F * j], F = dataNumber / 2 + 1
-     * 
+     *
      * @param dataNumber total data number (input to FFT).
      * @param samplingFrequency sampling frequency, unit: Hz.
      */
@@ -214,15 +206,15 @@ namespace vuprs
 
     /**
      * @brief Frequency vector.
-     * 
+     *
      * @note [f_1, f_2, ..., f_F], F = dataNumber / 2 + 1
-     * 
+     *
      * @param dataNumber total data number (input to FFT).
      * @param samplingFrequency sampling frequency, unit: Hz.
      */
     Eigen::Matrix<double, -1, 1> GenerateRealFrequencyList(int dataNumber, double samplingFrequency);
 
-    enum class WindowType 
+    enum class WindowType
     {
         SIG_WINDOW__HAMMING,
         SIG_WINDOW__HANN,
@@ -233,7 +225,7 @@ namespace vuprs
 
     /**
      * @brief Add window for signal.
-     * 
+     *
      * @param signal the given signal.
      */
     template <typename T>
@@ -248,34 +240,33 @@ namespace vuprs
 
     /**
      * @brief Add window for signal.
-     * 
+     *
      * @note T: double, std::complex<double>
-     * 
+     *
      * @param signal the given signal.
      */
     template <typename T>
     Eigen::Matrix<T, -1, 1> AddWindow(const Eigen::Matrix<T, -1, 1> &signal, vuprs::WindowType type = vuprs::WindowType::SIG_WINDOW__HAMMING)
     {
-        if (signal.size() == 0)
-        {
-            throw std::runtime_error("Empty signal for window.");
-        }
+        PARAM_CHECK(signal.size() > 0, "signal_processing", " Empty signal for window.");
         return signal.cwiseProduct(vuprs::GetWindow(type, signal.rows()));
     }
 
-    template<typename T>
+    template <typename T>
     void ifftshift(std::vector<T> *vec)
     {
-        if (vec == nullptr || vec->size() <= 1) return;
+        if (vec == nullptr || vec->size() <= 1)
+            return;
         size_t N = vec->size();
         size_t shift = N / 2;
         std::rotate(vec->begin(), vec->begin() + shift, vec->end());
     }
 
-    template<typename T>
+    template <typename T>
     void ifftshift(Eigen::Matrix<T, -1, 1> *vec)
     {
-        if (vec == nullptr || vec->size() <= 1) return;
+        if (vec == nullptr || vec->size() <= 1)
+            return;
         Eigen::Index N = vec->size();
         Eigen::Index shift = N / 2;
         Eigen::Matrix<T, -1, 1> temp(N);
@@ -284,8 +275,12 @@ namespace vuprs
         *vec = temp;
     }
 
-    void ApplyBandpassWindow(Eigen::Matrix<Eigen::dcomplex, -1, 1>* Hd, double f_low, double f_high, 
-                             double fs, int N, double trans_width = -1.0);
+    void ApplyBandpassWindow(Eigen::Matrix<Eigen::dcomplex, -1, 1> *Hd,
+                             double f_low,
+                             double f_high,
+                             double fs,
+                             int N,
+                             double trans_width = -1.0);
 }
 
 #endif

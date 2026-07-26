@@ -1,4 +1,5 @@
 #include "linux_session.h"
+#include "logger/log_manager.h"
 
 #define LINUX_SESSION_CPP__DEBUG_PRINT false  /* print something @ debug mode */
 
@@ -22,10 +23,7 @@ bool vuprs::LinuxSession::SendMessage(const std::string &message)
         std::unique_lock<std::mutex> lock(this->mut);
         manager = this->socketIOManager.lock();
     }
-    if (manager == nullptr)
-    {
-        throw std::runtime_error("in [LinuxSession::SendMessage] IO Manager is NULL.");
-    }
+    PARAM_CHECK(manager != nullptr, "server", " in [LinuxSession::SendMessage] IO Manager is NULL.");
     return manager->SendMessage(message);
 }
 
@@ -36,10 +34,7 @@ void vuprs::LinuxSession::ReceiveMessage(const std::string &tailer, vuprs::Socke
         std::unique_lock<std::mutex> lock(this->mut);
         manager = this->socketIOManager.lock();
     }
-    if (manager == nullptr)
-    {
-        throw std::runtime_error("in [LinuxSession::ReceiveMessage] IO Manager is NULL.");
-    }
+    PARAM_CHECK(manager != nullptr, "server", " in [LinuxSession::ReceiveMessage] IO Manager is NULL.");
     manager->ReceiveMessage(tailer, data);
 }
 
@@ -50,10 +45,7 @@ std::string vuprs::LinuxSession::ClientInformation() const
         std::unique_lock<std::mutex> lock(this->mut);
         manager = this->socketIOManager.lock();
     }
-    if (manager == nullptr)
-    {
-        throw std::runtime_error("in [LinuxSession::ClientInformation] IO Manager is NULL.");
-    }
+    PARAM_CHECK(manager != nullptr, "server", " in [LinuxSession::ClientInformation] IO Manager is NULL.");
     return manager->ClientInformation();
 }
 
@@ -87,10 +79,7 @@ void vuprs::LinuxSession::Stop()
 
 bool vuprs::LinuxSession::BindIOManager(std::shared_ptr<vuprs::SocketIOManager> ioManager)
 {
-    if (ioManager == nullptr)
-    {
-        throw std::runtime_error("in [LinuxSession::BindIOManager] Socket IO Manager is NULL.");
-    }
+    PARAM_CHECK(ioManager != nullptr, "server", " in [LinuxSession::BindIOManager] Socket IO Manager is NULL.");
     this->UnbindIOManager();
     {
         std::unique_lock<std::mutex> lock(this->mut);

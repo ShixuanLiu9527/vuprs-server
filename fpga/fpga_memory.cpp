@@ -1,4 +1,4 @@
-#include "fpga_memory.h"
+#include "fpga/fpga_memory.h"
 
 bool vuprs::FPGA_Memory__DDR::LoadFromJsonObj(const nlohmann::json &obj)
 {

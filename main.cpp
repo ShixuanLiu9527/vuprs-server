@@ -1,16 +1,11 @@
 #include <signal.h>
 #include "linux_server.h"
+#include "logger/log_manager.h"
 
 static void ParseConfigFIlesFromARGV(const std::vector<std::string> &args, vuprs::SystemConfigFiles *configs)
 {
-    if (args.size() != 9)
-    {
-        throw std::runtime_error("Invalid command with arg size = " + std::to_string(args.size()));
-    }
-    if (args[1] != "--server-config" || args[3] != "--fpga-config" || args[5] != "--array-config" || args[7] != "--fir-config")
-    {
-        throw std::runtime_error("Invalid command.");
-    }
+    PARAM_CHECK(args.size() == 9, "vuprs-server", " Invalid command with arg size = " + std::to_string(args.size()));
+    PARAM_CHECK(args[1] == "--server-config" && args[3] == "--fpga-config" && args[5] == "--array-config" && args[7] == "--fir-config", "vuprs-server", " Invalid command.");
 
     configs->serverConfigJsonFile = args[2];
     configs->fpgaConfigJsonFile = args[4];
@@ -42,10 +37,7 @@ int main(int argc, char *argv[])
 
     server.InitSystemConfigFiles(configs);
 
-    if (!server.ConfigDone())
-    {
-        throw std::runtime_error("Error occurred in configuration, the server has been killed.");
-    }
+    RUNTIME_CHECK(server.ConfigDone(), "vuprs-server", " Error occurred in configuration, the server has been killed.");
 
     server.Run();  /* Start */
 

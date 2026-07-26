@@ -1,4 +1,5 @@
-#include "fpga_tool.h"
+#include "fpga_tool/include/fpga_tool.h"
+#include "logger/log_manager.h"
 
 void tool::_FPGA_TOOL_CommandParseResult_ToDefault(_FPGA_TOOL_CommandParseResult *result)
 {
@@ -73,98 +74,97 @@ void tool::FPGA_TOOL_PrintErrorInfo()
 
 void tool::FPGA_TOOL_PrintValue(uint32_t offset, uint32_t val)
 {
-printf(" | --------------------------- Read Value ------------------------------ |\n");
-printf("   <address>    \033[33m0x%X\033[0m\n", offset);
-printf("   <value>      \033[33m0x%X\033[0m\n", val);
-printf(" | --------------------------------------------------------------------- |\n");
+    printf(" | --------------------------- Read Value ------------------------------ |\n");
+    printf("   <address>    \033[33m0x%X\033[0m\n", offset);
+    printf("   <value>      \033[33m0x%X\033[0m\n", val);
+    printf(" | --------------------------------------------------------------------- |\n");
 }
 
 void tool::FPGA_TOOL_PrintDeviceRegisters(const std::vector<std::string> &name, const std::vector<uint32_t> &offset, const std::vector<uint32_t> &val)
 {
     int len = name.size();
 
-    if (len == 0) 
-    {
-        throw std::runtime_error("No registers to display.");
-    }
-    
+    PARAM_CHECK(len > 0, "fpga_tool", " No registers to display.");
+
     printf(" | ------------------------ List Registers ----------------------------- |\n");
-    
+
     size_t maxNameLength = 0;
-    for (int i = 0; i < len; i++) 
+    for (int i = 0; i < len; i++)
     {
-        if (name[i].length() > maxNameLength) 
+        if (name[i].length() > maxNameLength)
         {
             maxNameLength = name[i].length();
         }
     }
-    
+
     int maxOffsetHexLength = 0;
-    for (int i = 0; i < len; i++) 
+    for (int i = 0; i < len; i++)
     {
         uint32_t temp = offset[i];
         int hexLength = 0;
-        if (temp == 0) 
+        if (temp == 0)
         {
             hexLength = 1;
-        } 
-        else 
+        }
+        else
         {
-            while (temp > 0) 
+            while (temp > 0)
             {
                 temp >>= 4;
                 hexLength++;
             }
         }
-        if (hexLength > maxOffsetHexLength) 
+        if (hexLength > maxOffsetHexLength)
         {
             maxOffsetHexLength = hexLength;
         }
     }
-    
-    if (maxOffsetHexLength < 2) maxOffsetHexLength = 2;
-    if (maxOffsetHexLength % 2 != 0) maxOffsetHexLength++;
-    
-    for (int i = 0; i < len; i++) 
+
+    if (maxOffsetHexLength < 2)
+        maxOffsetHexLength = 2;
+    if (maxOffsetHexLength % 2 != 0)
+        maxOffsetHexLength++;
+
+    for (int i = 0; i < len; i++)
     {
         printf("   ");
         printf("(0x");
         uint32_t temp = offset[i];
         int hexLength = 0;
-        if (temp == 0) 
+        if (temp == 0)
         {
             hexLength = 1;
-        } 
-        else 
+        }
+        else
         {
             uint32_t t = temp;
-            while (t > 0) 
+            while (t > 0)
             {
                 t >>= 4;
                 hexLength++;
             }
         }
 
-        for (int j = hexLength; j < maxOffsetHexLength; j++) 
+        for (int j = hexLength; j < maxOffsetHexLength; j++)
         {
             printf("0");
         }
-        
+
         printf("%X)", offset[i]);
         printf(" ");
         printf("%s", name[i].c_str());
 
         int spacesAfterName = maxNameLength - name[i].length();
         printf(":");
-        
-        for (int j = 0; j < spacesAfterName + 2; j++) 
+
+        for (int j = 0; j < spacesAfterName + 2; j++)
         {
             printf(" ");
         }
 
         printf("\033[33m0x%08X\033[0m\n", val[i]);
     }
-    
+
     printf(" | --------------------------------------------------------------------- |\n");
 }
 
@@ -176,63 +176,88 @@ void tool::FPGA_TOOL_ParseCommand(const std::vector<std::string> &args, const st
 
     if (args.size() == 2)
     {
-        if (IS_FOR_HELP(args)) result->operation = _FPGA_OPERATION::OPERATION_HELP;
+        if (IS_FOR_HELP(args))
+            result->operation = _FPGA_OPERATION::OPERATION_HELP;
     }
     if (args.size() == 5)
     {
-        if (IS_LIST_DEVICE_REGISTERS(args, DEVICE_NAME__ADC_CONTROLLER)) result->operation = _FPGA_OPERATION::LIST_DEVICE__ADC;
-        else if (IS_LIST_DEVICE_REGISTERS(args, DEVICE_NAME__AXI_DMA)) result->operation = _FPGA_OPERATION::LIST_DEVICE__DMA;
-        else if (IS_LIST_DEVICE_REGISTERS(args, DEVICE_NAME__CIRCULAR_BUFFER)) result->operation = _FPGA_OPERATION::LIST_DEVICE__CBUF;
-        else if (IS_LIST_DEVICE_REGISTERS(args, DEVICE_NAME__FIR_FILTER_BANK)) result->operation = _FPGA_OPERATION::LIST_DEVICE__FIR;
-        else if (IS_LIST_DEVICE_REGISTERS(args, DEVICE_NAME__PRE_DELAY_UNIT)) result->operation = _FPGA_OPERATION::LIST_DEVICE__PDLY;
+        if (IS_LIST_DEVICE_REGISTERS(args, DEVICE_NAME__ADC_CONTROLLER))
+            result->operation = _FPGA_OPERATION::LIST_DEVICE__ADC;
+        else if (IS_LIST_DEVICE_REGISTERS(args, DEVICE_NAME__AXI_DMA))
+            result->operation = _FPGA_OPERATION::LIST_DEVICE__DMA;
+        else if (IS_LIST_DEVICE_REGISTERS(args, DEVICE_NAME__CIRCULAR_BUFFER))
+            result->operation = _FPGA_OPERATION::LIST_DEVICE__CBUF;
+        else if (IS_LIST_DEVICE_REGISTERS(args, DEVICE_NAME__FIR_FILTER_BANK))
+            result->operation = _FPGA_OPERATION::LIST_DEVICE__FIR;
+        else if (IS_LIST_DEVICE_REGISTERS(args, DEVICE_NAME__PRE_DELAY_UNIT))
+            result->operation = _FPGA_OPERATION::LIST_DEVICE__PDLY;
     }
     if (args.size() == 7)
     {
-        if (IS_READ_DEVICE_REGISTER(args, DEVICE_NAME__ADC_CONTROLLER)) result->operation = _FPGA_OPERATION::DEVICE_REGISTER_OPERATION__ADC;
-        else if (IS_READ_DEVICE_REGISTER(args, DEVICE_NAME__AXI_DMA)) result->operation = _FPGA_OPERATION::DEVICE_REGISTER_OPERATION__DMA;
-        else if (IS_READ_DEVICE_REGISTER(args, DEVICE_NAME__CIRCULAR_BUFFER)) result->operation = _FPGA_OPERATION::DEVICE_REGISTER_OPERATION__CBUF;
-        else if (IS_READ_DEVICE_REGISTER(args, DEVICE_NAME__FIR_FILTER_BANK)) result->operation = _FPGA_OPERATION::DEVICE_REGISTER_OPERATION__FIR;
-        else if (IS_READ_DEVICE_REGISTER(args, DEVICE_NAME__PRE_DELAY_UNIT)) result->operation = _FPGA_OPERATION::DEVICE_REGISTER_OPERATION__PDLY;
+        if (IS_READ_DEVICE_REGISTER(args, DEVICE_NAME__ADC_CONTROLLER))
+            result->operation = _FPGA_OPERATION::DEVICE_REGISTER_OPERATION__ADC;
+        else if (IS_READ_DEVICE_REGISTER(args, DEVICE_NAME__AXI_DMA))
+            result->operation = _FPGA_OPERATION::DEVICE_REGISTER_OPERATION__DMA;
+        else if (IS_READ_DEVICE_REGISTER(args, DEVICE_NAME__CIRCULAR_BUFFER))
+            result->operation = _FPGA_OPERATION::DEVICE_REGISTER_OPERATION__CBUF;
+        else if (IS_READ_DEVICE_REGISTER(args, DEVICE_NAME__FIR_FILTER_BANK))
+            result->operation = _FPGA_OPERATION::DEVICE_REGISTER_OPERATION__FIR;
+        else if (IS_READ_DEVICE_REGISTER(args, DEVICE_NAME__PRE_DELAY_UNIT))
+            result->operation = _FPGA_OPERATION::DEVICE_REGISTER_OPERATION__PDLY;
 
         result->isread = true;
         result->offset = vuprs::ParseNumberFromString(args[6], &offset_parseStatus);
 
-        if (!offset_parseStatus) result->operation = _FPGA_OPERATION::OPERATION_ERR;
+        if (!offset_parseStatus)
+            result->operation = _FPGA_OPERATION::OPERATION_ERR;
     }
     else if (args.size() == 9)
     {
-        if (IS_WRITE_DEVICE_REGISTER(args, DEVICE_NAME__ADC_CONTROLLER)) result->operation = _FPGA_OPERATION::DEVICE_REGISTER_OPERATION__ADC;
-        else if (IS_WRITE_DEVICE_REGISTER(args, DEVICE_NAME__AXI_DMA)) result->operation = _FPGA_OPERATION::DEVICE_REGISTER_OPERATION__DMA;
-        else if (IS_WRITE_DEVICE_REGISTER(args, DEVICE_NAME__CIRCULAR_BUFFER)) result->operation = _FPGA_OPERATION::DEVICE_REGISTER_OPERATION__CBUF;
-        else if (IS_WRITE_DEVICE_REGISTER(args, DEVICE_NAME__FIR_FILTER_BANK)) result->operation = _FPGA_OPERATION::DEVICE_REGISTER_OPERATION__FIR;
-        else if (IS_WRITE_DEVICE_REGISTER(args, DEVICE_NAME__PRE_DELAY_UNIT)) result->operation = _FPGA_OPERATION::DEVICE_REGISTER_OPERATION__PDLY;
+        if (IS_WRITE_DEVICE_REGISTER(args, DEVICE_NAME__ADC_CONTROLLER))
+            result->operation = _FPGA_OPERATION::DEVICE_REGISTER_OPERATION__ADC;
+        else if (IS_WRITE_DEVICE_REGISTER(args, DEVICE_NAME__AXI_DMA))
+            result->operation = _FPGA_OPERATION::DEVICE_REGISTER_OPERATION__DMA;
+        else if (IS_WRITE_DEVICE_REGISTER(args, DEVICE_NAME__CIRCULAR_BUFFER))
+            result->operation = _FPGA_OPERATION::DEVICE_REGISTER_OPERATION__CBUF;
+        else if (IS_WRITE_DEVICE_REGISTER(args, DEVICE_NAME__FIR_FILTER_BANK))
+            result->operation = _FPGA_OPERATION::DEVICE_REGISTER_OPERATION__FIR;
+        else if (IS_WRITE_DEVICE_REGISTER(args, DEVICE_NAME__PRE_DELAY_UNIT))
+            result->operation = _FPGA_OPERATION::DEVICE_REGISTER_OPERATION__PDLY;
 
         result->isread = false;
         result->offset = vuprs::ParseNumberFromString(args[6], &offset_parseStatus);
         result->value = vuprs::ParseNumberFromString(args[8], &value_parseStatus);
 
-        if (!offset_parseStatus || !value_parseStatus) result->operation = _FPGA_OPERATION::OPERATION_ERR;
+        if (!offset_parseStatus || !value_parseStatus)
+            result->operation = _FPGA_OPERATION::OPERATION_ERR;
     }
     else if (args.size() == 11)
     {
-        if (_IS_MEM_OPERATION(args, MEMORY_NAME__DDR)) result->operation = _FPGA_OPERATION::MEMORY_OPERATION__DDR;
-        else if (_IS_MEM_OPERATION(args, MEMORY_NAME__FIR_BRAM)) result->operation = _FPGA_OPERATION::MEMORY_OPERATION__FIR_BRAM;
-        else if (_IS_MEM_OPERATION(args, MEMORY_NAME__SG_BRAM)) result->operation = _FPGA_OPERATION::MEMORY_OPERATION__SG_BRAM;
-        else if (_IS_MEM_OPERATION(args, MEMORY_NAME__CIRCULAR_BUFFER_BRAM)) result->operation = _FPGA_OPERATION::MEMORY_OPERATION__CBUF_BRAM;
+        if (_IS_MEM_OPERATION(args, MEMORY_NAME__DDR))
+            result->operation = _FPGA_OPERATION::MEMORY_OPERATION__DDR;
+        else if (_IS_MEM_OPERATION(args, MEMORY_NAME__FIR_BRAM))
+            result->operation = _FPGA_OPERATION::MEMORY_OPERATION__FIR_BRAM;
+        else if (_IS_MEM_OPERATION(args, MEMORY_NAME__SG_BRAM))
+            result->operation = _FPGA_OPERATION::MEMORY_OPERATION__SG_BRAM;
+        else if (_IS_MEM_OPERATION(args, MEMORY_NAME__CIRCULAR_BUFFER_BRAM))
+            result->operation = _FPGA_OPERATION::MEMORY_OPERATION__CBUF_BRAM;
 
-        if (IS_READ_OPERATION(args[2]) && args[9] == "-O") result->isread = true;
-        else if (IS_WRITE_OPERATION(args[2]) && args[9] == "-I") result->isread = false;
-        else result->operation = _FPGA_OPERATION::OPERATION_ERR;
+        if (IS_READ_OPERATION(args[2]) && args[9] == "-O")
+            result->isread = true;
+        else if (IS_WRITE_OPERATION(args[2]) && args[9] == "-I")
+            result->isread = false;
+        else
+            result->operation = _FPGA_OPERATION::OPERATION_ERR;
 
         result->offset = vuprs::ParseNumberFromString(args[6], &offset_parseStatus);
 
-        if (IS_FILE_SIZE(args[8])) 
+        if (IS_FILE_SIZE(args[8]))
         {
             result->transfersize = 0;
             result->transferSizeIfFilesize = true;
             transfersize_parseStatus = true;
         }
-        else 
+        else
         {
             result->transfersize = vuprs::ParseNumberFromString(args[8], &transfersize_parseStatus);
             result->transferSizeIfFilesize = false;
@@ -240,7 +265,8 @@ void tool::FPGA_TOOL_ParseCommand(const std::vector<std::string> &args, const st
 
         result->file = argsLower[10];
 
-        if (!offset_parseStatus || !transfersize_parseStatus) result->operation = _FPGA_OPERATION::OPERATION_ERR;
+        if (!offset_parseStatus || !transfersize_parseStatus)
+            result->operation = _FPGA_OPERATION::OPERATION_ERR;
     }
 }
 
@@ -248,11 +274,14 @@ void tool::FPGA_TOOL_RestoreCommand(std::vector<std::string> *args)
 {
     if (args->size() == 7)
     {
-        if (IS_WRITE_DATA_TO_MEM_F0_S0((*args))) *args = RESTORE_CMD__WRITE_DATA_TO_MEM_F0_S0((*args));
+        if (IS_WRITE_DATA_TO_MEM_F0_S0((*args)))
+            *args = RESTORE_CMD__WRITE_DATA_TO_MEM_F0_S0((*args));
     }
     else if (args->size() == 9)
     {
-        if (IS_READ_DATA_FROM_MEM_F0((*args))) *args = RESTORE_CMD__READ_DATA_FROM_MEM_F0((*args));
-        if (IS_WRITE_DATA_TO_MEM_F0((*args))) *args = RESTORE_CMD__WRITE_DATA_TO_MEM_F0((*args));
+        if (IS_READ_DATA_FROM_MEM_F0((*args)))
+            *args = RESTORE_CMD__READ_DATA_FROM_MEM_F0((*args));
+        if (IS_WRITE_DATA_TO_MEM_F0((*args)))
+            *args = RESTORE_CMD__WRITE_DATA_TO_MEM_F0((*args));
     }
 }
