@@ -183,18 +183,18 @@ uint32_t vuprs::FPGA_Device__ADCController::GetSCIValueForSamplingFrequency(doub
     double f_SCI = this->SCI2FS(SCI);
     double f_SCI_u = this->SCI2FS(SCI_u);
     double f_SCI_l = this->SCI2FS(SCI_l);
-    if (abs(f_SCI - fs) <= abs(f_SCI_u - fs) &&
-        abs(f_SCI - fs) <= abs(f_SCI_l - fs))
+    if (std::abs(f_SCI - fs) <= std::abs(f_SCI_u - fs) &&
+        std::abs(f_SCI - fs) <= std::abs(f_SCI_l - fs))
     {
         return SCI;
     }
-    else if (abs(f_SCI_u - fs) <= abs(f_SCI - fs) &&
-             abs(f_SCI_u - fs) <= abs(f_SCI_l - fs))
+    else if (std::abs(f_SCI_u - fs) <= std::abs(f_SCI - fs) &&
+             std::abs(f_SCI_u - fs) <= std::abs(f_SCI_l - fs))
     {
         return SCI_u;
     }
-    else if (abs(f_SCI_l - fs) <= abs(f_SCI - fs) &&
-             abs(f_SCI_l - fs) <= abs(f_SCI_u - fs))
+    else if (std::abs(f_SCI_l - fs) <= std::abs(f_SCI - fs) &&
+             std::abs(f_SCI_l - fs) <= std::abs(f_SCI_u - fs))
     {
         return SCI_l;
     }

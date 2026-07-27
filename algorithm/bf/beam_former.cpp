@@ -1,8 +1,5 @@
 #include "algorithm/bf/beam_former.h"
 
-#define BEAM_FORMER_CPP__DEBUG_PRINT false
-#define BEAM_FORMER_CPP__DEBUG_SAVE false
-
 /* ------------------------------------------------------------------------------ */
 /* ---------------------------------- DCRCB ------------------------------------- */
 /* ------------------------------------------------------------------------------ */
@@ -22,7 +19,7 @@ void vuprs::Beamformer_DCRCB::CalculateBeamformingForOneFreq(int freqIndex)
     Eigen::Matrix<Eigen::dcomplex, -1, -1> R = this->estimate_covMatrix[freqIndex];
     double fs = this->signalFrequencyList(freqIndex);
     double e0 = this->array.CalculateSteeringVectorErrorRadius(fs);
-    int M = this->array.elementArray.size();
+    int M = this->array.size();
     /* Compute */
     Eigen::Matrix<double, -1, 1> gamma;                      /* matrix gamma (Note: not diag) */
     Eigen::Matrix<double, -1, 1> inv_gamma;                  /* matrix gamma.(-1) (Note: not diag) */
@@ -41,15 +38,6 @@ void vuprs::Beamformer_DCRCB::CalculateBeamformingForOneFreq(int freqIndex)
     U_H = U.adjoint();
     min_eig = gamma.minCoeff();
     max_eig = gamma.maxCoeff();
-#if (BEAM_FORMER_CPP__DEBUG_SAVE || BEAM_FORMER_CPP__DEBUG_PRINT)
-    /* DEBUG ! */
-    if (freqIndex == 100 || freqIndex == 200)
-    {
-#if BEAM_FORMER_CPP__DEBUG_PRINT
-        printf("[debug] DCRCB: (max, min) eigenvalue (@ index = %d) is (%.6f, %.6f)\n", freqIndex, max_eig, min_eig);
-#endif
-    }
-#endif
     zs = U_H * ps;
     zs2 = zs.array().abs2().matrix();
 
@@ -89,18 +77,6 @@ void vuprs::Beamformer_DCRCB::CalculateBeamformingForOneFreq(int freqIndex)
     w = invR_ps_hat / (ps_hat.adjoint() * invR_ps_hat)(0, 0);
     /* Dump */
     this->resultWeightVectors.col(freqIndex) = w;
-#if (BEAM_FORMER_CPP__DEBUG_SAVE || BEAM_FORMER_CPP__DEBUG_PRINT)
-    /* DEBUG ! */
-    if (freqIndex == 100 || freqIndex == 200)
-    {
-#if BEAM_FORMER_CPP__DEBUG_SAVE
-        vuprs::SaveToCSV_complex(this->resultWeightVectors.col(freqIndex), "../weights/weight_" + std::to_string(freqIndex) + ".csv");
-#endif
-#if BEAM_FORMER_CPP__DEBUG_PRINT
-        printf("[debug] DCRCB: frequency (@ index = %d) = %.6f Hz\n", freqIndex, this->signalFrequencyList(freqIndex));
-#endif
-    }
-#endif
 }
 
 /* ------------------------------------------------------------------------------ */
@@ -118,20 +94,8 @@ vuprs::Beamformer_CBF::~Beamformer_CBF()
 void vuprs::Beamformer_CBF::CalculateBeamformingForOneFreq(int freqIndex)
 {
     Eigen::Matrix<Eigen::dcomplex, -1, 1> ps = this->steeringVectors.col(freqIndex); /* ps */
-    double M = this->array.elementArray.size();                                      /* M */
+    double M = this->array.size();                                                   /* M */
     this->resultWeightVectors.col(freqIndex) = ps / M;
-#if (BEAM_FORMER_CPP__DEBUG_SAVE || BEAM_FORMER_CPP__DEBUG_PRINT)
-    /* DEBUG ! */
-    if (freqIndex == 100 || freqIndex == 200)
-    {
-#if BEAM_FORMER_CPP__DEBUG_SAVE
-        vuprs::SaveToCSV_complex(this->resultWeightVectors.col(freqIndex), "../weights/weight_" + std::to_string(freqIndex) + ".csv");
-#endif
-#if BEAM_FORMER_CPP__DEBUG_PRINT
-        printf("[debug] CBF: frequency (@ index = %d) = %.6f Hz\n", freqIndex, this->signalFrequencyList(freqIndex));
-#endif
-    }
-#endif
 }
 
 /* ------------------------------------------------------------------------------ */
@@ -152,7 +116,7 @@ void vuprs::Beamformer_MVDR::CalculateBeamformingForOneFreq(int freqIndex)
     Eigen::Matrix<Eigen::dcomplex, -1, 1> ps = this->steeringVectors.col(freqIndex);
     Eigen::Matrix<Eigen::dcomplex, -1, -1> R = this->estimate_covMatrix[freqIndex];
     double fs = this->signalFrequencyList(freqIndex);
-    int M = this->array.elementArray.size();
+    int M = this->array.size();
     /* Compute */
     Eigen::Matrix<Eigen::dcomplex, -1, -1> invR;   /* R.-1 = U * GAMMA.-1 * U.H */
     Eigen::Matrix<Eigen::dcomplex, -1, 1> invR_ps; /* R.-1 * ps */
@@ -162,16 +126,4 @@ void vuprs::Beamformer_MVDR::CalculateBeamformingForOneFreq(int freqIndex)
     w = invR_ps / (ps.adjoint() * invR_ps)(0, 0);
     /* Dump */
     this->resultWeightVectors.col(freqIndex) = w;
-#if (BEAM_FORMER_CPP__DEBUG_SAVE || BEAM_FORMER_CPP__DEBUG_PRINT)
-    /* DEBUG ! */
-    if (freqIndex == 100 || freqIndex == 200)
-    {
-#if BEAM_FORMER_CPP__DEBUG_SAVE
-        vuprs::SaveToCSV_complex(this->resultWeightVectors.col(freqIndex), "../weights/weight_" + std::to_string(freqIndex) + ".csv");
-#endif
-#if BEAM_FORMER_CPP__DEBUG_PRINT
-        printf("[debug] MVDR: frequency (@ index = %d) = %.6f Hz\n", freqIndex, this->signalFrequencyList(freqIndex));
-#endif
-    }
-#endif
 }

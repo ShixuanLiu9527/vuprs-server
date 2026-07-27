@@ -47,7 +47,6 @@ namespace vuprs
                         while (true)
                         {
                             std::function<void()> task;
-
                             {
                                 std::unique_lock<std::mutex> lock(this->queue_mutex);
                                 this->condition.wait(lock, [this] {return this->stop || !this->tasks.empty();});
@@ -55,7 +54,6 @@ namespace vuprs
                                 task = std::move(this->tasks.front());
                                 this->tasks.pop();
                             }
-
                             try 
                             {
                                 task();  /* Do task */

@@ -156,7 +156,7 @@ namespace vuprs
         uint64_t coefficientSize = input.size();
         PARAM_CHECK(coefficientSize > 0, "fpga", " in [FIRCoefficient_DOUBLE_TO_Q31_UINT32] Input FIR coefficient is empty.");
         output->resize(coefficientSize);
-        if (abs(maxAbsCoef - 0.0) < FPGA_TYPE_EPS)
+        if (std::abs(maxAbsCoef - 0.0) < FPGA_TYPE_EPS)
         {
             memset(output->data(), 0, coefficientSize * sizeof(uint32_t));
             return;

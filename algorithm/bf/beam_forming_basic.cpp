@@ -1,3 +1,5 @@
+#include "config.h"
+#include "system_tools/file_processing.h"
 #include "algorithm/bf/beam_forming_basic.h"
 #include "logger/log_manager.h"
 
@@ -68,7 +70,7 @@ double vuprs::BeamFormingArray::CalculateSteeringVectorErrorRadius(double signal
     RUNTIME_CHECK(!this->empty(), "bf", "Array is empty");
 
     /* Calculate time delay error */
-    double timedelay_err = this->maxElementPositionError / DEFAULT_SOUND_VELOCITY_MPS;
+    double timedelay_err = this->maxElementPositionError / DEFAULT_WAVE_VELOCITY;
     /* Get error */
     Eigen::Matrix<double, -1, 1> vec;
     vec.resize(this->elementArray.size(), 1);
@@ -375,93 +377,6 @@ bool vuprs::BeamFormingScanArray::empty() const
 /* --------------------------------------------------------------------------------------------------------------- */
 /* ------------------------------------------------ Tool functions ----------------------------------------------- */
 /* --------------------------------------------------------------------------------------------------------------- */
-
-bool vuprs::SaveToCSV(const std::vector<double> &data, const std::string &filename)
-{
-    if (data.empty())
-    {
-        return true;
-    }
-    std::string dir;
-    vuprs::SplitFile(filename, &dir, nullptr, nullptr);
-    if (!dir.empty() && !vuprs::PathExist(dir))
-    {
-        vuprs::MakeDir(dir);
-    }
-    std::ofstream file(filename);
-    if (!file.is_open())
-    {
-        return false;
-    }
-    file << std::fixed << std::setprecision(20);
-    for (const auto &value : data)
-    {
-        file << value << "\n";
-    }
-    file.close();
-    return true;
-}
-
-bool vuprs::SaveToCSV(const std::vector<std::vector<double>> &data, const std::string &filename)
-{
-    if (data.empty())
-        return true;
-    size_t rowCount = data[0].size();
-    for (size_t i = 1; i < data.size(); ++i)
-    {
-        if (data[i].size() != rowCount)
-            return false;
-    }
-    std::string dir;
-    vuprs::SplitFile(filename, &dir, nullptr, nullptr);
-    if (!dir.empty() && !vuprs::PathExist(dir))
-    {
-        vuprs::MakeDir(dir);
-    }
-    std::ofstream file(filename);
-    if (!file.is_open())
-        return false;
-    file << std::fixed << std::setprecision(20);
-    for (size_t r = 0; r < rowCount; ++r)
-    {
-        for (size_t c = 0; c < data.size(); ++c)
-        {
-            file << data[c][r];
-            if (c + 1 < data.size())
-                file << ",";
-        }
-        file << "\n";
-    }
-    file.close();
-    return true;
-}
-
-bool vuprs::SaveToCSV_complex(const std::vector<std::complex<double>> &data, const std::string &filename)
-{
-    if (data.empty())
-    {
-        return true;
-    }
-    std::string dir;
-    vuprs::SplitFile(filename, &dir, nullptr, nullptr);
-    if (!dir.empty() && !vuprs::PathExist(dir))
-    {
-        vuprs::MakeDir(dir);
-    }
-    std::ofstream file(filename);
-    if (!file.is_open())
-    {
-        return false;
-    }
-    file << "real,imag\n";
-    file << std::fixed << std::setprecision(20);
-    for (const auto &value : data)
-    {
-        file << value.real() << "," << value.imag() << "\n";
-    }
-    file.close();
-    return true;
-}
 
 bool vuprs::SaveToCSV(const Eigen::Matrix<double, -1, 1> &data, const std::string &filename)
 {

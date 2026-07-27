@@ -1,12 +1,6 @@
+#include "config.h"
 #include "collaboration_beamformer.h"
 #include "logger/log_manager.h"
-
-#define ARM_FPGA_BF_COLLAB_CPP__DEBUG_PRINT false /* print something @ debug mode */
-#define ARM_FPGA_BF_COLLAB_CPP__DEBUG_SAVE false  /* save data @ debug mode */
-
-#define CIRCULAR_BUFFER_DEBUG_FILENAME "./signals/signal.csv"
-#define FIR_RESULT_DEBUG_FILENAME "./signals/bf_result.csv"
-#define FIR_COEF_DEBUG_FILENAME "./signals/fir_coef.csv"
 
 vuprs::CollaborationBeamformer::CollaborationBeamformer()
 {
@@ -17,7 +11,7 @@ vuprs::CollaborationBeamformer::CollaborationBeamformer()
         std::lock_guard<std::mutex> lock(this->mut_scan_opt); /* LOCK */
         this->scan_pointsInHalf = DEFAULT_SCANNING_POINTS_IN_HALF;
         this->scan_alt_min = DEFAULT_SCANNING_ALTITUDE_MIN;
-        this->scan_waveVelocity = DEFAULT_SCANNING_WAVE_VELOCITY;
+        this->scan_waveVelocity = DEFAULT_WAVE_VELOCITY;
         vuprs::FibonacciGrid(this->scan_pointsInHalf,
                              &this->scan_alt,
                              &this->scan_az,
@@ -138,7 +132,7 @@ bool vuprs::CollaborationBeamformer::StartBeamformerWithConfiguration(const Coll
     /* Step 2: Initialize loop cycle */
     this->interruptWaitTime_us = descriptorUpdateCycle_us / 20;
     this->circularBufferWaitTime_us = descriptorUpdateCycle_us / 20;
-#if ARM_FPGA_BF_COLLAB_CPP__DEBUG_PRINT
+#if DEBUG
     printf("DMA descriptor update cycle: %d us\n", descriptorUpdateCycle_us);
     printf("DMA interrupt wait time: %d us\n", this->interruptWaitTime_us.load());
     printf("Circular buffer interrupt wait time: %d us\n", this->circularBufferWaitTime_us.load());
@@ -418,7 +412,7 @@ void vuprs::CollaborationBeamformer::THREAD__ListenDMAInterrupt()
                 this->dmaCurDesc.store(r_val);
                 if (!isFirstChange)
                 {
-#if ARM_FPGA_BF_COLLAB_CPP__DEBUG_PRINT
+#if DEBUG
                     printf("[debug] DMA interrupt detected, current desc = 0x%X\n", r_val);
 #endif
                     this->dmaDescriptorIRQ = true;
@@ -446,8 +440,11 @@ void vuprs::CollaborationBeamformer::THREAD__ReadResult()
     std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> _refDescriptors;
     vuprs::AlignedBufferDMA buffer;
     std::vector<uint32_t> result;
-    std::vector<double> result_d;
     bool hasInterrupt;
+#if DEBUG
+    std::vector<double> result_d;
+    int debug_file_group = 0;
+#endif
     {
         std::lock_guard<std::mutex> lock(this->mut); /* LOCK */
         _refDescriptors = this->dmaDescriptors;
@@ -487,9 +484,17 @@ void vuprs::CollaborationBeamformer::THREAD__ReadResult()
                                               previousDescriptor.ALIGNMENT_2_BUFFER_SIZE);
                 /* Convert buffer to vector */
                 result = buffer.to_vector<uint32_t>();
-#if ARM_FPGA_BF_COLLAB_CPP__DEBUG_SAVE
-                vuprs::FIRResult_Q16_TO_DOUBLE(result, &result_d);
-                vuprs::SaveToCSV(result_d, FIR_RESULT_DEBUG_FILENAME);
+#if DEBUG
+                buffer.to_file(std::string(DEBUG_FILES_ROOT_DIR) + "/" +
+                               std::string(DEBUG_FILES_DIR) + "-" + std::to_string(debug_file_group) + "/" +
+                               std::string(FIR_RESULT_BIN_DEBUG_FILENAME));
+                vuprs::FIRResult_Q16_TO_DOUBLE(result, &result_d); /* Convert to double */
+                vuprs::SaveToCSV(result_d, std::string(DEBUG_FILES_ROOT_DIR) + "/" +
+                                               std::string(DEBUG_FILES_DIR) + "-" + std::to_string(debug_file_group) + "/" +
+                                               std::string(FIR_RESULT_DEBUG_FILENAME));
+                debug_file_group++;
+                if (debug_file_group >= DEBUG_DATA_GROUP_COUNT)
+                    debug_file_group = 0;
 #endif
                 /* Push data to queue */
                 {
@@ -500,7 +505,6 @@ void vuprs::CollaborationBeamformer::THREAD__ReadResult()
                         this->resultQueue.pop_front(); /* Pop the oldest data to avoid overflow */
                     }
                 }
-
                 this->newResultDataInput = true;
             }
             catch (const std::exception &e)
@@ -525,7 +529,7 @@ void vuprs::CollaborationBeamformer::THREAD__ReadCircularBuffer()
         try
         {
             this->controller.dev__Circular_Buffer.ReadSingleRegisterBIT(vuprs::Circular_Buffer__Registers::CBUF_RS, 1, &r_val);
-#if ARM_FPGA_BF_COLLAB_CPP__DEBUG_PRINT
+#if DEBUG
             printf("[debug] circular buffer CBUF_RS[1] = %d\n", r_val);
 #endif
         }
@@ -583,6 +587,9 @@ void vuprs::CollaborationBeamformer::THREAD__AlgorithmCalculation()
     Eigen::Matrix<Eigen::dcomplex, -1, -1> firExpectedFrequencyResponse; /* Expected frequency response of FIR filter bank */
     std::vector<std::vector<double>> firCoefficients;                    /* Coefficient of FIR filter bank, [channel][point] */
     std::vector<std::string> channelName;                                /* Channel name */
+#if DEBUG
+    int debug_file_group = 0;
+#endif
     while (this->system_run)
     {
         /* Sleep here to wait interrupt */
@@ -607,9 +614,6 @@ void vuprs::CollaborationBeamformer::THREAD__AlgorithmCalculation()
             /* Read signal data from queue */
             signal = this->arraySignalQueue.front();
             this->arraySignalQueue.pop_front();
-#if ARM_FPGA_BF_COLLAB_CPP__DEBUG_SAVE
-            signal.ToCSV(CIRCULAR_BUFFER_DEBUG_FILENAME);
-#endif
             /* Step 1: Push data to Beam forming algorithm */
             this->bf->InputSignal(signal);
             /* Step 2: Update covariance matrix */
@@ -632,20 +636,23 @@ void vuprs::CollaborationBeamformer::THREAD__AlgorithmCalculation()
                                                              this->hardwareSamplingFrequency);
             this->fir.GetFIRBankCoefficient(&firCoefficients);
         }
+#if DEBUG
+        signal.ToCSV(std::string(DEBUG_FILES_ROOT_DIR) + "/" +
+                     std::string(DEBUG_FILES_DIR) + "-" + std::to_string(debug_file_group) + "/" +
+                     std::string(CIRCULAR_BUFFER_DEBUG_FILENAME));
+        printf("[debug] max FIR coefficient = %.8f\n", this->fir.MaxAbsoluteFIRCoefficient());
+        debug_file_group++;
+        if (debug_file_group >= DEBUG_DATA_GROUP_COUNT)
+            debug_file_group = 0;
+#endif
         /* Issue coefficients to FIR */
         fpgaOperationStatus = true;
         try
         {
-#if ARM_FPGA_BF_COLLAB_CPP__DEBUG_SAVE
-            vuprs::SaveToCSV(firCoefficients, FIR_COEF_DEBUG_FILENAME);
-#endif
             fpgaOperationStatus &= vuprs::FPGA_API__FIR__SetCoefficients(&this->controller,
                                                                          &firCoefficients,
                                                                          this->fir.MaxAbsoluteFIRCoefficient());
-#if ARM_FPGA_BF_COLLAB_CPP__DEBUG_PRINT
-            printf("[debug] max FIR coefficient = %.8f\n", this->fir.MaxAbsoluteFIRCoefficient());
-#endif
-            RUNTIME_CHECK(fpgaOperationStatus, "collab_bf", " in [CollaborationBeamformer::THREAD__AlgorithmCalculation] FPGA operation failed.");
+            RUNTIME_CHECK(fpgaOperationStatus, "collab_bf", "FPGA operation failed.");
         }
         catch (const std::exception &e)
         {

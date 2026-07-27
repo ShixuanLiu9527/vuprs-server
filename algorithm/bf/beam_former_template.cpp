@@ -1,7 +1,6 @@
+#include "config.h"
 #include "algorithm/bf/beam_former_template.h"
 #include "logger/log_manager.h"
-
-#define BEAM_FORMER_TEMPLATE_DEBUG_PRINT false
 
 vuprs::WidebandBeamformerTemplate::WidebandBeamformerTemplate()
 {
@@ -38,13 +37,13 @@ bool vuprs::WidebandBeamformerTemplate::ConfigArrayFromJson(const std::string &a
 {
     if (this->array.LoadArrayFromJson(arrayConfigJsonFilename))
     {
-        int arraySize = this->array.elementArray.size();
+        int arraySize = this->array.size();
         this->elementChannelName.resize(arraySize);
         this->elementPredelayTime.resize(arraySize);
         this->elementPredelayCount.resize(arraySize);
         for (int i = 0; i < arraySize; i++)
         {
-            this->elementChannelName[i] = this->array.elementArray[i].adcChannel;
+            this->elementChannelName[i] = this->array[i].adcChannel;
         }
         this->is_arrayConfigDone = true;
         this->scan_array.LoadArrayFromJson(arrayConfigJsonFilename); /* Load scan array, which has same element position as array but different time delay */
@@ -66,7 +65,7 @@ bool vuprs::WidebandBeamformerTemplate::CalculateEnable() const
 int vuprs::WidebandBeamformerTemplate::ElementCount() const
 {
     RUNTIME_CHECK(this->ConfigDone(), "bf", "Config not complete");
-    return this->array.elementArray.size();
+    return this->array.size();
 }
 
 void vuprs::WidebandBeamformerTemplate::InputSignal(const vuprs::SignalData &signal)
@@ -74,7 +73,7 @@ void vuprs::WidebandBeamformerTemplate::InputSignal(const vuprs::SignalData &sig
     RUNTIME_CHECK(this->ConfigDone(), "bf", "Config not complete");
     this->array.InputElementSignal(signal);
     this->is_signalEmpty = false;
-    if (signal.signalPoints != this->signalPoints && abs(signal.samplingFrequency - this->fs) > 1e-3)
+    if (signal.signalPoints != this->signalPoints && std::abs(signal.samplingFrequency - this->fs) > 1e-3)
     {
         this->fs = signal.samplingFrequency;
         this->signalPoints = signal.signalPoints;
@@ -186,7 +185,7 @@ void vuprs::WidebandBeamformerTemplate::GetFIRExpectedFrequencyResponse(Eigen::M
         *dst = this->resultWeightVectors;
         return;
     }
-    uint64_t M = this->array.elementArray.size();
+    uint64_t M = this->array.size();
     /* [T1, T2, ..., TM] */
     Eigen::Map<const Eigen::VectorXd> Tm_vec(this->elementPredelayTime.data(), M);
     /* [ exp(j*2*pi*fk*Tm) ] */
@@ -198,11 +197,6 @@ void vuprs::WidebandBeamformerTemplate::GetFIRExpectedFrequencyResponse(Eigen::M
     int nyquist_idx = dst->cols() - 1;
     dst->col(0).imag().setZero();
     dst->col(nyquist_idx).imag().setZero();
-    // for (int m = 0; m < dst->rows(); m++)
-    // {
-    //     (*dst)(m, 0) = (*dst)(m, 0).real();
-    //     (*dst)(m, nyquist_idx) = (*dst)(m, nyquist_idx).real();
-    // }
 }
 
 void vuprs::WidebandBeamformerTemplate::UpdateElementPredelay_externalFS(double firLength,
@@ -215,12 +209,12 @@ void vuprs::WidebandBeamformerTemplate::UpdateElementPredelay_externalFS(double 
     RUNTIME_CHECK(this->ConfigDone(), "bf", "No signal input");
     RUNTIME_CHECK(elementPredelayTime && elementPredelayCount && channelName, "bf", "Predelay pointer is NULL");
     /* Calculate predelay */
-    uint64_t M = this->array.elementArray.size();
+    uint64_t M = this->array.size();
     double Ts = 1.0 / fs;
     int minPredelayCount = INT_MAX;
     for (uint64_t i = 0; i < M; i++)
     {
-        this->elementPredelayCount[i] = includeFIRGroupDelay ? -std::round(this->array.elementArray[i].timeDelay / Ts + (firLength - 1.0) / 2.0) : -std::round(this->array.elementArray[i].timeDelay / Ts);
+        this->elementPredelayCount[i] = includeFIRGroupDelay ? -std::round(this->array[i].timeDelay / Ts + (firLength - 1.0) / 2.0) : -std::round(this->array[i].timeDelay / Ts);
         minPredelayCount = std::min(this->elementPredelayCount[i], minPredelayCount);
     }
     for (uint64_t i = 0; i < M; i++)
@@ -255,8 +249,11 @@ void vuprs::WidebandBeamformerTemplate::UpdateAndGetElementPredelay(double firLe
                                                                     std::vector<double> *elementPredelayTime,
                                                                     std::vector<std::string> *channelName)
 {
-    this->UpdateElementPredelay_externalFS(firLength, fs, includeFIRGroupDelay,
-                                           elementPredelayCount, elementPredelayTime, channelName);
+    this->UpdateElementPredelay_externalFS(firLength,
+                                           fs, includeFIRGroupDelay,
+                                           elementPredelayCount,
+                                           elementPredelayTime,
+                                           channelName);
 }
 
 bool vuprs::WidebandBeamformerTemplate::ScanForPositionPower(std::vector<double> *res,
@@ -276,7 +273,7 @@ bool vuprs::WidebandBeamformerTemplate::ScanForPositionPower(std::vector<double>
     }
 
     /* STEP 0: Prepare for data */
-    double M = this->array.elementArray.size();                                      /* Element counts */
+    double M = this->array.size();                                                   /* Element counts */
     int k = alt.size();                                                              /* Scan points counts */
     int f_count = this->estimate_covMatrix.size();                                   /* Frequency counts */
     Eigen::Matrix<double, 1, -1> totalPower = Eigen::Matrix<double, 1, -1>::Zero(k); /* Total power for each scan position */
@@ -287,9 +284,6 @@ bool vuprs::WidebandBeamformerTemplate::ScanForPositionPower(std::vector<double>
     }
     std::mutex mut_total; /* Mutex for totalPower */
     std::vector<std::future<void>> futures;
-#if BEAM_FORMER_TEMPLATE_DEBUG_PRINT
-    std::cout << "[ScanForPositionPower] Start scanning for position power. Scan points: " << k << ", Frequency points: " << f_count << ", Element counts: " << M << std::endl;
-#endif
     for (int i = 0; i < f_count; i++)
     {
         /* Calculate power (in each alt & az) for frequency index i */
@@ -359,7 +353,7 @@ void vuprs::WidebandBeamformerTemplate::CalculateBeamforming()
     int numFreqs = this->estimate_covMatrix.size(); /* = N / 2 + 1 */
     if (numFreqs == 0)
         return;
-    int M = this->array.elementArray.size();
+    int M = this->array.size();
     std::vector<std::future<void>> futures;
     this->resultWeightVectors.resize(M, numFreqs);
     futures.reserve(numFreqs);

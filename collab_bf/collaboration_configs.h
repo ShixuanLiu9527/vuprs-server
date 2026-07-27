@@ -5,10 +5,6 @@
 #include <vector>
 #include "fpga/fpga_controller.h"
 
-#define DEFAULT_SCANNING_POINTS_IN_HALF 100
-#define DEFAULT_SCANNING_ALTITUDE_MIN 15.0
-#define DEFAULT_SCANNING_WAVE_VELOCITY 346.0
-
 namespace vuprs
 {
     /**
@@ -30,6 +26,7 @@ namespace vuprs
         bool m_dma__bufferCount;                  /* Mask of [dma__bufferCount] */
         bool m_queue__circularBufferQueueSizeMAX; /* Mask of [queue__circularBufferQueueSizeMAX] */
         bool m_queue__resultQueueSizeMAX;         /* Mask of [queue__resultQueueSizeMAX] */
+
         CollaborationBeamformerConfigMask() { this->Reset(); }
 
         /**
@@ -44,6 +41,10 @@ namespace vuprs
         void SetDefault();
 
     public:
+        /*
+            Note: The sampling time for each package is:
+            dma__bufferSize / (sizeof(uint32_t)) / fs (seconds)
+         */
         double fs;                                  /* sampling frequency (unit: Hz), the valid range is [10, 120000] Hz */
         double bf_target__alt;                      /* altitude (unit: degree) of beam former pointing target */
         double bf_target__az;                       /* azimuth (unit: degree) of beam former pointing target */
@@ -52,10 +53,10 @@ namespace vuprs
         double bf_freq__upper;                      /* upper boundary of beam former work frequency (unit: Hz), the valid range is [10, 120000] Hz */
         int bf_cov_snapshotsWindowSize;             /* Snapshots window size (to fit covariance matrix) */
         double bf_cov_freqAverageIndex;             /* frequency average index (to fit covariance matrix) */
-        uint32_t dma__bufferSize;                   /* AXI DMA descriptor buffer size in bytes */
-        uint32_t dma__bufferCount;                  /* AXI DMA descriptor buffer count */
-        uint32_t queue__circularBufferQueueSizeMAX; /* MAX size of circular buffer data queue */
-        uint32_t queue__resultQueueSizeMAX;         /* MAX size of result data queue */
+        uint32_t dma__bufferSize;                   /* [internal param] AXI DMA descriptor buffer size in bytes */
+        uint32_t dma__bufferCount;                  /* [internal param] AXI DMA descriptor buffer count */
+        uint32_t queue__circularBufferQueueSizeMAX; /* [internal param] MAX size of circular buffer data queue */
+        uint32_t queue__resultQueueSizeMAX;         /* [internal param] MAX size of result data queue */
         vuprs::CollaborationBeamformerConfigMask mask;
 
         CollaborationBeamformerConfig() { this->SetDefault(); }
@@ -93,10 +94,7 @@ namespace vuprs
         int pointsInHalf;
         double alt_min;
         bool needRegeneratePositionPoints;
-
-        ScanningConfig() : pointsInHalf(DEFAULT_SCANNING_POINTS_IN_HALF),
-                           alt_min(DEFAULT_SCANNING_ALTITUDE_MIN),
-                           needRegeneratePositionPoints(true) {}
+        ScanningConfig();
     };
 
     struct ScanResult

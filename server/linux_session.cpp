@@ -1,7 +1,8 @@
-#include "linux_session.h"
+#include "config.h"
+#include "server/linux_session.h"
 #include "logger/log_manager.h"
 
-#define LINUX_SESSION_CPP__DEBUG_PRINT false  /* print something @ debug mode */
+#define LINUX_SESSION_CPP__DEBUG_PRINT false /* print something @ debug mode */
 
 vuprs::LinuxSession::LinuxSession(const std::string &frameHeader, const std::string &frameTailer)
 {
@@ -49,31 +50,27 @@ std::string vuprs::LinuxSession::ClientInformation() const
     return manager->ClientInformation();
 }
 
-void vuprs::LinuxSession::Start() 
+void vuprs::LinuxSession::Start()
 {
     this->running = true;
-    std::cout << "[session][" << this->ClientInformation() << "] start receive loop."   << std::endl;
+    std::cout << "[session][" << this->ClientInformation() << "] start receive loop." << std::endl;
     this->ReceiveLoop();
 }
 
 void vuprs::LinuxSession::Stop()
 {
     /* Close client file descriptor */
-
     this->running = false;
-
     std::shared_ptr<vuprs::SocketIOManager> manager;
     {
         std::unique_lock<std::mutex> lock(this->mut);
         manager = this->socketIOManager.lock();
         this->socketIOManager.reset();
     }
-
     if (manager != nullptr)
     {
         manager->CloseSocket();
     }
-
     this->isIOManagerBind = false;
 }
 
@@ -98,7 +95,7 @@ void vuprs::LinuxSession::UnbindIOManager()
     this->isIOManagerBind = false;
 }
 
-bool vuprs::LinuxSession::IsRun() const 
+bool vuprs::LinuxSession::IsRun() const
 {
     return this->running;
 }
@@ -108,11 +105,10 @@ void vuprs::LinuxSession::SetMessageHandler(vuprs::SessionMessageHandler handler
     this->messageHandler = std::move(handler);
 }
 
-void vuprs::LinuxSession::ReceiveLoop() 
+void vuprs::LinuxSession::ReceiveLoop()
 {
-    vuprs::SocketReceiveData data;  /* received data */
+    vuprs::SocketReceiveData data; /* received data */
     std::string clientInfo = "unknown-client";
-
     try
     {
         clientInfo = this->ClientInformation();
@@ -120,26 +116,21 @@ void vuprs::LinuxSession::ReceiveLoop()
     catch (...)
     {
     }
-    
     while (this->running)
     {
-
         this->ReceiveMessage(this->frameTailer, &data);
-        
         if (data.is_connect && data.receiveBytes > 0)
         {
             std::string message;
-
-            if(vuprs::CheckFrameFormat(data, this->frameHeader, this->frameTailer, &message))
+            if (vuprs::CheckFrameFormat(data, this->frameHeader, this->frameTailer, &message))
             {
                 /* Get message from client */
-            
                 if (this->messageHandler != nullptr)
                 {
-                #if LINUX_SESSION_CPP__DEBUG_PRINT
+#if DEBUG
                     std::cout << "[session][" << clientInfo << "] received message: " << message << std::endl;
-                #endif
-                    this->messageHandler(this->socketIOManager, message);  /* Call user function */
+#endif
+                    this->messageHandler(this->socketIOManager, message); /* Call user function */
                 }
                 else
                 {
@@ -148,36 +139,25 @@ void vuprs::LinuxSession::ReceiveLoop()
                 }
             }
         }
-        else if (!data.is_connect)  /* Connect shut down */
+        else if (!data.is_connect) /* Connect shut down */
         {
-            std::cout << "[session][" << clientInfo << "] disconnected."  << std::endl;
+            std::cout << "[session][" << clientInfo << "] disconnected." << std::endl;
             break;
         }
-
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
-    
-    running = false;
-
+    this->running = false;
     std::cout << "[session][" << clientInfo << "] client service end." << std::endl;
 }
 
-std::string vuprs::LinuxSession::DefaultMessageProcess(const std::string& message) 
+std::string vuprs::LinuxSession::DefaultMessageProcess(const std::string &message)
 {
-    if (message == "hello") 
-    {
+    if (message == "hello")
         return "This is vuprs server.";
-    }
     else if (message == "status")
-    {
         return "server status: running";
-    } 
-    else if (message == "quit" || message == "exit") 
-    {
+    else if (message == "quit" || message == "exit")
         return "server quit.";
-    } 
     else
-    {
         return "echo: " + message;
-    }
 }

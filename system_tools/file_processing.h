@@ -9,6 +9,7 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <complex>
 
 namespace vuprs
 {
@@ -18,6 +19,10 @@ namespace vuprs
     bool PathExist(const std::string &path);
     bool FileExist(const std::string &file);
     bool MakeDir(const std::string &dir);
+
+    bool SaveToCSV(const std::vector<double> &data, const std::string &filename);
+    bool SaveToCSV(const std::vector<std::vector<double>> &data, const std::string &filename);
+    bool SaveToCSV_complex(const std::vector<std::complex<double>> &data, const std::string &filename);
 }
 
 #endif

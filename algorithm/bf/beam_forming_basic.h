@@ -18,8 +18,6 @@
 
 #define VUPRS_EPS_1 1e-5
 
-#define DEFAULT_SOUND_VELOCITY_MPS 346.0 /* (unit: m/s) NOTE: Default value, can only used for estimating steering vector error. */
-
 namespace vuprs
 {
     /**
@@ -81,14 +79,13 @@ namespace vuprs
     private:
         std::unique_ptr<vuprs::ThreadPool> threadPool;
         double maxElementPositionError;
-
-    public:
+        Eigen::Matrix<Eigen::dcomplex, -1, 1> timeDelayVector;
+        vuprs::AlignedEigenVector<vuprs::BeamFormingElement> elementArray;
         double fs = 0.0;           /* sampling frequency for this signal, unit: Hz */
         double samplingTime = 0.0; /* sampling time for this signal, unit: sec */
         int signalPointCounts = 0; /* sampling points for this signal */
-        Eigen::Matrix<Eigen::dcomplex, -1, 1> timeDelayVector;
-        vuprs::AlignedEigenVector<vuprs::BeamFormingElement> elementArray;
 
+    public:
         BeamFormingArray();
 
         ~BeamFormingArray();
@@ -179,6 +176,10 @@ namespace vuprs
 
         bool empty() const;
 
+        BeamFormingElement &operator[](size_t idx) { return this->elementArray[idx]; }
+        const BeamFormingElement &operator[](size_t idx) const { return this->elementArray[idx]; }
+        size_t size() const { return this->elementArray.size(); }
+
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };
 
@@ -238,10 +239,7 @@ namespace vuprs
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };
 
-    bool SaveToCSV(const std::vector<double> &data, const std::string &filename);
-    bool SaveToCSV(const std::vector<std::vector<double>> &data, const std::string &filename);
     bool SaveToCSV(const Eigen::Matrix<double, -1, 1> &data, const std::string &filename);
-    bool SaveToCSV_complex(const std::vector<std::complex<double>> &data, const std::string &filename);
     bool SaveToCSV_complex(const Eigen::Matrix<Eigen::dcomplex, -1, 1> &data, const std::string &filename);
 }
 

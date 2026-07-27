@@ -8,8 +8,8 @@
 #include <condition_variable>
 #include "algorithm/bf/beam_former.h"
 #include "algorithm/bf/fir.h"
-#include "fpga/fpga_api.h"
 #include "collab_bf/collaboration_configs.h"
+#include "fpga/fpga_api.h"
 
 namespace vuprs
 {

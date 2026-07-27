@@ -1,3 +1,4 @@
+#include "config.h"
 #include "fpga/fpga_api.h"
 #include "logger/log_manager.h"
 
@@ -134,7 +135,9 @@ bool vuprs::FPGA_API__FIR__SetCoefficients(vuprs::FPGAController *controller,
 {
     PARAM_CHECK(controller->ConfigDown(), "fpga", " in [vuprs::FPGA_API__FIR__SetCoefficients] FPGA Controller not configured in advance.");
     PARAM_CHECK(!coefficients->empty(), "fpga", " in [vuprs::FPGA_API__FIR__SetCoefficients] Coefficients empty.");
-
+#if DEBUG
+    static int debug_file_group = 0;
+#endif
     uint64_t banks = coefficients->size();
     int checkCoefficientsCount = -1;
     for (uint64_t i = 0; i < banks; i++)
@@ -167,6 +170,17 @@ bool vuprs::FPGA_API__FIR__SetCoefficients(vuprs::FPGAController *controller,
     }
     /* Data to buffer */
     buffer.from_vector<uint32_t>(coefficientsToWrite);
+#if DEBUG
+    vuprs::SaveToCSV(*coefficients, std::string(DEBUG_FILES_ROOT_DIR) + "/" +
+                                        std::string(DEBUG_FILES_DIR) + "-" + std::to_string(debug_file_group) + "/" +
+                                        std::string(FIR_COEF_DEBUG_FILENAME));
+    buffer.to_file(std::string(DEBUG_FILES_ROOT_DIR) + "/" +
+                   std::string(DEBUG_FILES_DIR) + "-" + std::to_string(debug_file_group) + "/" +
+                   std::string(FIR_COEF_BIN_DEBUG_FILENAME));
+    debug_file_group++;
+    if (debug_file_group >= DEBUG_DATA_GROUP_COUNT)
+        debug_file_group = 0;
+#endif
     /* Write coefficients to BRAM */
     operateStatus &= controller->mem__FIR_BRAM.WriteMemory(&buffer, 0, totalCoefficientsCount * sizeof(uint32_t));
     /* Write scale to FIR */
@@ -179,11 +193,12 @@ bool vuprs::FPGA_API__FIR__SetCoefficients(vuprs::FPGAController *controller,
 }
 
 bool vuprs::FPGA_API__FIR__SetLengthAndCoefficients(vuprs::FPGAController *controller,
-                                                    std::vector<std::vector<double>> *coefficients, double maxAbsoluteCoefficient, uint32_t len)
+                                                    std::vector<std::vector<double>> *coefficients,
+                                                    double maxAbsoluteCoefficient,
+                                                    uint32_t len)
 {
     PARAM_CHECK(controller->ConfigDown(), "fpga", " in [vuprs::FPGA_API__FIR__SetLengthAndCoefficients] FPGA Controller not configured in advance.");
     PARAM_CHECK(!coefficients->empty(), "fpga", " in [vuprs::FPGA_API__FIR__SetLengthAndCoefficients] Coefficients empty.");
-
     uint64_t banks = coefficients->size();
     int checkCoefficientsCount = -1;
     for (uint64_t i = 0; i < banks; i++)
@@ -253,7 +268,9 @@ bool vuprs::FPGA_API__FIR__RunningControl(vuprs::FPGAController *controller, boo
 /* ----------------------------------------------------------------------------- */
 
 bool vuprs::FPGA_API__DDR__ReadDDR(vuprs::FPGAController *controller,
-                                   vuprs::AlignedBufferDMA *buffer, uint32_t ddrOffset, uint32_t transferSize)
+                                   vuprs::AlignedBufferDMA *buffer,
+                                   uint32_t ddrOffset,
+                                   uint32_t transferSize)
 {
     PARAM_CHECK(controller->ConfigDown(), "fpga", " in [vuprs::FPGA_API__DDR__ReadDDR] FPGA Controller not configured in advance.");
     return controller->mem__DDR.ReadMemory(buffer, ddrOffset, transferSize);
@@ -375,7 +392,8 @@ bool vuprs::FPGA_API__DMA__GetCurrentDescriptor(vuprs::FPGAController *controlle
     return operateStatus;
 }
 
-bool vuprs::FPGA_API__DMA__ReadCurrentDescriptor(vuprs::FPGAController *controller, uint32_t *currentDescriptor)
+bool vuprs::FPGA_API__DMA__ReadCurrentDescriptor(vuprs::FPGAController *controller,
+                                                 uint32_t *currentDescriptor)
 {
     PARAM_CHECK(controller->ConfigDown(), "fpga", " in [vuprs::FPGA_API__DMA__ReadCurrentDescriptor] FPGA Controller not configured in advance.");
     PARAM_CHECK(currentDescriptor != nullptr, "fpga", " in [vuprs::FPGA_API__DMA__ReadCurrentDescriptor] CURRENT_DESCRIPTOR is NULL.");
@@ -386,7 +404,8 @@ bool vuprs::FPGA_API__DMA__ReadCurrentDescriptor(vuprs::FPGAController *controll
     return operateStatus;
 }
 
-bool vuprs::FPGA_API__DMA__SetTimeoutForInterrupt(vuprs::FPGAController *controller, uint32_t timeout_ms)
+bool vuprs::FPGA_API__DMA__SetTimeoutForInterrupt(vuprs::FPGAController *controller,
+                                                  uint32_t timeout_ms)
 {
     PARAM_CHECK(controller->ConfigDown(), "fpga", " in [vuprs::FPGA_API__DMA__SetTimeoutForInterrupt] FPGA Controller not configured in advance.");
     controller->dev__AXI_DMA.SetInterruptTimeout(timeout_ms);

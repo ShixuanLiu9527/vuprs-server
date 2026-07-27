@@ -5,9 +5,6 @@
 #include "algorithm/bf/beam_forming_basic.h"
 #include "algorithm/bf/beam_forming_algorithm.h"
 
-#define DEFAULT_COVARIANCE_SNAP_WINDOW_SIZE 100
-#define DEFAULT_ADJACENT_FREQ_AVERAGE_INDEX 0.8
-
 namespace vuprs
 {
     class WidebandBeamformerTemplate

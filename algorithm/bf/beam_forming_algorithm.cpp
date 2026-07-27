@@ -98,13 +98,13 @@ bool vuprs::NewtonIteration1D(const vuprs::IterationConfig &config, double *resu
     {
         fx = config.func(x);
         diff_x = config.diff(x);
-        if (abs(diff_x) < config.jumpout)
+        if (std::abs(diff_x) < config.jumpout)
         {
             return vuprs::BisectionIteration1D(config, result); /* Try bisection */
         }
         xp1 = x - fx / diff_x;
         fxp1 = config.func(xp1);
-        if (abs(x - xp1) < config.jumpout && abs(fxp1) < config.jumpout)
+        if (std::abs(x - xp1) < config.jumpout && std::abs(fxp1) < config.jumpout)
         {
             thresholdJump = true;
             break;
@@ -145,7 +145,7 @@ bool vuprs::RobustNewtonIteration1D(const vuprs::IterationConfig &config, double
     {
         fx = config.func(x);
         diff_x = config.diff(x);
-        if (abs(diff_x) < config.jumpout)
+        if (std::abs(diff_x) < config.jumpout)
         {
             return vuprs::BisectionIteration1D(config, result); /* Try bisection */
         }
@@ -155,11 +155,11 @@ bool vuprs::RobustNewtonIteration1D(const vuprs::IterationConfig &config, double
         {
             xp1 = x - lambda * increase;
             fxp1 = config.func(xp1);
-            if (abs(fxp1) < abs(fx))
+            if (std::abs(fxp1) < std::abs(fx))
                 break;
             lambda = lambda * 0.5;
         }
-        if (abs(x - xp1) < config.jumpout && abs(fxp1) < config.jumpout)
+        if (std::abs(x - xp1) < config.jumpout && std::abs(fxp1) < config.jumpout)
         {
             thresholdJump = true;
             break;
@@ -188,12 +188,12 @@ bool vuprs::BisectionIteration1D(const vuprs::IterationConfig &config, double *r
     int maxIteration = std::max(config.maxIteration, 10);
     if (fl * fr > 0.0)
     {
-        if (abs(fl) < config.jumpout)
+        if (std::abs(fl) < config.jumpout)
         {
             *result = left;
             return true;
         }
-        if (abs(fr) < config.jumpout)
+        if (std::abs(fr) < config.jumpout)
         {
             *result = right;
             return true;
@@ -205,7 +205,7 @@ bool vuprs::BisectionIteration1D(const vuprs::IterationConfig &config, double *r
     {
         mid = 0.5 * (left + right);
         fm = config.func(mid);
-        if (abs(fm) < config.jumpout)
+        if (std::abs(fm) < config.jumpout)
         {
             *result = mid;
             return true;
@@ -224,7 +224,7 @@ bool vuprs::BisectionIteration1D(const vuprs::IterationConfig &config, double *r
         {
             break;
         }
-        if (abs(left - right) < config.jumpout)
+        if (std::abs(left - right) < config.jumpout)
         {
             *result = mid;
             return true;
@@ -258,13 +258,7 @@ void vuprs::CholeskyDecomposition(const Eigen::Matrix<Eigen::dcomplex, -1, -1> &
     RUNTIME_CHECK(G, "bf", "Output pointer cannot be null");
     Eigen::Matrix<double, -1, 1> gamma;
     Eigen::Matrix<Eigen::dcomplex, -1, -1> U; /* R = U * gamma * U.H */
-#if BEAM_FORMING_ALGORITHM_DEBUG_PRINT
-    std::cout << "[cholesky decomposition] start eigenvalue decomposition." << std::endl;
-#endif
     vuprs::EigenvalueDecomposition(covMatrix, &gamma, &U);
-#if BEAM_FORMING_ALGORITHM_DEBUG_PRINT
-    std::cout << "[cholesky decomposition] done." << std::endl;
-#endif
     *G = U * gamma.cwiseSqrt().asDiagonal(); /* R = U * gamma * U.H = B * B.H */
 }
 
