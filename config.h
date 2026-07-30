@@ -8,7 +8,7 @@
 /**
  * @brief Enable custom debug information.
  */
-#define DEBUG true
+#define DEBUG false
 
 /**
  * @defgroup Debug files.

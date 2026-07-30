@@ -47,7 +47,7 @@ build_server()
 {
     echo -e "${BLUE}Build Server & Tool...${NC}"
     cd "${BUILD_OUTPUT}" || exit 1
-    cmake .. -DCMAKE_TOOLCHAIN_FILE=../rk3568_toolchain.cmake
+    cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/rk3568_toolchain.cmake
     make
     echo -e "${GREEN}Build Server & Tool DONE${NC}"
 }

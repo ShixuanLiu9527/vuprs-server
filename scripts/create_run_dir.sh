@@ -6,13 +6,14 @@ BLUE='\033[1;34m'
 NC='\033[0m'  # No Color
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-BUILD_OUTPUT="${SCRIPT_DIR}/build"
+VUPRS_ROOT="${SCRIPT_DIR}/../"
+BUILD_OUTPUT="${VUPRS_ROOT}/build"
 
 XDMA_DRIVER="${BUILD_OUTPUT}/xdma/xdma.ko"
 SERVER="${BUILD_OUTPUT}/server"
-RUN_SHELL="${SCRIPT_DIR}/run_server.sh"
-RKNPU2_LIB_DIR="${SCRIPT_DIR}/3rdparty/rknpu2/librknn_api/aarch64"
 FFTW_OUTPUT_DIR="${BUILD_OUTPUT}/3rdparty/fftw3"
+RUN_SHELL="${SCRIPT_DIR}/run_server.sh"
+RKNPU2_LIB_DIR="${VUPRS_ROOT}/3rdparty/rknpu2/librknn_api/aarch64"
 
 # Check file or directories exits.
 
@@ -29,7 +30,7 @@ fi
 
 # Copy file
 
-OUTPUT_DIR="${SCRIPT_DIR}/run_dir/"
+OUTPUT_DIR="${VUPRS_ROOT}/run_dir/"
 
 mkdir -p "${OUTPUT_DIR}"
 mkdir -p "${OUTPUT_DIR}/fftw3"

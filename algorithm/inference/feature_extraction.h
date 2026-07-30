@@ -2,6 +2,7 @@
 #define FEATURE_EXTRACTION_H
 
 #include <math.h>
+#include <deque>
 #include <Eigen/Dense>
 #include <vector>
 #include "algorithm/signal_processing/signal_processing.h"
@@ -34,29 +35,44 @@ namespace vuprs
     {
     private:
         bool filterFirstAlloc, dctMatrixFirstAlloc;
+        double f_l;                                         /* lower boundary of frequency interval for mel-filters */
+        double f_u;                                         /* upper boundary of frequency interval for mel-filters */
         double fs;                                          /* sampling frequency: Hz */
         uint32_t N;                                         /* sampling points: N */
         uint32_t K;                                         /* mel filter count */
         uint32_t L;                                         /* output MFCC dimension */
         Eigen::Matrix<double, -1, -1> filters;              /* K x (N / 2 + 1) matrix, each row of the matrix is a mel filter */
-        Eigen::Matrix<double, -1, -1> dctMatrix;            /* L x K, reserve for dct */
+        Eigen::Matrix<double, -1, -1> dctMatrix;            /* (L + 1) x K, reserve for dct */
         std::vector<MelFilterDescriptor> filterDescriptors; /* K x 1, corrsponding to the filters */
+        vuprs::FFTWManagerComplex fftManager;
 
     public:
-        MelFilterBank();
-        ~MelFilterBank();
+        MelFilterBank() : filterFirstAlloc(true),
+                          dctMatrixFirstAlloc(true),
+                          f_l(0.0),
+                          f_u(0.0),
+                          fs(1.0),
+                          N(0),
+                          K(0),
+                          L(0) {};
+        ~MelFilterBank() = default;
 
         /**
          * @brief Set and update parameters of mel filter bank.
          *
          * @note This operation will trigger memory alloc automatically.
+         * @note K >= L.
          *
-         * @param fs sampling frequency in Hz.
+         * @param f_l lower boundary of frequency interval for mel-filters
+         * @param f_u lower boundary of frequency interval for mel-filters
+         * @param fs frequency threshold in Hz (<= fs/2).
          * @param N sampling points.
          * @param K filter bank count.
          * @param L MFCC output dimension.
          */
-        void SetFilterParameters(double fs,
+        void SetFilterParameters(double f_l,
+                                 double f_u,
+                                 double fs,
                                  uint32_t N,
                                  uint32_t K,
                                  uint32_t L);
@@ -68,8 +84,8 @@ namespace vuprs
          * @brief Compute mel band energy.
          *
          * @note This is the intermediate step in calculating MFCC.
-         * @note if \p log == false, output = filters (size M x (N / 2 + 1)) * signal (size = N / 2 + 1);
-         * @note if \p log == true, output = log10(1.0 + filters * signal).
+         * @note if \p log == false, output (K x 1) = filters (size K x (N / 2 + 1)) * signal (size = N / 2 + 1);
+         * @note if \p log == true, output (K x 1) = log10(1.0 + filters * signal).
          *
          * @param signal Input signal in frequency domain, size = N / 2 + 1 (frequency in range 0 - fs / 2.0).
          * @param log log flag.
@@ -83,14 +99,117 @@ namespace vuprs
          *
          * @note The 0th element of the output is the total energy (= sum(mel output)), witch can
          * @note be excluded through option \p include0.
+         * @note If \p freqDomain == false, this method will apply hamming window
+         * @note and FFT forward transform operation to \p signal.
          *
-         * @param signal Input signal in frequency domain, size = N / 2 + 1 (frequency in range 0 - fs / 2.0).
+         * @param signal Input signal.
+         *               If \p freqDomain == true: size = N / 2 + 1 (frequency in range 0 - fs / 2.0).
+         *               If \p freqDomain == false: size = N (N points).
          * @param include0 Keep the 0th element.
+         * @param freqDomain true: \p signal is in frequency domain.
+         *                   false: \p signal is in time domain.
+         * @param wType Window type for FFT if \p freqDomain == false.
          *
          * @retval if \p include0 == true, the output is completed MFCC (size = L x 1).
-         * @retval if \p include0 == false, the output part MFCC (element 0 is deleted, size = (L-1) x 1).
+         * @retval if \p include0 == false, the output part MFCC (element 0 is deleted, size = L x 1).
          */
-        Eigen::Matrix<double, -1, 1> ComputeMFCC(const Eigen::Matrix<Eigen::dcomplex, -1, 1> &signal, bool include0 = false) const;
+        Eigen::Matrix<double, -1, 1> ComputeMFCC(const Eigen::Matrix<Eigen::dcomplex, -1, 1> &signal,
+                                                 bool include0 = false,
+                                                 bool freqDomain = true,
+                                                 vuprs::WindowType wType = vuprs::WindowType::SIG_WINDOW__HANN);
+
+        EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+    };
+
+    /**
+     * @brief Signal Extractor
+     *
+     * @note [signal] (InputSignal()) -> Extractor -> (GetMFCC()) [MFCC-quantized]
+     */
+    class SignalExtractor
+    {
+    private:
+        bool firstAlloc;
+        bool flushed;
+        bool signal_average_set;
+        double signal_average;
+        double frame_time_ms;                            /* time per frame (ms) */
+        double f_l;                                      /* frequency range (lower) */
+        double f_u;                                      /* frequency range (upper) */
+        uint32_t N;                                      /* signal points per frame */
+        uint32_t pool_size;                              /* pool size */
+        uint32_t frames;                                 /* feature frames */
+        uint32_t dims;                                   /* feature dims */
+        uint32_t circularPtr;                            /* alway point to newly data */
+        uint32_t total_frames_processed;                 /* total frames written to pool */
+        Eigen::Matrix<double, -1, -1> extractTensorPool; /* extract tensor pool (frame X dim) */
+        MelFilterBank mel;
+
+        void InputFrameSignal(const Eigen::Matrix<double, -1, 1> &frame_signal, double fs);
+
+    public:
+        SignalExtractor() : frames(0),
+                            dims(0),
+                            N(0),
+                            circularPtr(0),
+                            total_frames_processed(0),
+                            firstAlloc(true),
+                            flushed(false),
+                            signal_average_set(false),
+                            f_l(0.0),
+                            f_u(0.0),
+                            frame_time_ms(0.0),
+                            signal_average(0.0) {};
+        ~SignalExtractor() = default;
+
+        SignalExtractor(const SignalExtractor &other) = delete;
+        SignalExtractor &operator=(const SignalExtractor &other) = delete;
+        SignalExtractor(SignalExtractor &&other) = delete;
+        SignalExtractor &operator=(SignalExtractor &&other) = delete;
+
+        /**
+         * @brief Set parameters.
+         *
+         * @note The output tensor size is (dims x frames) in 2D:
+         *       [mfcc(0,0),      mfcc(0,1),      ..., mfcc(0,frames-1),
+         *        mfcc(1,0),      mfcc(1,1),      ..., mfcc(1,frames-1),
+         *        ...             ...                  ...
+         *        mfcc(dims-1,0), mfcc(dims-1,1), ..., mfcc(dims-1,frames-1)]
+         *
+         * @param dims Vector dim in output tensor.
+         * @param frames Frames of MFCC.
+         * @param frame_time_ms Time period of one frame.
+         * @param f_l Lower boundary of frequency interval in MFCC.
+         * @param f_u Lower boundary of frequency interval in MFCC.
+         */
+        void SetParameters(uint32_t dims, uint32_t frames, double frame_time_ms, double f_l, double f_u);
+
+        /**
+         * @brief Input signal.
+         *
+         * @param signal Time domain signal.
+         * @param fs Sampling frequency for this signal.
+         */
+        void InputSignal(const Eigen::Matrix<double, -1, 1> &signal, double fs);
+
+        /**
+         * @brief Flushed flag.
+         *
+         * @retval true: flushed.
+         * @retval false: Not flushed.
+         */
+        bool Flushed() const { return this->flushed; }
+
+        /**
+         * @brief Get eigenvalue tensor for the given signal.
+         *
+         * @note Check flushed flag from Flushed() before.
+         *
+         * @param tensor output tensor, size = (dims x frames)
+         */
+        void GetExtractTensor(Eigen::Matrix<uint8_t, -1, -1> *tensor) const;
+
+        EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };
 }
 

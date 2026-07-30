@@ -1,0 +1,9 @@
+{
+    "frequency-range": {
+        "from": "100.0",
+        "to": "4000.0"
+    },
+    "rknn-model": {
+        "path": "./model/model.rknn"
+    }
+}
