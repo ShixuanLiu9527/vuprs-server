@@ -26,29 +26,29 @@ namespace vuprs
 
     struct MelFilterDescriptor
     {
-        double centerFreq;
-        double lowerFreq;
-        double upperFreq;
+        double center_freq;
+        double lower_freq;
+        double upper_freq;
     };
 
     class MelFilterBank
     {
     private:
-        bool filterFirstAlloc, dctMatrixFirstAlloc;
-        double f_l;                                         /* lower boundary of frequency interval for mel-filters */
-        double f_u;                                         /* upper boundary of frequency interval for mel-filters */
-        double fs;                                          /* sampling frequency: Hz */
-        uint32_t N;                                         /* sampling points: N */
-        uint32_t K;                                         /* mel filter count */
-        uint32_t L;                                         /* output MFCC dimension */
-        Eigen::Matrix<double, -1, -1> filters;              /* K x (N / 2 + 1) matrix, each row of the matrix is a mel filter */
-        Eigen::Matrix<double, -1, -1> dctMatrix;            /* (L + 1) x K, reserve for dct */
-        std::vector<MelFilterDescriptor> filterDescriptors; /* K x 1, corrsponding to the filters */
-        vuprs::FFTWManagerComplex fftManager;
+        bool filter_first_alloc, dct_matrix_first_alloc;
+        double f_l;                                          /* lower boundary of frequency interval for mel-filters */
+        double f_u;                                          /* upper boundary of frequency interval for mel-filters */
+        double fs;                                           /* sampling frequency: Hz */
+        uint32_t N;                                          /* sampling points: N */
+        uint32_t K;                                          /* mel filter count */
+        uint32_t L;                                          /* output MFCC dimension */
+        Eigen::Matrix<double, -1, -1> filters;               /* K x (N / 2 + 1) matrix, each row of the matrix is a mel filter */
+        Eigen::Matrix<double, -1, -1> dct_matrix;            /* (L + 1) x K, reserve for dct */
+        std::vector<MelFilterDescriptor> filter_descriptors; /* K x 1, corrsponding to the filters */
+        vuprs::FFTWManagerComplex fft_manager;
 
     public:
-        MelFilterBank() : filterFirstAlloc(true),
-                          dctMatrixFirstAlloc(true),
+        MelFilterBank() : filter_first_alloc(true),
+                          dct_matrix_first_alloc(true),
                           f_l(0.0),
                           f_u(0.0),
                           fs(1.0),
@@ -99,24 +99,24 @@ namespace vuprs
          *
          * @note The 0th element of the output is the total energy (= sum(mel output)), witch can
          * @note be excluded through option \p include0.
-         * @note If \p freqDomain == false, this method will apply hamming window
+         * @note If \p freq_domain == false, this method will apply hamming window
          * @note and FFT forward transform operation to \p signal.
          *
          * @param signal Input signal.
-         *               If \p freqDomain == true: size = N / 2 + 1 (frequency in range 0 - fs / 2.0).
-         *               If \p freqDomain == false: size = N (N points).
+         *               If \p freq_domain == true: size = N / 2 + 1 (frequency in range 0 - fs / 2.0).
+         *               If \p freq_domain == false: size = N (N points).
          * @param include0 Keep the 0th element.
-         * @param freqDomain true: \p signal is in frequency domain.
+         * @param freq_domain true: \p signal is in frequency domain.
          *                   false: \p signal is in time domain.
-         * @param wType Window type for FFT if \p freqDomain == false.
+         * @param w_type Window type for FFT if \p freq_domain == false.
          *
          * @retval if \p include0 == true, the output is completed MFCC (size = L x 1).
          * @retval if \p include0 == false, the output part MFCC (element 0 is deleted, size = L x 1).
          */
         Eigen::Matrix<double, -1, 1> ComputeMFCC(const Eigen::Matrix<Eigen::dcomplex, -1, 1> &signal,
                                                  bool include0 = false,
-                                                 bool freqDomain = true,
-                                                 vuprs::WindowType wType = vuprs::WindowType::SIG_WINDOW__HANN);
+                                                 bool freq_domain = true,
+                                                 vuprs::WindowType w_type = vuprs::WindowType::SIG_WINDOW__HANN);
 
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };
@@ -129,20 +129,20 @@ namespace vuprs
     class SignalExtractor
     {
     private:
-        bool firstAlloc;
+        bool first_alloc;
         bool flushed;
         bool signal_average_set;
         double signal_average;
-        double frame_time_ms;                            /* time per frame (ms) */
-        double f_l;                                      /* frequency range (lower) */
-        double f_u;                                      /* frequency range (upper) */
-        uint32_t N;                                      /* signal points per frame */
-        uint32_t pool_size;                              /* pool size */
-        uint32_t frames;                                 /* feature frames */
-        uint32_t dims;                                   /* feature dims */
-        uint32_t circularPtr;                            /* alway point to newly data */
-        uint32_t total_frames_processed;                 /* total frames written to pool */
-        Eigen::Matrix<double, -1, -1> extractTensorPool; /* extract tensor pool (frame X dim) */
+        double frame_time_ms;                              /* time per frame (ms) */
+        double f_l;                                        /* frequency range (lower) */
+        double f_u;                                        /* frequency range (upper) */
+        uint32_t N;                                        /* signal points per frame */
+        uint32_t pool_size;                                /* pool size */
+        uint32_t frames;                                   /* feature frames */
+        uint32_t dims;                                     /* feature dims */
+        uint32_t circular_ptr;                             /* alway point to newly data */
+        uint32_t total_frames_processed;                   /* total frames written to pool */
+        Eigen::Matrix<double, -1, -1> extract_tensor_pool; /* extract tensor pool (frame X dim) */
         MelFilterBank mel;
 
         void InputFrameSignal(const Eigen::Matrix<double, -1, 1> &frame_signal, double fs);
@@ -151,9 +151,9 @@ namespace vuprs
         SignalExtractor() : frames(0),
                             dims(0),
                             N(0),
-                            circularPtr(0),
+                            circular_ptr(0),
                             total_frames_processed(0),
-                            firstAlloc(true),
+                            first_alloc(true),
                             flushed(false),
                             signal_average_set(false),
                             f_l(0.0),

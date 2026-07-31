@@ -12,12 +12,12 @@ vuprs::Beamformer_DCRCB::~Beamformer_DCRCB()
 {
 }
 
-void vuprs::Beamformer_DCRCB::CalculateBeamformingForOneFreq(int freqIndex)
+void vuprs::Beamformer_DCRCB::CalculateBeamformingForOneFreq(int freq_index)
 {
     /* Read */
-    Eigen::Matrix<Eigen::dcomplex, -1, 1> ps = this->steeringVectors.col(freqIndex);
-    Eigen::Matrix<Eigen::dcomplex, -1, -1> R = this->estimate_covMatrix[freqIndex];
-    double fs = this->signalFrequencyList(freqIndex);
+    Eigen::Matrix<Eigen::dcomplex, -1, 1> ps = this->steering_vectors.col(freq_index);
+    Eigen::Matrix<Eigen::dcomplex, -1, -1> R = this->estimate_cov_matrix[freq_index];
+    double fs = this->signal_frequency_list(freq_index);
     double e0 = this->array.CalculateSteeringVectorErrorRadius(fs);
     int M = this->array.size();
     /* Compute */
@@ -46,8 +46,8 @@ void vuprs::Beamformer_DCRCB::CalculateBeamformingForOneFreq(int freqIndex)
     double lambda; /* result lambda */
     vuprs::SetIterationConfigDefault(&iter);
     /* - Generate range */
-    iter.lowerRegion = -(1.0 / max_eig);                                              /* -1/max(eig) */
-    iter.upperRegion = ((1.0 / min_eig) - sqrt_M_rho / max_eig) / (sqrt_M_rho - 1.0); /* [(1/min(eig) - sqrt(M * rho)/max(eig)) / (sqrt(M*rho) - 1)] */
+    iter.lower_region = -(1.0 / max_eig);                                              /* -1/max(eig) */
+    iter.upper_region = ((1.0 / min_eig) - sqrt_M_rho / max_eig) / (sqrt_M_rho - 1.0); /* [(1/min(eig) - sqrt(M * rho)/max(eig)) / (sqrt(M*rho) - 1)] */
     /* - Generate function: f(val) = h(val) - rho */
     auto func_lambda = [&zs2, &inv_gamma, &rho](double val) -> double
     {
@@ -76,7 +76,7 @@ void vuprs::Beamformer_DCRCB::CalculateBeamformingForOneFreq(int freqIndex)
     invR_ps_hat = invR * ps_hat;
     w = invR_ps_hat / (ps_hat.adjoint() * invR_ps_hat)(0, 0);
     /* Dump */
-    this->resultWeightVectors.col(freqIndex) = w;
+    this->result_weight_vectors.col(freq_index) = w;
 }
 
 /* ------------------------------------------------------------------------------ */
@@ -91,11 +91,11 @@ vuprs::Beamformer_CBF::~Beamformer_CBF()
 {
 }
 
-void vuprs::Beamformer_CBF::CalculateBeamformingForOneFreq(int freqIndex)
+void vuprs::Beamformer_CBF::CalculateBeamformingForOneFreq(int freq_index)
 {
-    Eigen::Matrix<Eigen::dcomplex, -1, 1> ps = this->steeringVectors.col(freqIndex); /* ps */
-    double M = this->array.size();                                                   /* M */
-    this->resultWeightVectors.col(freqIndex) = ps / M;
+    Eigen::Matrix<Eigen::dcomplex, -1, 1> ps = this->steering_vectors.col(freq_index); /* ps */
+    double M = this->array.size();                                                     /* M */
+    this->result_weight_vectors.col(freq_index) = ps / M;
 }
 
 /* ------------------------------------------------------------------------------ */
@@ -110,12 +110,12 @@ vuprs::Beamformer_MVDR::~Beamformer_MVDR()
 {
 }
 
-void vuprs::Beamformer_MVDR::CalculateBeamformingForOneFreq(int freqIndex)
+void vuprs::Beamformer_MVDR::CalculateBeamformingForOneFreq(int freq_index)
 {
     /* Read */
-    Eigen::Matrix<Eigen::dcomplex, -1, 1> ps = this->steeringVectors.col(freqIndex);
-    Eigen::Matrix<Eigen::dcomplex, -1, -1> R = this->estimate_covMatrix[freqIndex];
-    double fs = this->signalFrequencyList(freqIndex);
+    Eigen::Matrix<Eigen::dcomplex, -1, 1> ps = this->steering_vectors.col(freq_index);
+    Eigen::Matrix<Eigen::dcomplex, -1, -1> R = this->estimate_cov_matrix[freq_index];
+    double fs = this->signal_frequency_list(freq_index);
     int M = this->array.size();
     /* Compute */
     Eigen::Matrix<Eigen::dcomplex, -1, -1> invR;   /* R.-1 = U * GAMMA.-1 * U.H */
@@ -125,5 +125,5 @@ void vuprs::Beamformer_MVDR::CalculateBeamformingForOneFreq(int freqIndex)
     invR_ps = invR * ps;
     w = invR_ps / (ps.adjoint() * invR_ps)(0, 0);
     /* Dump */
-    this->resultWeightVectors.col(freqIndex) = w;
+    this->result_weight_vectors.col(freq_index) = w;
 }

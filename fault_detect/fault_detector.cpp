@@ -35,7 +35,7 @@ void vuprs::FaultDetector::LoadModel(const std::string &json, const vuprs::Fault
     /* Get and check input number and tensor size */
     std::vector<rknn_tensor_attr> inputs = this->model.GetInputAttrs();
     RUNTIME_CHECK(inputs.size() == 1, "inference", "Input number must be 1.");
-    /* We use NCWH layout (0-batch, 1-channel, 2-width, 3-height) */
+    /* NCWH layout (0-batch, 1-channel, 2-width, 3-height) */
     RUNTIME_CHECK(inputs[0].n_dims == 4, "inference", "Not a 4D-input model.");
     uint32_t mfcc_dim = inputs[0].dims[3];   /* MFCC image height (MFCC dims) */
     uint32_t mfcc_frame = inputs[0].dims[2]; /* MFCC image width (frames) */
@@ -60,7 +60,11 @@ void vuprs::FaultDetector::RunInference()
     Eigen::Matrix<uint8_t, -1, -1> tensor;
     this->extractor.GetExtractTensor(&tensor); /* tensor size: H x W (col first) */
     tensor.transposeInPlace();                 /* convert to row first */
-    this->model.SetInput(0, tensor.data(), tensor.size() * sizeof(uint8_t));
+    this->model.SetInput(0,
+                         tensor.data(),
+                         tensor.size() * sizeof(uint8_t),
+                         RKNN_TENSOR_UINT8,
+                         RKNN_TENSOR_NCHW);
     this->model.run();
 }
 

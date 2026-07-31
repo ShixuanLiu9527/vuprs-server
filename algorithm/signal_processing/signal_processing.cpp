@@ -163,16 +163,16 @@ void vuprs::FFTWManagerComplex::DoDFT(const void *input, void *output)
                 this->fft_points * sizeof(std::complex<double>));
 }
 
-void vuprs::FFT(const Eigen::Matrix<Eigen::dcomplex, -1, 1> &inputData,
-                Eigen::Matrix<Eigen::dcomplex, -1, 1> *outputData,
+void vuprs::FFT(const Eigen::Matrix<Eigen::dcomplex, -1, 1> &input_data,
+                Eigen::Matrix<Eigen::dcomplex, -1, 1> *output_data,
                 bool inverse)
 {
-    uint64_t dataSize = inputData.rows();
-    PARAM_CHECK(dataSize > 0, "signal_processing", " in [vuprs::FFT] The input data is empty.");
+    uint64_t data_size = input_data.rows();
+    PARAM_CHECK(data_size > 0, "signal_processing", " in [vuprs::FFT] The input data is empty.");
     fftw_complex *input, *output;
     fftw_plan plan;
-    input = reinterpret_cast<fftw_complex *>(fftw_malloc(sizeof(fftw_complex) * dataSize));
-    output = reinterpret_cast<fftw_complex *>(fftw_malloc(sizeof(fftw_complex) * dataSize));
+    input = reinterpret_cast<fftw_complex *>(fftw_malloc(sizeof(fftw_complex) * data_size));
+    output = reinterpret_cast<fftw_complex *>(fftw_malloc(sizeof(fftw_complex) * data_size));
     if (input == nullptr || output == nullptr)
     {
         fftw_free(input);
@@ -181,7 +181,7 @@ void vuprs::FFT(const Eigen::Matrix<Eigen::dcomplex, -1, 1> &inputData,
                       "signal_processing",
                       " in [vuprs::FFT] Failed to allocate FFTW memory.");
     }
-    plan = fftw_plan_dft_1d(dataSize,
+    plan = fftw_plan_dft_1d(data_size,
                             input,
                             output,
                             inverse ? FFTW_BACKWARD : FFTW_FORWARD,
@@ -196,17 +196,17 @@ void vuprs::FFT(const Eigen::Matrix<Eigen::dcomplex, -1, 1> &inputData,
     {
         /* Input data to *input */
         std::memcpy(input,
-                    inputData.data(),
-                    dataSize * sizeof(std::complex<double>));
+                    input_data.data(),
+                    data_size * sizeof(std::complex<double>));
         /* Do fft */
         fftw_execute(plan);
-        outputData->resize(dataSize, 1);
-        std::memcpy(outputData->data(),
+        output_data->resize(data_size, 1);
+        std::memcpy(output_data->data(),
                     output,
-                    dataSize * sizeof(std::complex<double>));
+                    data_size * sizeof(std::complex<double>));
         if (inverse)
         {
-            (*outputData) = (*outputData) / (double)dataSize;
+            (*output_data) = (*output_data) / (double)data_size;
         }
     }
     catch (const std::exception &e)
@@ -221,21 +221,21 @@ void vuprs::FFT(const Eigen::Matrix<Eigen::dcomplex, -1, 1> &inputData,
     fftw_free(output);
 }
 
-void vuprs::FFT(const std::vector<std::complex<double>> &inputData, std::vector<std::complex<double>> *outputData, bool inverse)
+void vuprs::FFT(const std::vector<std::complex<double>> &input_data, std::vector<std::complex<double>> *output_data, bool inverse)
 {
-    uint64_t dataSize = inputData.size();
-    PARAM_CHECK(dataSize > 0, "signal_processing", " in [vuprs::FFT] The input data is empty.");
+    uint64_t data_size = input_data.size();
+    PARAM_CHECK(data_size > 0, "signal_processing", " in [vuprs::FFT] The input data is empty.");
     fftw_complex *input, *output;
     fftw_plan plan;
-    input = reinterpret_cast<fftw_complex *>(fftw_malloc(sizeof(fftw_complex) * dataSize));
-    output = reinterpret_cast<fftw_complex *>(fftw_malloc(sizeof(fftw_complex) * dataSize));
+    input = reinterpret_cast<fftw_complex *>(fftw_malloc(sizeof(fftw_complex) * data_size));
+    output = reinterpret_cast<fftw_complex *>(fftw_malloc(sizeof(fftw_complex) * data_size));
     if (input == nullptr || output == nullptr)
     {
         fftw_free(input);
         fftw_free(output);
         RUNTIME_CHECK(false, "signal_processing", " in [vuprs::FFT] Failed to allocate FFTW memory.");
     }
-    plan = fftw_plan_dft_1d(dataSize,
+    plan = fftw_plan_dft_1d(data_size,
                             input,
                             output,
                             inverse ? FFTW_BACKWARD : FFTW_FORWARD,
@@ -250,19 +250,19 @@ void vuprs::FFT(const std::vector<std::complex<double>> &inputData, std::vector<
     {
         /* Input data to *input */
         std::memcpy(input,
-                    inputData.data(),
-                    dataSize * sizeof(std::complex<double>));
+                    input_data.data(),
+                    data_size * sizeof(std::complex<double>));
         /* Do fft */
         fftw_execute(plan);
-        outputData->resize(dataSize);
-        std::memcpy(outputData->data(),
+        output_data->resize(data_size);
+        std::memcpy(output_data->data(),
                     output,
-                    dataSize * sizeof(std::complex<double>));
+                    data_size * sizeof(std::complex<double>));
         if (inverse)
         {
-            for (uint64_t i = 0; i < dataSize; i++)
+            for (uint64_t i = 0; i < data_size; i++)
             {
-                (*outputData)[i] = (*outputData)[i] / (double)dataSize;
+                (*output_data)[i] = (*output_data)[i] / (double)data_size;
             }
         }
     }
@@ -278,29 +278,29 @@ void vuprs::FFT(const std::vector<std::complex<double>> &inputData, std::vector<
     fftw_free(output);
 }
 
-void vuprs::CutTheFirstHalf(std::vector<std::complex<double>> *inputData)
+void vuprs::CutTheFirstHalf(std::vector<std::complex<double>> *input_data)
 {
-    int size = inputData->size();
-    inputData->resize(size / 2 + 1);
+    int size = input_data->size();
+    input_data->resize(size / 2 + 1);
 }
 
-void vuprs::CutTheFirstHalf(Eigen::Matrix<Eigen::dcomplex, -1, 1> *inputData)
+void vuprs::CutTheFirstHalf(Eigen::Matrix<Eigen::dcomplex, -1, 1> *input_data)
 {
-    PARAM_CHECK(inputData != nullptr, "signal_processing", " in [vuprs::CutTheFirstHalf] Input data is null.");
-    int size = inputData->rows();
+    PARAM_CHECK(input_data != nullptr, "signal_processing", " in [vuprs::CutTheFirstHalf] Input data is null.");
+    int size = input_data->rows();
     if (size <= 0)
         return;
-    inputData->resize(size / 2 + 1);
+    input_data->resize(size / 2 + 1);
 }
 
-void vuprs::CompleteConjugateSymmetric(std::vector<std::complex<double>> *inputData)
+void vuprs::CompleteConjugateSymmetric(std::vector<std::complex<double>> *input_data)
 {
-    uint64_t originSize = inputData->size();
+    uint64_t originSize = input_data->size();
     if (originSize <= 2)
     {
         return;
     }
-    std::vector<std::complex<double>> backHalf = *inputData;
+    std::vector<std::complex<double>> backHalf = *input_data;
     /* reverse */
     std::reverse(backHalf.begin(), backHalf.end());
     /* erase N/2 and 0 */
@@ -314,73 +314,73 @@ void vuprs::CompleteConjugateSymmetric(std::vector<std::complex<double>> *inputD
         element = std::conj(element);
     }
     /* insert */
-    inputData->insert(inputData->end(),
-                      backHalf.begin(),
-                      backHalf.end());
-    (*inputData)[originSize - 1].imag(0.0);
-    (*inputData)[0].imag(0.0);
+    input_data->insert(input_data->end(),
+                       backHalf.begin(),
+                       backHalf.end());
+    (*input_data)[originSize - 1].imag(0.0);
+    (*input_data)[0].imag(0.0);
 }
 
-void vuprs::CompleteConjugateSymmetric(Eigen::Matrix<Eigen::dcomplex, -1, 1> *inputData)
+void vuprs::CompleteConjugateSymmetric(Eigen::Matrix<Eigen::dcomplex, -1, 1> *input_data)
 {
-    int halfSize = inputData->rows(); /* N / 2 + 1 */
+    int halfSize = input_data->rows(); /* N / 2 + 1 */
     if (halfSize <= 2)
         return;
     int fullSize = 2 * (halfSize - 1);
-    inputData->conservativeResize(fullSize);
+    input_data->conservativeResize(fullSize);
     for (int i = 1; i < halfSize - 1; i++)
     {
-        (*inputData)(fullSize - i) = std::conj((*inputData)(i));
+        (*input_data)(fullSize - i) = std::conj((*input_data)(i));
     }
-    (*inputData)(halfSize - 1).imag(0.0); /* x(N/2).imag = 0 */
-    (*inputData)(0).imag(0.0);            /* x(0).imag = 0 */
+    (*input_data)(halfSize - 1).imag(0.0); /* x(N/2).imag = 0 */
+    (*input_data)(0).imag(0.0);            /* x(0).imag = 0 */
 }
 
-void vuprs::CompleteSymmetric(Eigen::Matrix<double, -1, 1> *inputData)
+void vuprs::CompleteSymmetric(Eigen::Matrix<double, -1, 1> *input_data)
 {
-    int halfSize = inputData->rows(); /* N / 2 + 1 */
+    int halfSize = input_data->rows(); /* N / 2 + 1 */
     if (halfSize <= 2)
         return;
     int fullSize = 2 * (halfSize - 1);
-    Eigen::Matrix<double, -1, 1> original = *inputData;
-    inputData->conservativeResize(fullSize);
+    Eigen::Matrix<double, -1, 1> original = *input_data;
+    input_data->conservativeResize(fullSize);
     for (int i = 1; i < halfSize - 1; i++)
     {
-        (*inputData)(fullSize - i) = original(i);
+        (*input_data)(fullSize - i) = original(i);
     }
 }
 
-Eigen::Matrix<Eigen::dcomplex, -1, 1> vuprs::GenerateComplexFrequencyList(int dataNumber, double samplingFrequency)
+Eigen::Matrix<Eigen::dcomplex, -1, 1> vuprs::GenerateComplexFrequencyList(int data_number, double fs)
 {
     Eigen::Matrix<Eigen::dcomplex, -1, 1> retVector;
-    int frequencyNumber = dataNumber / 2 + 1;
+    int frequencyNumber = data_number / 2 + 1;
     retVector.resize(frequencyNumber, 1);
     retVector.setZero();
     for (int i = 0; i < frequencyNumber; i++)
     {
-        retVector(i, 0).imag(double(i) / double(dataNumber));
+        retVector(i, 0).imag(double(i) / double(data_number));
     }
-    retVector *= samplingFrequency; /* f * j */
+    retVector *= fs; /* f * j */
     return retVector;
 }
 
-Eigen::Matrix<double, -1, 1> vuprs::GenerateRealFrequencyList(int dataNumber, double samplingFrequency)
+Eigen::Matrix<double, -1, 1> vuprs::GenerateRealFrequencyList(int data_number, double fs)
 {
     Eigen::Matrix<double, -1, 1> retVector;
-    int frequencyNumber = dataNumber / 2 + 1;
+    int frequencyNumber = data_number / 2 + 1;
     retVector.resize(frequencyNumber, 1);
     retVector.setZero();
     for (int i = 0; i < frequencyNumber; i++)
     {
-        retVector(i, 0) = double(i) / double(dataNumber);
+        retVector(i, 0) = double(i) / double(data_number);
     }
-    retVector *= samplingFrequency; /* f * j */
+    retVector *= fs; /* f * j */
     return retVector;
 }
 
-Eigen::Matrix<double, -1, 1> vuprs::GetWindow(vuprs::WindowType type, int signalLength)
+Eigen::Matrix<double, -1, 1> vuprs::GetWindow(vuprs::WindowType type, int signal_length)
 {
-    Eigen::Matrix<double, -1, 1> w(signalLength);
+    Eigen::Matrix<double, -1, 1> w(signal_length);
 
     switch (type)
     {
@@ -388,17 +388,17 @@ Eigen::Matrix<double, -1, 1> vuprs::GetWindow(vuprs::WindowType type, int signal
     {
         double alpha0 = 25.0 / 46.0;
         double alpha1 = 1.0 - alpha0;
-        for (int i = 0; i < signalLength; i++)
+        for (int i = 0; i < signal_length; i++)
         {
-            w(i) = alpha0 - alpha1 * cos(2 * M_PI * i / (signalLength - 1));
+            w(i) = alpha0 - alpha1 * cos(2 * M_PI * i / (signal_length - 1));
         }
         break;
     }
     case WindowType::SIG_WINDOW__HANN:
     {
-        for (int i = 0; i < signalLength; i++)
+        for (int i = 0; i < signal_length; i++)
         {
-            w(i) = 0.5 * (1 - cos(2 * M_PI * i / (signalLength - 1)));
+            w(i) = 0.5 * (1 - cos(2 * M_PI * i / (signal_length - 1)));
         }
         break;
     }
@@ -407,9 +407,9 @@ Eigen::Matrix<double, -1, 1> vuprs::GetWindow(vuprs::WindowType type, int signal
         double a0 = 0.42;
         double a1 = 0.5;
         double a2 = 0.08;
-        for (int i = 0; i < signalLength; i++)
+        for (int i = 0; i < signal_length; i++)
         {
-            w(i) = a0 - a1 * cos(2 * M_PI * i / (signalLength - 1)) + a2 * cos(4 * M_PI * i / (signalLength - 1));
+            w(i) = a0 - a1 * cos(2 * M_PI * i / (signal_length - 1)) + a2 * cos(4 * M_PI * i / (signal_length - 1));
         }
         break;
     }

@@ -36,14 +36,14 @@ namespace vuprs
     class CollaborationBeamformer
     {
     private:
-        bool configdone;
+        bool config_done;
 
         std::vector<std::thread> threads; /* Beam former threads */
 
         vuprs::FPGAController controller; /* FPGA controller */
 
-        std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> dmaDescriptors; /* SG descriptors for AXI DMA */
-        vuprs::AXI_DMA_SGDescriptor_Config sg_descriptorConfig;             /* SG descriptor config */
+        std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> dma_descriptors; /* SG descriptors for AXI DMA */
+        vuprs::AXI_DMA_SGDescriptor_Config sg_descriptor_config;             /* SG descriptor config */
 
         /**
          * @brief Start beam former (hardware & algorithm).
@@ -63,64 +63,64 @@ namespace vuprs
 
         /* Scan */
 
-        std::mutex mut_scan_opt;                /* Scan mutex lock */
-        std::vector<double> scan_alt, scan_az;  /* controlled by mut_scan_opt */
-        int scan_pointsInHalf;                  /* controlled by mut_scan_opt */
-        double scan_waveVelocity, scan_alt_min; /* controlled by mut_scan_opt */
+        std::mutex mut_scan_opt;                 /* Scan mutex lock */
+        std::vector<double> scan_alt, scan_az;   /* controlled by mut_scan_opt */
+        int scan_points_in_hemisphere;           /* controlled by mut_scan_opt */
+        double scan_wave_velocity, scan_alt_min; /* controlled by mut_scan_opt */
 
-        std::atomic<bool> newScanPointsInput{false};   /* scan points changed flag */
-        std::mutex mut_scan_result;                    /* Scan result mutex lock */
-        std::condition_variable scanCV;                /* Scan condition var, controlled by mut_scan */
-        std::deque<vuprs::ScanResult> scanResultQueue; /* Scan result, controlled by mut_scan_result */
+        std::atomic<bool> new_scan_points_input{false};  /* scan points changed flag */
+        std::mutex mut_scan_result;                      /* Scan result mutex lock */
+        std::condition_variable scan_cv;                 /* Scan condition var, controlled by mut_scan */
+        std::deque<vuprs::ScanResult> scan_result_queue; /* Scan result, controlled by mut_scan_result */
 
         /* Circular buffer interrupt */
 
-        std::mutex mut_alg;                  /* Algorithm mutex lock */
-        std::condition_variable algorithmCV; /* Algorithm interrupt condition var, [controlled by mut_alg] */
+        std::mutex mut_alg;                   /* Algorithm mutex lock */
+        std::condition_variable algorithm_cv; /* Algorithm interrupt condition var, [controlled by mut_alg] */
 
-        std::deque<vuprs::SignalData> arraySignalQueue; /* Array signal queue, [controlled by mut_alg] */
+        std::deque<vuprs::SignalData> array_signal_queue; /* Array signal queue, [controlled by mut_alg] */
 
-        std::atomic<bool> newArraySignalInput{false};         /* new array signal input flag */
-        std::mutex mut_output_arraySignal;                    /* Output array signal mutex lock */
-        std::deque<vuprs::SignalData> outputArraySignalQueue; /* Output array signal queue, controlled by mut_output_arraySignal */
+        std::atomic<bool> new_array_signal_input{false};         /* new array signal input flag */
+        std::mutex mut_output_arraySignal;                       /* Output array signal mutex lock */
+        std::deque<vuprs::SignalData> output_array_signal_queue; /* Output array signal queue, controlled by mut_output_arraySignal */
 
         vuprs::FIRCalculator fir;                              /* FIR algorithm, [controlled by mut_alg] (can be only used in THREAD__AlgorithmCalculation) */
         std::unique_ptr<vuprs::WidebandBeamformerTemplate> bf; /* Beam forming algorithm, [controlled by mut_alg] (can be only used in THREAD__AlgorithmCalculation) */
-        double hardwareSamplingFrequency;                      /* Hardware sampling frequency, calculate by SCI register, [controlled by mut_alg] */
+        double hardware_fs;                                    /* Hardware sampling frequency, calculate by SCI register, [controlled by mut_alg] */
 
         /* DMA Interrupt */
 
-        std::atomic<uint32_t> dmaCurDesc{0xFFFFFFFF}; /* current descriptor address, initialized to an invalid value */
+        std::atomic<uint32_t> dma_current_desc{0xFFFFFFFF}; /* current descriptor address, initialized to an invalid value */
 
-        std::mutex mut_dma;                     /* DMA Interrupt mutex lock */
-        std::condition_variable dmaInterruptCV; /* DMA Interrupt condition var, [controlled by mut_dma] */
+        std::mutex mut_dma;                       /* DMA Interrupt mutex lock */
+        std::condition_variable dma_interrupt_cv; /* DMA Interrupt condition var, [controlled by mut_dma] */
 
-        std::atomic<bool> newResultDataInput{false};   /* assign to outside */
-        std::deque<std::vector<uint32_t>> resultQueue; /* Result queue, [controlled by mut_dma] */
+        std::atomic<bool> new_result_data_input{false}; /* assign to outside */
+        std::deque<std::vector<uint32_t>> result_queue; /* Result queue, [controlled by mut_dma] */
 
         /* Atomics */
 
         std::atomic<bool> system_run{false}; /* system run enable */
 
-        std::atomic<bool> circularBufferIRQ{false}; /* Circular buffer interrupt flag */
-        std::atomic<bool> dmaDescriptorIRQ{false};  /* DMA Interrupt flag */
+        std::atomic<bool> circular_buffer_irq{false}; /* Circular buffer interrupt flag */
+        std::atomic<bool> dma_descriptor_irq{false};  /* DMA Interrupt flag */
 
-        std::atomic<int> interruptWaitTime_us{0};      /* = descriptorUpdateCycle_us / 10 */
-        std::atomic<int> circularBufferWaitTime_us{0}; /* = descriptorUpdateCycle_us / 5 */
+        std::atomic<int> interrupt_wait_time_us{0};       /* = descriptor_update_cycle_us / 10 */
+        std::atomic<int> circular_buffer_wait_time_us{0}; /* = descriptor_update_cycle_us / 5 */
 
-        std::atomic<uint32_t> circularBufferQueueSizeMAX; /* MAX size of circular buffer queue */
-        std::atomic<uint32_t> resultQueueSizeMAX;         /* MAX size of result queue */
+        std::atomic<uint32_t> circular_buffer_queue_size_max; /* MAX size of circular buffer queue */
+        std::atomic<uint32_t> result_queue_size_max;          /* MAX size of result queue */
 
-        std::atomic<bool> scanEnable{false};             /* Scan enable flag */
-        std::atomic<bool> scanOptionsChanged{false};     /* Scan options changed flag */
-        std::atomic<bool> scanOptionsInitialized{false}; /* Scan options initialized flag */
+        std::atomic<bool> scan_enable{false};              /* Scan enable flag */
+        std::atomic<bool> scan_options_changed{false};     /* Scan options changed flag */
+        std::atomic<bool> scan_options_initialized{false}; /* Scan options initialized flag */
 
         /* Threads */
 
         /**
          * @brief Listen to interrupt.
          *
-         * @note If interrupt detected, dmaDescriptorIRQ <-- true.
+         * @note If interrupt detected, dma_descriptor_irq <-- true.
          * @note Control mutex lock: mut_dma.
          */
         void THREAD__ListenDMAInterrupt();
@@ -138,7 +138,7 @@ namespace vuprs
         /**
          * @brief Read circular buffer and push data to queue.
          *
-         * @note If interrupt detected, circularBufferIRQ <-- true.
+         * @note If interrupt detected, circular_buffer_irq <-- true.
          * @note Control mutex lock: mut_alg.
          */
         void THREAD__ReadCircularBuffer();
@@ -162,13 +162,13 @@ namespace vuprs
         /**
          * @brief Initialize FPGA controller & Beamforming algorithm.
          *
-         * @param fpgaConfigJson FPGA config JSON file.
-         * @param bfArrayConfigJson Beam forming array config JSON file.
-         * @param firConfigJson FIR filter config JSON file.
+         * @param fpga_config_json FPGA config JSON file.
+         * @param bf_array_config_json Beam forming array config JSON file.
+         * @param fir_config_json FIR filter config JSON file.
          */
-        bool InitCollaborationBeamformer(const std::string &fpgaConfigJson,
-                                         const std::string &bfArrayConfigJson,
-                                         const std::string &firConfigJson);
+        bool InitCollaborationBeamformer(const std::string &fpga_config_json,
+                                         const std::string &bf_array_config_json,
+                                         const std::string &fir_config_json);
 
         /**
          * @brief Bind beam forming algorithm.
@@ -230,9 +230,9 @@ namespace vuprs
          *
          * @param alt altitude (unit: degree) of beam former pointing target.
          * @param az azimuth (unit: degree) of beam former pointing target.
-         * @param waveVelocity wave velocity (m/s). e.g. 346.0 for speed of sound in air.
+         * @param wave_velocity wave velocity (m/s). e.g. 346.0 for speed of sound in air.
          */
-        bool ReDirect(double alt, double az, double waveVelocity);
+        bool ReDirect(double alt, double az, double wave_velocity);
 
         /* - Part 2.2: Scan control - */
 
@@ -260,11 +260,11 @@ namespace vuprs
          *
          * @note Tread safety.
          *
-         * @param pointsInHalf scanning points in half of the scanning area (altitude: 0-90 degree, azimuth: -180-180 degree).
+         * @param points_in_hemisphere scanning points in half of the scanning area (altitude: 0-90 degree, azimuth: -180-180 degree).
          * @param alt_min minimum altitude (unit: degree) of scanning area.
-         * @param waveVelocity wave velocity (m/s). e.g. 346.0 for speed of sound in air.
+         * @param wave_velocity wave velocity (m/s). e.g. 346.0 for speed of sound in air.
          */
-        void ScanOptions(int pointsInHalf, double alt_min, double waveVelocity);
+        void ScanOptions(int points_in_hemisphere, double alt_min, double wave_velocity);
 
         /* ------ Part 3: Data Input/Output ------ */
 
@@ -334,15 +334,15 @@ namespace vuprs
          * @note Tread safety.
          *
          * @param scanPower pointer to vector to store the scan power (in dB).
-         * @param maxPowerDB pointer to maximum power value in dB.
-         * @param minPowerDB pointer to minimum power value in dB.
+         * @param max_power_db pointer to maximum power value in dB.
+         * @param min_power_db pointer to minimum power value in dB.
          *
          * @retval true: success.
          * @retval false: failed.
          */
         bool ReadScanPower(std::vector<uint16_t> *scanPower,
-                           double *maxPowerDB,
-                           double *minPowerDB);
+                           double *max_power_db,
+                           double *min_power_db);
 
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };

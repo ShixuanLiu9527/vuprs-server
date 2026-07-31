@@ -8,7 +8,7 @@ int main(int argc, char *argv[])
     vuprs::AlignedBufferDMA buffer;
     tool::_FPGA_TOOL_CommandParseResult cmd;
 
-    uint32_t readValue = 0;
+    uint32_t read_value = 0;
     uint32_t memoryTransferSize = 0;
 
     args.resize(argc);
@@ -61,31 +61,31 @@ int main(int argc, char *argv[])
 
         case tool::_FPGA_OPERATION::LIST_DEVICE__ADC:
         {
-            controller.dev__ADC_Controller.ReadAllRegisters(&registerNameList, &registerOffsetList, &registerValueList);
+            controller.dev__adc_controller.ReadAllRegisters(&registerNameList, &registerOffsetList, &registerValueList);
             tool::FPGA_TOOL_PrintDeviceRegisters(registerNameList, registerOffsetList, registerValueList);
             break;
         }
         case tool::_FPGA_OPERATION::LIST_DEVICE__DMA:
         {
-            controller.dev__AXI_DMA.ReadAllRegisters(&registerNameList, &registerOffsetList, &registerValueList);
+            controller.dev__axi_dma.ReadAllRegisters(&registerNameList, &registerOffsetList, &registerValueList);
             tool::FPGA_TOOL_PrintDeviceRegisters(registerNameList, registerOffsetList, registerValueList);
             break;
         }
         case tool::_FPGA_OPERATION::LIST_DEVICE__CBUF:
         {
-            controller.dev__Circular_Buffer.ReadAllRegisters(&registerNameList, &registerOffsetList, &registerValueList);
+            controller.dev__circular_buffer.ReadAllRegisters(&registerNameList, &registerOffsetList, &registerValueList);
             tool::FPGA_TOOL_PrintDeviceRegisters(registerNameList, registerOffsetList, registerValueList);
             break;
         }
         case tool::_FPGA_OPERATION::LIST_DEVICE__FIR:
         {
-            controller.dev__FIR_Filter_Bank.ReadAllRegisters(&registerNameList, &registerOffsetList, &registerValueList);
+            controller.dev__fir_filter_bank.ReadAllRegisters(&registerNameList, &registerOffsetList, &registerValueList);
             tool::FPGA_TOOL_PrintDeviceRegisters(registerNameList, registerOffsetList, registerValueList);
             break;
         }
         case tool::_FPGA_OPERATION::LIST_DEVICE__PDLY:
         {
-            controller.dev__PreDelay_Unit.ReadAllRegisters(&registerNameList, &registerOffsetList, &registerValueList);
+            controller.dev__predelay_unit.ReadAllRegisters(&registerNameList, &registerOffsetList, &registerValueList);
             tool::FPGA_TOOL_PrintDeviceRegisters(registerNameList, registerOffsetList, registerValueList);
             break;
         }
@@ -96,12 +96,12 @@ int main(int argc, char *argv[])
         {
             if (cmd.isread)
             {
-                controller.dev__ADC_Controller.ReadSingleRegister(cmd.offset, &readValue);
-                tool::FPGA_TOOL_PrintValue(cmd.offset, readValue);
+                controller.dev__adc_controller.ReadSingleRegister(cmd.offset, &read_value);
+                tool::FPGA_TOOL_PrintValue(cmd.offset, read_value);
             }
             else
             {
-                controller.dev__ADC_Controller.WriteSingleRegister(cmd.offset, cmd.value);
+                controller.dev__adc_controller.WriteSingleRegister(cmd.offset, cmd.value);
             }
             break;
         }
@@ -109,12 +109,12 @@ int main(int argc, char *argv[])
         {
             if (cmd.isread)
             {
-                controller.dev__AXI_DMA.ReadSingleRegister(cmd.offset, &readValue);
-                tool::FPGA_TOOL_PrintValue(cmd.offset, readValue);
+                controller.dev__axi_dma.ReadSingleRegister(cmd.offset, &read_value);
+                tool::FPGA_TOOL_PrintValue(cmd.offset, read_value);
             }
             else
             {
-                controller.dev__AXI_DMA.WriteSingleRegister(cmd.offset, cmd.value);
+                controller.dev__axi_dma.WriteSingleRegister(cmd.offset, cmd.value);
             }
             break;
         }
@@ -122,12 +122,12 @@ int main(int argc, char *argv[])
         {
             if (cmd.isread)
             {
-                controller.dev__Circular_Buffer.ReadSingleRegister(cmd.offset, &readValue);
-                tool::FPGA_TOOL_PrintValue(cmd.offset, readValue);
+                controller.dev__circular_buffer.ReadSingleRegister(cmd.offset, &read_value);
+                tool::FPGA_TOOL_PrintValue(cmd.offset, read_value);
             }
             else
             {
-                controller.dev__Circular_Buffer.WriteSingleRegister(cmd.offset, cmd.value);
+                controller.dev__circular_buffer.WriteSingleRegister(cmd.offset, cmd.value);
             }
             break;
         }
@@ -135,12 +135,12 @@ int main(int argc, char *argv[])
         {
             if (cmd.isread)
             {
-                controller.dev__FIR_Filter_Bank.ReadSingleRegister(cmd.offset, &readValue);
-                tool::FPGA_TOOL_PrintValue(cmd.offset, readValue);
+                controller.dev__fir_filter_bank.ReadSingleRegister(cmd.offset, &read_value);
+                tool::FPGA_TOOL_PrintValue(cmd.offset, read_value);
             }
             else
             {
-                controller.dev__FIR_Filter_Bank.WriteSingleRegister(cmd.offset, cmd.value);
+                controller.dev__fir_filter_bank.WriteSingleRegister(cmd.offset, cmd.value);
             }
             break;
         }
@@ -148,12 +148,12 @@ int main(int argc, char *argv[])
         {
             if (cmd.isread)
             {
-                controller.dev__PreDelay_Unit.ReadSingleRegister(cmd.offset, &readValue);
-                tool::FPGA_TOOL_PrintValue(cmd.offset, readValue);
+                controller.dev__predelay_unit.ReadSingleRegister(cmd.offset, &read_value);
+                tool::FPGA_TOOL_PrintValue(cmd.offset, read_value);
             }
             else
             {
-                controller.dev__PreDelay_Unit.WriteSingleRegister(cmd.offset, cmd.value);
+                controller.dev__predelay_unit.WriteSingleRegister(cmd.offset, cmd.value);
             }
             break;
         }
@@ -165,7 +165,7 @@ int main(int argc, char *argv[])
             if (cmd.isread)
             {
                 buffer.malloc(cmd.transfersize);
-                controller.mem__DDR.ReadMemory(&buffer, cmd.offset, cmd.transfersize);
+                controller.mem__ddr.ReadMemory(&buffer, cmd.offset, cmd.transfersize);
                 buffer.to_file(cmd.file);
             }
             else
@@ -175,7 +175,7 @@ int main(int argc, char *argv[])
                     memoryTransferSize = buffer.size();
                 else
                     memoryTransferSize = cmd.transfersize;
-                controller.mem__DDR.WriteMemory(&buffer, cmd.offset, memoryTransferSize);
+                controller.mem__ddr.WriteMemory(&buffer, cmd.offset, memoryTransferSize);
             }
             break;
         }
@@ -184,7 +184,7 @@ int main(int argc, char *argv[])
             if (cmd.isread)
             {
                 buffer.malloc(cmd.transfersize);
-                controller.mem__FIR_BRAM.ReadMemory(&buffer, cmd.offset, cmd.transfersize);
+                controller.mem__fir_bram.ReadMemory(&buffer, cmd.offset, cmd.transfersize);
                 buffer.to_file(cmd.file);
             }
             else
@@ -194,7 +194,7 @@ int main(int argc, char *argv[])
                     memoryTransferSize = buffer.size();
                 else
                     memoryTransferSize = cmd.transfersize;
-                controller.mem__FIR_BRAM.WriteMemory(&buffer, cmd.offset, memoryTransferSize);
+                controller.mem__fir_bram.WriteMemory(&buffer, cmd.offset, memoryTransferSize);
             }
             break;
         }
@@ -203,7 +203,7 @@ int main(int argc, char *argv[])
             if (cmd.isread)
             {
                 buffer.malloc(cmd.transfersize);
-                controller.mem__SG_BRAM.ReadMemory(&buffer, cmd.offset, cmd.transfersize);
+                controller.mem__sg_bram.ReadMemory(&buffer, cmd.offset, cmd.transfersize);
                 buffer.to_file(cmd.file);
             }
             else
@@ -213,7 +213,7 @@ int main(int argc, char *argv[])
                     memoryTransferSize = buffer.size();
                 else
                     memoryTransferSize = cmd.transfersize;
-                controller.mem__SG_BRAM.WriteMemory(&buffer, cmd.offset, memoryTransferSize);
+                controller.mem__sg_bram.WriteMemory(&buffer, cmd.offset, memoryTransferSize);
             }
             break;
         }
@@ -222,7 +222,7 @@ int main(int argc, char *argv[])
             if (cmd.isread)
             {
                 buffer.malloc(cmd.transfersize);
-                controller.mem__Circular_Buffer_BRAM.ReadMemory(&buffer, cmd.offset, cmd.transfersize);
+                controller.mem___circular_buffer_bram.ReadMemory(&buffer, cmd.offset, cmd.transfersize);
                 buffer.to_file(cmd.file);
             }
             else
@@ -232,7 +232,7 @@ int main(int argc, char *argv[])
                     memoryTransferSize = buffer.size();
                 else
                     memoryTransferSize = cmd.transfersize;
-                controller.mem__Circular_Buffer_BRAM.WriteMemory(&buffer, cmd.offset, memoryTransferSize);
+                controller.mem___circular_buffer_bram.WriteMemory(&buffer, cmd.offset, memoryTransferSize);
             }
             break;
         }

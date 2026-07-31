@@ -20,7 +20,6 @@ void vuprs::SplitFile(const std::string &fullpath, std::string *dir, std::string
 {
     size_t slash_pos = fullpath.find_last_of("/\\");
     size_t dot_pos = fullpath.find_last_of('.');
-
     if (dir != nullptr)
     {
         if (slash_pos == std::string::npos)
@@ -32,10 +31,8 @@ void vuprs::SplitFile(const std::string &fullpath, std::string *dir, std::string
     {
         size_t name_start = (slash_pos == std::string::npos) ? 0 : slash_pos + 1;
         size_t name_end = fullpath.length(); /* string after '/' */
-
         if (dot_pos != std::string::npos && dot_pos > slash_pos)
             name_end = dot_pos;
-
         *filename = fullpath.substr(name_start, name_end - name_start);
     }
     if (extension != nullptr)
@@ -47,36 +44,32 @@ void vuprs::SplitFile(const std::string &fullpath, std::string *dir, std::string
     }
 }
 
-std::string vuprs::FileAbsolutePath(const std::string &path, const std::string &fileName)
+std::string vuprs::FileAbsolutePath(const std::string &path, const std::string &filename)
 {
-    std::string normalizedPath = EnsureTrailingSlash(path);
-    return normalizedPath + fileName;
+    std::string normalized_path = EnsureTrailingSlash(path);
+    return normalized_path + filename;
 }
 
-std::string vuprs::AddPath(const std::string &basePath, const std::string &addedPath)
+std::string vuprs::AddPath(const std::string &base_path, const std::string &added_path)
 {
-    std::string normalizedBase = EnsureTrailingSlash(basePath);
-    return normalizedBase + addedPath;
+    std::string normalized_base = EnsureTrailingSlash(base_path);
+    return normalized_base + added_path;
 }
 
 bool vuprs::MakeDir(const std::string &dir)
 {
     PARAM_CHECK(!dir.empty(), "system_tools", " in [vuprs::MakeDir] dir empty.");
-
     std::string path;
     std::stringstream ss(dir);
     std::string segment;
-
     while (std::getline(ss, segment, '/'))
     {
         if (segment.empty())
             continue;
-
         if (path.empty())
             path = segment;
         else
             path = path + "/" + segment;
-
         if (!PathExist(path))
         {
             RUNTIME_CHECK(::mkdir(path.c_str(), 0777) == 0 || errno == EEXIST,
@@ -133,10 +126,10 @@ bool vuprs::SaveToCSV(const std::vector<std::vector<double>> &data, const std::s
 {
     if (data.empty())
         return true;
-    size_t rowCount = data[0].size();
+    size_t row_count = data[0].size();
     for (size_t i = 1; i < data.size(); ++i)
     {
-        if (data[i].size() != rowCount)
+        if (data[i].size() != row_count)
             return false;
     }
     std::string dir;
@@ -149,7 +142,7 @@ bool vuprs::SaveToCSV(const std::vector<std::vector<double>> &data, const std::s
     if (!file.is_open())
         return false;
     file << std::fixed << std::setprecision(20);
-    for (size_t r = 0; r < rowCount; ++r)
+    for (size_t r = 0; r < row_count; ++r)
     {
         for (size_t c = 0; c < data.size(); ++c)
         {

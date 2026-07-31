@@ -69,8 +69,8 @@ namespace vuprs
      * @note All predelay values should be equal or smaller than MAX_PDLY.
      *
      * @param controller FPGA controller.
-     * @param channelPredelay channel predelay values (n * Ts).
-     * @param channelName corrsponding channel name.
+     * @param channel_predelay channel predelay values (n * Ts).
+     * @param channel_name corrsponding channel name.
      *
      * @retval true: success.
      * @retval false: failed.
@@ -78,8 +78,8 @@ namespace vuprs
      * @throw std::runtime_error
      */
     bool FPGA_API__PDLY__SetPredelay(vuprs::FPGAController *controller,
-                                     const std::vector<int> &channelPredelay,
-                                     const std::vector<std::string> &channelName);
+                                     const std::vector<int> &channel_predelay,
+                                     const std::vector<std::string> &channel_name);
 
     /**
      * @brief Reset Predelay Unit.
@@ -98,7 +98,7 @@ namespace vuprs
      *
      * @param controller FPGA controller.
      * @param coefficients new coefficients of FIR filter bank (raw data, no need for scale).
-     * @param maxAbsoluteCoefficient max absolute coefficients (= max(abs(coefficients))).
+     * @param max_absolute_coefficient max absolute coefficients (= max(abs(coefficients))).
      *
      * @retval true: success.
      * @retval false: failed.
@@ -107,7 +107,7 @@ namespace vuprs
      */
     bool FPGA_API__FIR__SetCoefficients(vuprs::FPGAController *controller,
                                         std::vector<std::vector<double>> *coefficients,
-                                        double maxAbsoluteCoefficient);
+                                        double max_absolute_coefficient);
 
     /**
      * @brief Set new FIR filter bank coefficients & FIR filter length.
@@ -117,7 +117,7 @@ namespace vuprs
      *
      * @param controller FPGA controller.
      * @param coefficients new coefficients of FIR filter bank (raw data, no need for scale).
-     * @param maxAbsoluteCoefficient max absolute coefficients (= max(abs(coefficients))).
+     * @param max_absolute_coefficient max absolute coefficients (= max(abs(coefficients))).
      * @param len new length of FIR filter (<= MAX_FIR_LEN).
      *
      * @retval true: success.
@@ -127,7 +127,7 @@ namespace vuprs
      */
     bool FPGA_API__FIR__SetLengthAndCoefficients(vuprs::FPGAController *controller,
                                                  std::vector<std::vector<double>> *coefficients,
-                                                 double maxAbsoluteCoefficient,
+                                                 double max_absolute_coefficient,
                                                  uint32_t len);
 
     /**
@@ -145,9 +145,9 @@ namespace vuprs
      * @note Controller must be configured in advance.
      *
      * @param controller FPGA controller.
-     * @param runEnable true: enable run, false: disable run.
+     * @param run_enable true: enable run, false: disable run.
      */
-    bool FPGA_API__FIR__RunningControl(vuprs::FPGAController *controller, bool runEnable);
+    bool FPGA_API__FIR__RunningControl(vuprs::FPGAController *controller, bool run_enable);
 
     /* ----------------------------------------------------------------------------- */
     /* ------------------------------------ DDR ------------------------------------ */
@@ -160,8 +160,8 @@ namespace vuprs
      *
      * @param controller FPGA controller.
      * @param buffer aligned buffer.
-     * @param ddrOffset address offset in DDR (where to start reading).
-     * @param transferSize transfer size in bytes.
+     * @param ddr_offset address offset in DDR (where to start reading).
+     * @param transfer_size transfer size in bytes.
      *
      * @retval true: success.
      * @retval false: failed.
@@ -170,8 +170,8 @@ namespace vuprs
      */
     bool FPGA_API__DDR__ReadDDR(vuprs::FPGAController *controller,
                                 vuprs::AlignedBufferDMA *buffer,
-                                uint32_t ddrOffset,
-                                uint32_t transferSize);
+                                uint32_t ddr_offset,
+                                uint32_t transfer_size);
 
     /* ----------------------------------------------------------------------------- */
     /* ---------------------------------- AXI DMA ---------------------------------- */
@@ -202,8 +202,8 @@ namespace vuprs
      *
      * @param controller FPGA controller.
      * @param descriptors AXI DMA Scatter/Gather Descriptor list.
-     * @param isCyclicMode true: Cyclic DMA Mode, false: Normal Mode.
-     * @param enableIOCInterrupt true: enable IOC Interrupt, false: disable IOC Interrupt.
+     * @param is_cyclic_mode true: Cyclic DMA Mode, false: Normal Mode.
+     * @param enable_ioc_interrupt true: enable IOC Interrupt, false: disable IOC Interrupt.
      *
      * @retval true: success.
      * @retval false: failed.
@@ -212,8 +212,8 @@ namespace vuprs
      */
     bool FPGA_API__DMA__StartScatterGatherDMA_S2MM(vuprs::FPGAController *controller,
                                                    const std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> &descriptors,
-                                                   bool isCyclicMode,
-                                                   bool enableIOCInterrupt);
+                                                   bool is_cyclic_mode,
+                                                   bool enable_ioc_interrupt);
 
     /**
      * @brief Get IOC interrupt flag of AXI DMA (in Scatter/Gather mode).
@@ -246,10 +246,10 @@ namespace vuprs
      * @note Controller must be configured in advance.
      *
      * @param controller FPGA controller.
-     * @param referenceDescriptors reference descriptors (to match).
-     * @param currentDescriptor current descriptor.
-     * @param previousDescriptor previous descriptor.
-     * @param nextDescriptor next descriptor.
+     * @param reference_descriptors reference descriptors (to match).
+     * @param current_descriptor current descriptor.
+     * @param previous_descriptor previous descriptor.
+     * @param next_descriptor next descriptor.
      *
      * @retval true: success.
      * @retval false: failed.
@@ -257,10 +257,10 @@ namespace vuprs
      * @throw std::runtime_error
      */
     bool FPGA_API__DMA__GetCurrentDescriptor(vuprs::FPGAController *controller,
-                                             const std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> &referenceDescriptors,
-                                             vuprs::AXI_DMA_ScatterGatherDescriptor *currentDescriptor,
-                                             vuprs::AXI_DMA_ScatterGatherDescriptor *previousDescriptor,
-                                             vuprs::AXI_DMA_ScatterGatherDescriptor *nextDescriptor);
+                                             const std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> &reference_descriptors,
+                                             vuprs::AXI_DMA_ScatterGatherDescriptor *current_descriptor,
+                                             vuprs::AXI_DMA_ScatterGatherDescriptor *previous_descriptor,
+                                             vuprs::AXI_DMA_ScatterGatherDescriptor *next_descriptor);
 
     /**
      * @brief Read current descriptor address.
@@ -269,12 +269,12 @@ namespace vuprs
      * @note The API function will read the current descriptor address from AXI DMA register,
      *
      * @param controller FPGA controller.
-     * @param currentDescriptor current descriptor address.
+     * @param current_descriptor current descriptor address.
      *
      * @retval true: success.
      * @retval false: failed.
      */
-    bool FPGA_API__DMA__ReadCurrentDescriptor(vuprs::FPGAController *controller, uint32_t *currentDescriptor);
+    bool FPGA_API__DMA__ReadCurrentDescriptor(vuprs::FPGAController *controller, uint32_t *current_descriptor);
 
     /**
      * @brief Set timeout for interrupt detection in AXI DMA.

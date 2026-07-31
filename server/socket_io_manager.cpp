@@ -3,15 +3,15 @@
 #include <thread>
 #include "server/socket_io_manager.h"
 
-static constexpr int kSocketSendTimeoutMs = 500;
-static constexpr int kSocketRecvTimeoutMs = 100;
-static constexpr int kSendRetryMaximumCount = 3;
+static constexpr int k_socket_send_timeout_ms = 500;
+static constexpr int k_socket_recv_timeout_ms = 100;
+static constexpr int k_send_retry_max_count = 3;
 
-static bool SetSocketTimeoutOption(int fd, int option, int timeoutMs)
+static bool SetSocketTimeoutOption(int fd, int option, int timeout_ms)
 {
     struct timeval tv;
-    tv.tv_sec = timeoutMs / 1000;
-    tv.tv_usec = (timeoutMs % 1000) * 1000;
+    tv.tv_sec = timeout_ms / 1000;
+    tv.tv_usec = (timeout_ms % 1000) * 1000;
     return setsockopt(fd, SOL_SOCKET, option, &tv, sizeof(tv)) == 0;
 }
 
@@ -21,16 +21,16 @@ bool vuprs::SendAllWithRetry(int fd, const char *data, size_t bytes)
     {
         return false;
     }
-    size_t totalSent = 0;
-    int retryCount = 0;
-    while (totalSent < bytes)
+    size_t total_sent = 0;
+    int retry_count = 0;
+    while (total_sent < bytes)
     {
-        const size_t remaining = bytes - totalSent;
-        ssize_t sent = send(fd, data + totalSent, remaining, 0);
+        const size_t remaining = bytes - total_sent;
+        ssize_t sent = send(fd, data + total_sent, remaining, 0);
         if (sent > 0)
         {
-            totalSent += static_cast<size_t>(sent);
-            retryCount = 0;
+            total_sent += static_cast<size_t>(sent);
+            retry_count = 0;
             continue;
         }
         if (sent == 0)
@@ -39,8 +39,8 @@ bool vuprs::SendAllWithRetry(int fd, const char *data, size_t bytes)
         }
         if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK)
         {
-            retryCount++;
-            if (retryCount > kSendRetryMaximumCount)
+            retry_count++;
+            if (retry_count > k_send_retry_max_count)
             {
                 return false;
             }
@@ -56,10 +56,9 @@ vuprs::SocketIOManager::SocketIOManager(int client_fd, const sockaddr_in &client
 {
     this->client_fd = client_fd;
     this->client_addr = client_addr;
-    this->clientInformation = vuprs::ParseClientInformationFromSocketaddr(this->client_addr);
-
-    SetSocketTimeoutOption(this->client_fd, SO_SNDTIMEO, kSocketSendTimeoutMs);
-    SetSocketTimeoutOption(this->client_fd, SO_RCVTIMEO, kSocketRecvTimeoutMs);
+    this->client_info = vuprs::ParseClientInformationFromSocketaddr(this->client_addr);
+    SetSocketTimeoutOption(this->client_fd, SO_SNDTIMEO, k_socket_send_timeout_ms);
+    SetSocketTimeoutOption(this->client_fd, SO_RCVTIMEO, k_socket_recv_timeout_ms);
 }
 
 vuprs::SocketIOManager::~SocketIOManager()
@@ -69,7 +68,7 @@ vuprs::SocketIOManager::~SocketIOManager()
 
 std::string vuprs::SocketIOManager::ClientInformation() const
 {
-    return this->clientInformation;
+    return this->client_info;
 }
 
 bool vuprs::SocketIOManager::SendMessage(const std::string &message)
@@ -78,9 +77,7 @@ bool vuprs::SocketIOManager::SendMessage(const std::string &message)
     {
         return true;
     }
-
     std::lock_guard<std::mutex> lock(this->mut); /* LOCK */
-
     return vuprs::SendAllWithRetry(this->client_fd, message.data(), message.size());
 }
 
@@ -90,11 +87,8 @@ bool vuprs::SocketIOManager::SendBuffer(const vuprs::AlignedBufferDMA &buffer)
     {
         return false;
     }
-
     const char *data_ptr = reinterpret_cast<const char *>(buffer.data());
-
     std::lock_guard<std::mutex> lock(this->mut); /* LOCK */
-
     return vuprs::SendAllWithRetry(this->client_fd, data_ptr, static_cast<size_t>(buffer.size()));
 }
 
@@ -104,34 +98,31 @@ void vuprs::SocketIOManager::ReceiveMessage(const std::string &tailer, vuprs::So
     {
         return;
     }
-
-    ssize_t recvReturn = 1;
-
+    ssize_t recv_return = 1;
     vuprs::SetSocketReceiveDataToDefault(data);
-
     std::lock_guard<std::mutex> lock(this->mut); /* LOCK */
-
     if (this->client_fd < 0)
     {
         data->is_connect = false;
         data->is_error = true;
         return;
     }
-
-    while (data->receiveBytes < __SOCKET_RECEIVE_BUFFER_SIZE_BYTES__)
+    while (data->receive_bytes < __SOCKET_RECEIVE_BUFFER_SIZE_BYTES__)
     {
-        recvReturn = recv(this->client_fd, data->buf + data->receiveBytes, __SOCKET_RECEIVE_BUFFER_SIZE_BYTES__ - data->receiveBytes, 0);
-
-        if (recvReturn > 0) /* Successfully received */
+        recv_return = recv(this->client_fd,
+                           data->buf + data->receive_bytes,
+                           __SOCKET_RECEIVE_BUFFER_SIZE_BYTES__ - data->receive_bytes,
+                           0);
+        if (recv_return > 0) /* Successfully received */
         {
-            data->receiveBytes += recvReturn;
-            std::string_view receivedData(data->buf, data->receiveBytes);
-            if (receivedData.find(tailer) != std::string_view::npos)
+            data->receive_bytes += recv_return;
+            std::string_view received_data(data->buf, data->receive_bytes);
+            if (received_data.find(tailer) != std::string_view::npos)
             {
                 break;
             }
         }
-        else if (recvReturn == 0) /* Closed */
+        else if (recv_return == 0) /* Closed */
         {
             data->is_connect = false;
             break;
@@ -154,7 +145,6 @@ void vuprs::SocketIOManager::ReceiveMessage(const std::string &tailer, vuprs::So
 void vuprs::SocketIOManager::CloseSocket()
 {
     std::lock_guard<std::mutex> lock(this->mut); /* LOCK */
-
     if (this->client_fd >= 0)
     {
         shutdown(this->client_fd, SHUT_RDWR);
@@ -166,11 +156,8 @@ void vuprs::SocketIOManager::CloseSocket()
 std::string vuprs::ParseClientInformationFromSocketaddr(const sockaddr_in &client_addr)
 {
     char ip[INET_ADDRSTRLEN];
-
     /* Calculate IP & Port */
-
     inet_ntop(AF_INET, &client_addr.sin_addr, ip, INET_ADDRSTRLEN);
-
     return std::string(ip) + ":" + std::to_string(ntohs(client_addr.sin_port));
 }
 
@@ -180,24 +167,20 @@ bool vuprs::CheckFrameFormat(const vuprs::SocketReceiveData &data, const std::st
         return false;
     if (header.empty() || tailer.empty())
         return false;
-
-    std::string dataString(data.buf, data.receiveBytes);
-
-    dataString.erase(std::remove_if(dataString.begin(), dataString.end(),
-                                    [](unsigned char ch)
-                                    {
-                                        return ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t';
-                                    }),
-                     dataString.end());
-
-    if (dataString.size() < header.size() + tailer.size())
+    std::string data_string(data.buf, data.receive_bytes);
+    data_string.erase(std::remove_if(data_string.begin(), data_string.end(),
+                                     [](unsigned char ch)
+                                     {
+                                         return ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t';
+                                     }),
+                      data_string.end());
+    if (data_string.size() < header.size() + tailer.size())
         return false;
-    if (dataString.compare(0, header.size(), header) != 0)
+    if (data_string.compare(0, header.size(), header) != 0)
         return false;
-    if (dataString.compare(dataString.size() - tailer.size(), tailer.size(), tailer) != 0)
+    if (data_string.compare(data_string.size() - tailer.size(), tailer.size(), tailer) != 0)
         return false;
-
-    *result = dataString; /* do not cut */
+    *result = data_string; /* do not cut */
     return true;
 }
 
@@ -206,6 +189,6 @@ void vuprs::SetSocketReceiveDataToDefault(vuprs::SocketReceiveData *data)
     data->is_connect = true;
     data->is_timeout = false;
     data->is_error = false;
-    data->receiveBytes = 0;
+    data->receive_bytes = 0;
     memset(data->buf, 0, sizeof(data->buf));
 }

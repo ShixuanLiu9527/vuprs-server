@@ -110,16 +110,16 @@ namespace vuprs
     public:
         SignalData();
 
-        std::vector<std::vector<std::complex<double>>> _channelData;
-        std::vector<std::string> _channelName;
+        std::vector<std::vector<std::complex<double>>> _channel_data;
+        std::vector<std::string> _channel_name;
 
-        double samplingFrequency = 0.0, samplingTime = 0.0;
-        int signalPoints = 0; /* signal data point number for one channel */
+        double fs = 0.0, sampling_time = 0.0;
+        int signal_points = 0; /* signal data point number for one channel */
 
         /**
          * @brief Indicate whether this channel is included.
          *
-         * @param channelName channel name, optional:
+         * @param channel_name channel name, optional:
          *                    CH-A-1: channel-A1;
          *                    CH-A-2: channel-A2;
          *                    CH-A-3: channel-A3;
@@ -140,33 +140,33 @@ namespace vuprs
          * @retval true: this channel is included.
          * @retval false: this channel is not included.
          */
-        bool contains(const std::string &channelName) const;
+        bool contains(const std::string &channel_name) const;
 
         /**
          * @brief Get channel data.
          *
-         * @param channelName channel name.
+         * @param channel_name channel name.
          * @param data output data.
          *
          * @throw std::runtime_error
          */
-        void GetChannelData(const std::string &channelName, std::vector<std::complex<double>> *data) const;
+        void GetChannelData(const std::string &channel_name, std::vector<std::complex<double>> *data) const;
 
         /**
          * @brief Delete channel data.
          *
-         * @param channelName channel name.
+         * @param channel_name channel name.
          */
-        void DeleteChannelData(const std::string &channelName);
+        void DeleteChannelData(const std::string &channel_name);
 
         /**
          * @brief Save all data to CSV file.
          *
-         * @param outputFile output file name.
+         * @param output_file output file name.
          *
          * @throw std::runtime_error
          */
-        void ToCSV(const std::string &outputFile);
+        void ToCSV(const std::string &output_file);
 
         void _UpdataHashMap();
     };
@@ -175,36 +175,36 @@ namespace vuprs
      * @brief Rotate data in circular buffer.
      *
      * @note e.g. Input: vec = [1, 2, 3, 4, 5, 6],
-     * @note and currentPointer = 2,
+     * @note and current_pointer = 2,
      * @note then Output = [4, 5, 6, 1, 2, 3].
      */
     template <typename T>
-    void RotateCircularBuffer(std::vector<T> *vec, uint32_t currentPointer)
+    void RotateCircularBuffer(std::vector<T> *vec, uint32_t current_pointer)
     {
-        if (vec->empty() || currentPointer >= vec->size() - 1)
+        if (vec->empty() || current_pointer >= vec->size() - 1)
         {
             return;
         }
-        std::rotate(vec->begin(), vec->begin() + currentPointer + 1, vec->end());
+        std::rotate(vec->begin(), vec->begin() + current_pointer + 1, vec->end());
     }
 
     /**
-     * @brief Parse circular buffer data to adcData.
+     * @brief Parse circular buffer data to adc_data.
      *
      * @param buffer Input aligned DMA buffer.
-     * @param adcData Output ADC data (ch1: adcData[0], ch2: adcData[1], ...).
+     * @param adc_data Output ADC data (ch1: adc_data[0], ch2: adc_data[1], ...).
      * @param fs sampling frequency.
      * @param v_scale ADC voltage scale (5.0 or 10.0 for AD7606)
-     * @param pointPosCBF current data pointer (= (CBF + sizeof(uint32_t)) / (sizeof(uint32_t) * ADC_FRAME_WORD_SIZE) - 1).
+     * @param point_pos_cbf current data pointer (= (CBF + sizeof(uint32_t)) / (sizeof(uint32_t) * ADC_FRAME_WORD_SIZE) - 1).
      *
      * @retval true: success.
      * @retval false: failed.
      */
     bool FPGACircularBuffer2Frames(vuprs::AlignedBufferDMA *buffer,
-                                   vuprs::SignalData *adcData,
+                                   vuprs::SignalData *adc_data,
                                    double fs,
                                    double v_scale,
-                                   uint32_t pointPosCBF);
+                                   uint32_t point_pos_cbf);
 
     /**
      * @brief Convert memory data to signed float.
@@ -212,14 +212,14 @@ namespace vuprs
      * @note 1st: uint32_t to signed, 2nd: signed to float.
      *
      * @param buffer Input aligned DMA buffer.
-     * @param beamformingResult Output beam forming result.
+     * @param beamforming_result Output beam forming result.
      * @param fs sampling frequency.
      *
      * @retval true: success.
      * @retval false: failed.
      */
     bool FPGAMemoryBuffer2Frames(vuprs::AlignedBufferDMA *buffer,
-                                 std::vector<double> *beamformingResult,
+                                 std::vector<double> *beamforming_result,
                                  double fs);
 }
 

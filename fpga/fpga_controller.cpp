@@ -6,115 +6,115 @@ vuprs::FPGAController::FPGAController()
     this->ResetController();
 }
 
-vuprs::FPGAController::FPGAController(const std::string &configJsonFilename)
+vuprs::FPGAController::FPGAController(const std::string &json_filename)
 {
     this->ResetController();
-    this->ConfigFPGAFromJson(configJsonFilename);
+    this->ConfigFPGAFromJson(json_filename);
 }
 
 void vuprs::FPGAController::ResetController()
 {
     std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
-    this->ioManagerList_dev.clear();
-    this->ioManagerList_mem.clear();
-    this->ioManagerList_irq.clear();
-    this->ioManagerList_dev.reserve(FPGA_MODULE_COUNT * 2);
-    this->ioManagerList_mem.reserve(FPGA_MODULE_COUNT * 2);
-    this->ioManagerList_irq.reserve(FPGA_MODULE_COUNT);
+    this->io_manager_list_dev.clear();
+    this->io_manager_list_mem.clear();
+    this->io_manager_list_irq.clear();
+    this->io_manager_list_dev.reserve(FPGA_MODULE_COUNT * 2);
+    this->io_manager_list_mem.reserve(FPGA_MODULE_COUNT * 2);
+    this->io_manager_list_irq.reserve(FPGA_MODULE_COUNT);
 
-    this->configdone = false;
+    this->config_done = false;
 }
 
 vuprs::FPGAController::~FPGAController()
 {
     std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
-    this->ioManagerList_dev.clear();
-    this->ioManagerList_mem.clear();
-    this->ioManagerList_irq.clear();
+    this->io_manager_list_dev.clear();
+    this->io_manager_list_mem.clear();
+    this->io_manager_list_irq.clear();
 }
 
-bool vuprs::FPGAController::ConfigFPGAFromJson(const std::string &configJsonFilename)
+bool vuprs::FPGAController::ConfigFPGAFromJson(const std::string &json_filename)
 {
-    std::ifstream configJsonFile;
+    std::ifstream f;
 
     /* open config json file */
-    configJsonFile.open(configJsonFilename);
-    RUNTIME_CHECK(configJsonFile.is_open(), "fpga", " in [FPGAController::ConfigFPGAFromJson] Cannot open file: " + configJsonFilename);
-    nlohmann::json configJsonData;
+    f.open(json_filename);
+    RUNTIME_CHECK(f.is_open(), "fpga", " in [FPGAController::ConfigFPGAFromJson] Cannot open file: " + json_filename);
+    nlohmann::json json_data;
     try
     {
-        configJsonFile >> configJsonData;
+        f >> json_data;
     }
     catch (const std::exception &e)
     {
         RUNTIME_CHECK(false, "fpga", " in [FPGAController::ConfigFPGAFromJson] Error occurred when parsing JSON file." + std::string(e.what()));
     }
-    bool configStatus = true;
+    bool config_status = true;
     try
     {
-        auto devices = configJsonData["devices"];
+        auto devices = json_data["devices"];
         {
             std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
             /* Load devices */
-            configStatus &= this->dev__AXI_DMA.LoadFromJsonObj(devices["axi_dma"]);
-            configStatus &= this->dev__ADC_Controller.LoadFromJsonObj(devices["adc_controller"]);
-            configStatus &= this->dev__Circular_Buffer.LoadFromJsonObj(devices["circular_buffer"]);
-            configStatus &= this->dev__FIR_Filter_Bank.LoadFromJsonObj(devices["fir_bank"]);
-            configStatus &= this->dev__PreDelay_Unit.LoadFromJsonObj(devices["pre_delay_unit"]);
+            config_status &= this->dev__axi_dma.LoadFromJsonObj(devices["axi_dma"]);
+            config_status &= this->dev__adc_controller.LoadFromJsonObj(devices["adc_controller"]);
+            config_status &= this->dev__circular_buffer.LoadFromJsonObj(devices["circular_buffer"]);
+            config_status &= this->dev__fir_filter_bank.LoadFromJsonObj(devices["fir_bank"]);
+            config_status &= this->dev__predelay_unit.LoadFromJsonObj(devices["pre_delay_unit"]);
             /* Load memorys */
-            configStatus &= this->mem__DDR.LoadFromJsonObj(devices["ddr"]);
-            configStatus &= this->mem__FIR_BRAM.LoadFromJsonObj(devices["fir_bram"]);
-            configStatus &= this->mem__SG_BRAM.LoadFromJsonObj(devices["sg_bram"]);
-            configStatus &= this->mem__Circular_Buffer_BRAM.LoadFromJsonObj(devices["cbuf_bram"]);
+            config_status &= this->mem__ddr.LoadFromJsonObj(devices["ddr"]);
+            config_status &= this->mem__fir_bram.LoadFromJsonObj(devices["fir_bram"]);
+            config_status &= this->mem__sg_bram.LoadFromJsonObj(devices["sg_bram"]);
+            config_status &= this->mem___circular_buffer_bram.LoadFromJsonObj(devices["cbuf_bram"]);
         }
-        configStatus &= this->BindIOManager();
+        config_status &= this->BindIOManager();
     }
     catch (const std::exception &e)
     {
         RUNTIME_CHECK(false, "fpga", " in [FPGAController::ConfigFPGAFromJson] Error occurred in parsing: " + std::string(e.what()));
     }
-    RUNTIME_CHECK(configStatus, "fpga", " in [FPGAController::ConfigFPGAFromJson] Config failed.");
-    this->configdone = true;
+    RUNTIME_CHECK(config_status, "fpga", " in [FPGAController::ConfigFPGAFromJson] Config failed.");
+    this->config_done = true;
     return true;
 }
 
-void vuprs::FPGAController::GetOrCreateInterruptIOManagerIndex(const std::string &deviceFile, int *index)
+void vuprs::FPGAController::GetOrCreateInterruptIOManagerIndex(const std::string &device_file, int *index)
 {
     PARAM_CHECK(index != nullptr, "fpga", " in [FPGAController::GetOrCreateInterruptIOManagerIndex] Index is NULL.");
     int len;
     {
         std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
-        len = this->ioManagerList_irq.size();
+        len = this->io_manager_list_irq.size();
     }
     *index = 0;
     {
         std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
         for (int i = 0; i < len; i++)
         {
-            if (this->ioManagerList_irq[i]->GetDeviceFilename() == deviceFile)
+            if (this->io_manager_list_irq[i]->GetDeviceFilename() == device_file)
             {
                 *index = i;
                 return;
             }
         }
-        this->ioManagerList_irq.emplace_back(std::make_shared<vuprs::FPGA_IOManagerForInterrput>(deviceFile));
-        *index = this->ioManagerList_irq.size() - 1;
+        this->io_manager_list_irq.emplace_back(std::make_shared<vuprs::FPGA_IOManagerForInterrput>(device_file));
+        *index = this->io_manager_list_irq.size() - 1;
     }
 }
 
-void vuprs::FPGAController::GetOrCreateNormalIOManagerIndex(const std::string &deviceFile, int *index, bool isDevice)
+void vuprs::FPGAController::GetOrCreateNormalIOManagerIndex(const std::string &device_file, int *index, bool is_device)
 {
     PARAM_CHECK(index != nullptr, "fpga", " in [FPGAController::GetOrCreateNormalIOManagerIndex] Index is NULL.");
     int len;
     {
         std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
-        if (isDevice)
+        if (is_device)
         {
-            len = this->ioManagerList_dev.size();
+            len = this->io_manager_list_dev.size();
         }
         else
         {
-            len = this->ioManagerList_mem.size();
+            len = this->io_manager_list_mem.size();
         }
     }
     *index = 0;
@@ -123,9 +123,9 @@ void vuprs::FPGAController::GetOrCreateNormalIOManagerIndex(const std::string &d
 
         for (int i = 0; i < len; i++)
         {
-            if (isDevice)
+            if (is_device)
             {
-                if (this->ioManagerList_dev[i]->GetDeviceFilename() == deviceFile)
+                if (this->io_manager_list_dev[i]->GetDeviceFilename() == device_file)
                 {
                     *index = i;
                     return;
@@ -133,71 +133,71 @@ void vuprs::FPGAController::GetOrCreateNormalIOManagerIndex(const std::string &d
             }
             else
             {
-                if (this->ioManagerList_mem[i]->GetDeviceFilename() == deviceFile)
+                if (this->io_manager_list_mem[i]->GetDeviceFilename() == device_file)
                 {
                     *index = i;
                     return;
                 }
             }
         }
-        if (isDevice)
+        if (is_device)
         {
-            this->ioManagerList_dev.emplace_back(std::make_shared<vuprs::FPGA_IOManagerForDevice>(deviceFile));
-            *index = this->ioManagerList_dev.size() - 1;
+            this->io_manager_list_dev.emplace_back(std::make_shared<vuprs::FPGA_IOManagerForDevice>(device_file));
+            *index = this->io_manager_list_dev.size() - 1;
         }
         else
         {
-            this->ioManagerList_mem.emplace_back(std::make_shared<vuprs::FPGA_IOManagerForMemory>(deviceFile));
-            *index = this->ioManagerList_mem.size() - 1;
+            this->io_manager_list_mem.emplace_back(std::make_shared<vuprs::FPGA_IOManagerForMemory>(device_file));
+            *index = this->io_manager_list_mem.size() - 1;
         }
     }
 }
 
 bool vuprs::FPGAController::BindIOManager()
 {
-    int i_AXI_DMA, i_ADC_Controller, i_Circular_Buffer, i_FIR_Filter_Bank, i_PreDelay_Unit;
-    int i_h2c_DDR, i_c2h_DDR;
-    int i_h2c_FIR_BRAM, i_c2h_FIR_BRAM;
-    int i_h2c_SG_BRAM, i_c2h_SG_BRAM;
-    int i_h2c_Circular_Buffer_BRAM, i_c2h_Circular_Buffer_BRAM;
-    int i_AXI_DMA_irq;
-    bool bindStatus = true;
+    int i_axi_dma, i_adc_controller, i_circular_buffer, i_fir_filter_bank, i_predelay_unit;
+    int i_h2c_ddr, i_c2h_ddr;
+    int i_h2c_fir_bram, i_c2h_fir_bram;
+    int i_h2c_sg_bram, i_c2h_sg_bram;
+    int i_h2c_circular_buffer_bram, i_c2h_circular_buffer_bram;
+    int i_axi_dma_irq;
+    bool bind_status = true;
     /* Generate devices */
-    this->GetOrCreateNormalIOManagerIndex(this->dev__AXI_DMA.ControlDeviceFilename(), &i_AXI_DMA, true);
-    this->GetOrCreateNormalIOManagerIndex(this->dev__ADC_Controller.ControlDeviceFilename(), &i_ADC_Controller, true);
-    this->GetOrCreateNormalIOManagerIndex(this->dev__Circular_Buffer.ControlDeviceFilename(), &i_Circular_Buffer, true);
-    this->GetOrCreateNormalIOManagerIndex(this->dev__FIR_Filter_Bank.ControlDeviceFilename(), &i_FIR_Filter_Bank, true);
-    this->GetOrCreateNormalIOManagerIndex(this->dev__PreDelay_Unit.ControlDeviceFilename(), &i_PreDelay_Unit, true);
-    this->GetOrCreateInterruptIOManagerIndex(this->dev__AXI_DMA.EventDeviceFilename(), &i_AXI_DMA_irq);
+    this->GetOrCreateNormalIOManagerIndex(this->dev__axi_dma.ControlDeviceFilename(), &i_axi_dma, true);
+    this->GetOrCreateNormalIOManagerIndex(this->dev__adc_controller.ControlDeviceFilename(), &i_adc_controller, true);
+    this->GetOrCreateNormalIOManagerIndex(this->dev__circular_buffer.ControlDeviceFilename(), &i_circular_buffer, true);
+    this->GetOrCreateNormalIOManagerIndex(this->dev__fir_filter_bank.ControlDeviceFilename(), &i_fir_filter_bank, true);
+    this->GetOrCreateNormalIOManagerIndex(this->dev__predelay_unit.ControlDeviceFilename(), &i_predelay_unit, true);
+    this->GetOrCreateInterruptIOManagerIndex(this->dev__axi_dma.EventDeviceFilename(), &i_axi_dma_irq);
     /* Generate memories */
-    this->GetOrCreateNormalIOManagerIndex(this->mem__DDR.H2C_ControlDeviceFilename(), &i_h2c_DDR, false);
-    this->GetOrCreateNormalIOManagerIndex(this->mem__DDR.C2H_ControlDeviceFilename(), &i_c2h_DDR, false);
-    this->GetOrCreateNormalIOManagerIndex(this->mem__FIR_BRAM.H2C_ControlDeviceFilename(), &i_h2c_FIR_BRAM, false);
-    this->GetOrCreateNormalIOManagerIndex(this->mem__FIR_BRAM.C2H_ControlDeviceFilename(), &i_c2h_FIR_BRAM, false);
-    this->GetOrCreateNormalIOManagerIndex(this->mem__SG_BRAM.H2C_ControlDeviceFilename(), &i_h2c_SG_BRAM, false);
-    this->GetOrCreateNormalIOManagerIndex(this->mem__SG_BRAM.C2H_ControlDeviceFilename(), &i_c2h_SG_BRAM, false);
-    this->GetOrCreateNormalIOManagerIndex(this->mem__Circular_Buffer_BRAM.H2C_ControlDeviceFilename(), &i_h2c_Circular_Buffer_BRAM, false);
-    this->GetOrCreateNormalIOManagerIndex(this->mem__Circular_Buffer_BRAM.C2H_ControlDeviceFilename(), &i_c2h_Circular_Buffer_BRAM, false);
+    this->GetOrCreateNormalIOManagerIndex(this->mem__ddr.H2C_ControlDeviceFilename(), &i_h2c_ddr, false);
+    this->GetOrCreateNormalIOManagerIndex(this->mem__ddr.C2H_ControlDeviceFilename(), &i_c2h_ddr, false);
+    this->GetOrCreateNormalIOManagerIndex(this->mem__fir_bram.H2C_ControlDeviceFilename(), &i_h2c_fir_bram, false);
+    this->GetOrCreateNormalIOManagerIndex(this->mem__fir_bram.C2H_ControlDeviceFilename(), &i_c2h_fir_bram, false);
+    this->GetOrCreateNormalIOManagerIndex(this->mem__sg_bram.H2C_ControlDeviceFilename(), &i_h2c_sg_bram, false);
+    this->GetOrCreateNormalIOManagerIndex(this->mem__sg_bram.C2H_ControlDeviceFilename(), &i_c2h_sg_bram, false);
+    this->GetOrCreateNormalIOManagerIndex(this->mem___circular_buffer_bram.H2C_ControlDeviceFilename(), &i_h2c_circular_buffer_bram, false);
+    this->GetOrCreateNormalIOManagerIndex(this->mem___circular_buffer_bram.C2H_ControlDeviceFilename(), &i_c2h_circular_buffer_bram, false);
     {
         std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
         /* Bind devices */
-        bindStatus &= this->dev__AXI_DMA.BindFPGAFileManager(this->ioManagerList_dev[i_AXI_DMA]);
-        bindStatus &= this->dev__ADC_Controller.BindFPGAFileManager(this->ioManagerList_dev[i_ADC_Controller]);
-        bindStatus &= this->dev__Circular_Buffer.BindFPGAFileManager(this->ioManagerList_dev[i_Circular_Buffer]);
-        bindStatus &= this->dev__FIR_Filter_Bank.BindFPGAFileManager(this->ioManagerList_dev[i_FIR_Filter_Bank]);
-        bindStatus &= this->dev__PreDelay_Unit.BindFPGAFileManager(this->ioManagerList_dev[i_PreDelay_Unit]);
+        bind_status &= this->dev__axi_dma.BindFPGAFileManager(this->io_manager_list_dev[i_axi_dma]);
+        bind_status &= this->dev__adc_controller.BindFPGAFileManager(this->io_manager_list_dev[i_adc_controller]);
+        bind_status &= this->dev__circular_buffer.BindFPGAFileManager(this->io_manager_list_dev[i_circular_buffer]);
+        bind_status &= this->dev__fir_filter_bank.BindFPGAFileManager(this->io_manager_list_dev[i_fir_filter_bank]);
+        bind_status &= this->dev__predelay_unit.BindFPGAFileManager(this->io_manager_list_dev[i_predelay_unit]);
 
-        bindStatus &= this->dev__AXI_DMA.BindFPGAFileManager_Interrupt(this->ioManagerList_irq[i_AXI_DMA_irq]);
+        bind_status &= this->dev__axi_dma.BindFPGAFileManager_Interrupt(this->io_manager_list_irq[i_axi_dma_irq]);
         /* Bind memories */
-        bindStatus &= this->mem__DDR.BindFPGAFileManager(this->ioManagerList_mem[i_h2c_DDR], this->ioManagerList_mem[i_c2h_DDR]);
-        bindStatus &= this->mem__FIR_BRAM.BindFPGAFileManager(this->ioManagerList_mem[i_h2c_FIR_BRAM], this->ioManagerList_mem[i_c2h_FIR_BRAM]);
-        bindStatus &= this->mem__SG_BRAM.BindFPGAFileManager(this->ioManagerList_mem[i_h2c_SG_BRAM], this->ioManagerList_mem[i_c2h_SG_BRAM]);
-        bindStatus &= this->mem__Circular_Buffer_BRAM.BindFPGAFileManager(this->ioManagerList_mem[i_h2c_Circular_Buffer_BRAM], this->ioManagerList_mem[i_c2h_Circular_Buffer_BRAM]);
+        bind_status &= this->mem__ddr.BindFPGAFileManager(this->io_manager_list_mem[i_h2c_ddr], this->io_manager_list_mem[i_c2h_ddr]);
+        bind_status &= this->mem__fir_bram.BindFPGAFileManager(this->io_manager_list_mem[i_h2c_fir_bram], this->io_manager_list_mem[i_c2h_fir_bram]);
+        bind_status &= this->mem__sg_bram.BindFPGAFileManager(this->io_manager_list_mem[i_h2c_sg_bram], this->io_manager_list_mem[i_c2h_sg_bram]);
+        bind_status &= this->mem___circular_buffer_bram.BindFPGAFileManager(this->io_manager_list_mem[i_h2c_circular_buffer_bram], this->io_manager_list_mem[i_c2h_circular_buffer_bram]);
     }
-    return bindStatus;
+    return bind_status;
 }
 
 bool vuprs::FPGAController::ConfigDown() const
 {
-    return this->configdone;
+    return this->config_done;
 }

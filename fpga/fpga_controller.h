@@ -17,10 +17,10 @@ namespace vuprs
     class FPGAController
     {
     private:
-        std::vector<std::shared_ptr<vuprs::FPGA_IOManagerForInterrput>> ioManagerList_irq;
-        std::vector<std::shared_ptr<vuprs::FPGA_IOManagerForDevice>> ioManagerList_dev;
-        std::vector<std::shared_ptr<vuprs::FPGA_IOManagerForMemory>> ioManagerList_mem;
-        std::atomic<bool> configdone;
+        std::vector<std::shared_ptr<vuprs::FPGA_IOManagerForInterrput>> io_manager_list_irq;
+        std::vector<std::shared_ptr<vuprs::FPGA_IOManagerForDevice>> io_manager_list_dev;
+        std::vector<std::shared_ptr<vuprs::FPGA_IOManagerForMemory>> io_manager_list_mem;
+        std::atomic<bool> config_done;
 
         std::mutex mut;
 
@@ -30,43 +30,43 @@ namespace vuprs
         bool BindIOManager();
 
         /**
-         * @brief Get FPGA_IOManager obj index in this->ioManagerList_dev or this->ioManagerList_mem of the certain device filename.
+         * @brief Get FPGA_IOManager obj index in this->io_manager_list_dev or this->io_manager_list_mem of the certain device filename.
          *
-         * @param deviceFile device filename.
+         * @param device_file device filename.
          * @param index index of corrsponding io manager in this->ioManagerList.
-         * @param isDevice true: for device, false: for memory.
+         * @param is_device true: for device, false: for memory.
          *
          * @throw std::runtime_error
          */
-        void GetOrCreateNormalIOManagerIndex(const std::string &deviceFile, int *index, bool isDevice);
+        void GetOrCreateNormalIOManagerIndex(const std::string &device_file, int *index, bool is_device);
 
         /**
-         * @brief (For interrupt) Get FPGA_IOManager obj index in this->ioManagerList_irq of the certain device filename.
+         * @brief (For interrupt) Get FPGA_IOManager obj index in this->io_manager_list_irq of the certain device filename.
          *
-         * @param deviceFile device filename.
+         * @param device_file device filename.
          * @param index index of corrsponding io manager in this->ioManagerList.
          *
          * @throw std::runtime_error
          */
-        void GetOrCreateInterruptIOManagerIndex(const std::string &deviceFile, int *index);
+        void GetOrCreateInterruptIOManagerIndex(const std::string &device_file, int *index);
 
         void ResetController();
 
     public:
         /* FPGA Devices */
 
-        vuprs::FPGA_Device__AXIDirectMemoryAccess dev__AXI_DMA;  /* AXI Direct Memory Access */
-        vuprs::FPGA_Device__ADCController dev__ADC_Controller;   /* ADC Controller */
-        vuprs::FPGA_Device__CircularBuffer dev__Circular_Buffer; /* Circular Buffer */
-        vuprs::FPGA_Device__FIRFilterBank dev__FIR_Filter_Bank;  /* FIR Filer Bank */
-        vuprs::FPGA_Device__PreDelayUnit dev__PreDelay_Unit;     /* Pre-delay Unit */
+        vuprs::FPGA_Device__AXIDirectMemoryAccess dev__axi_dma;  /* AXI Direct Memory Access */
+        vuprs::FPGA_Device__ADCController dev__adc_controller;   /* ADC Controller */
+        vuprs::FPGA_Device__CircularBuffer dev__circular_buffer; /* Circular Buffer */
+        vuprs::FPGA_Device__FIRFilterBank dev__fir_filter_bank;  /* FIR Filer Bank */
+        vuprs::FPGA_Device__PreDelayUnit dev__predelay_unit;     /* Pre-delay Unit */
 
         /* FPGA Memories */
 
-        vuprs::FPGA_Memory__DDR mem__DDR;                                 /* System DDR in FPGA */
-        vuprs::FPGA_Memory__FIRBram mem__FIR_BRAM;                        /* FIR Coefficient BRAM */
-        vuprs::FPGA_Memory__SGBram mem__SG_BRAM;                          /* AXI DMA SG BRAM */
-        vuprs::FPGA_Memory__CircularBufferBram mem__Circular_Buffer_BRAM; /* Circular Buffer BRAM */
+        vuprs::FPGA_Memory__DDR mem__ddr;                                  /* System DDR in FPGA */
+        vuprs::FPGA_Memory__FIRBram mem__fir_bram;                         /* FIR Coefficient BRAM */
+        vuprs::FPGA_Memory__SGBram mem__sg_bram;                           /* AXI DMA SG BRAM */
+        vuprs::FPGA_Memory__CircularBufferBram mem___circular_buffer_bram; /* Circular Buffer BRAM */
 
         /* Interfaces */
 
@@ -87,14 +87,14 @@ namespace vuprs
          * @note 3rd: Bind IO Manager to certain device.
          * @note No need to call method: ConfigFPGAFromJson().
          *
-         * @param configJsonFilename the JSON file name.
+         * @param json_filename the JSON file name.
          *
          * @retval true: success.
          * @retval false: failed.
          *
          * @throw std::runtime_error
          */
-        FPGAController(const std::string &configJsonFilename);
+        FPGAController(const std::string &json_filename);
 
         /**
          * @brief Configure the FPGA using JSON file.
@@ -103,14 +103,14 @@ namespace vuprs
          * @note 2nd: Open device files in FPGA IO Manager;
          * @note 3rd: Bind IO Manager to certain device.
          *
-         * @param configJsonFilename the JSON file name.
+         * @param json_filename the JSON file name.
          *
          * @retval true: success.
          * @retval false: failed.
          *
          * @throw std::runtime_error
          */
-        bool ConfigFPGAFromJson(const std::string &configJsonFilename);
+        bool ConfigFPGAFromJson(const std::string &json_filename);
 
         /**
          * @brief Indicate config is down.

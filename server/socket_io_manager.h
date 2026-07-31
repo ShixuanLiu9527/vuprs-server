@@ -23,7 +23,7 @@ namespace vuprs
     struct SocketReceiveData
     {
         char buf[__SOCKET_RECEIVE_BUFFER_SIZE_BYTES__]; /* reserve buffer */
-        ssize_t receiveBytes;                           /* received bytes, 0: receive none, >0 receive bytes */
+        ssize_t receive_bytes;                          /* received bytes, 0: receive none, >0 receive bytes */
         bool is_connect;                                /* true: client is connect, false: client is disconnect */
         bool is_timeout;                                /* true: timeout, false: no timeout */
         bool is_error;                                  /* true: error occurred, false: no error */
@@ -43,8 +43,7 @@ namespace vuprs
     private:
         int client_fd;
         struct sockaddr_in client_addr;
-        std::string clientInformation;
-
+        std::string client_info;
         mutable std::mutex mut;
 
     public:
@@ -72,12 +71,9 @@ namespace vuprs
             {
                 return false;
             }
-
             const char *data_ptr = reinterpret_cast<const char *>(buffer.data());
             size_t bytes = buffer.size() * sizeof(T);
-
             std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
-
             return vuprs::SendAllWithRetry(this->client_fd, data_ptr, bytes);
         }
 
@@ -86,9 +82,7 @@ namespace vuprs
         {
             const char *data_ptr = reinterpret_cast<const char *>(&word);
             size_t bytes = sizeof(T);
-
             std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
-
             return vuprs::SendAllWithRetry(this->client_fd, data_ptr, bytes);
         }
 

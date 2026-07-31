@@ -133,10 +133,10 @@ namespace vuprs
      */
     void inline ScaledFIRCoefficient_DOUBLE_TO_Q31_UINT32(const std::vector<double> &input_scaled, std::vector<uint32_t> *output)
     {
-        uint64_t coefficientSize = input_scaled.size();
-        PARAM_CHECK(coefficientSize > 0, "fpga", " in " + std::string(__func__) + " Input FIR coefficient is empty.");
-        output->resize(coefficientSize);
-        for (uint64_t i = 0; i < coefficientSize; i++)
+        uint64_t coefficient_size = input_scaled.size();
+        PARAM_CHECK(coefficient_size > 0, "fpga", " in " + std::string(__func__) + " Input FIR coefficient is empty.");
+        output->resize(coefficient_size);
+        for (uint64_t i = 0; i < coefficient_size; i++)
         {
             (*output)[i] = Q31__DOUBLE_TO_UINT32(input_scaled[i]);
         }
@@ -147,23 +147,23 @@ namespace vuprs
      *
      * @param input_scaled FIR coefficients (raw data, no need to scale).
      * @param output output Q31 coefficients (send to FPGA).
-     * @param maxAbsCoef max absolute coefficient (= max(abs(coef{i}))).
+     * @param max_abs_coef max absolute coefficient (= max(abs(coef{i}))).
      *
      * @throw std::runtime_error
      */
-    void inline FIRCoefficient_DOUBLE_TO_Q31_UINT32(const std::vector<double> &input, std::vector<uint32_t> *output, double maxAbsCoef)
+    void inline FIRCoefficient_DOUBLE_TO_Q31_UINT32(const std::vector<double> &input, std::vector<uint32_t> *output, double max_abs_coef)
     {
-        uint64_t coefficientSize = input.size();
-        PARAM_CHECK(coefficientSize > 0, "fpga", " in [FIRCoefficient_DOUBLE_TO_Q31_UINT32] Input FIR coefficient is empty.");
-        output->resize(coefficientSize);
-        if (std::abs(maxAbsCoef - 0.0) < FPGA_TYPE_EPS)
+        uint64_t coefficient_size = input.size();
+        PARAM_CHECK(coefficient_size > 0, "fpga", " in [FIRCoefficient_DOUBLE_TO_Q31_UINT32] Input FIR coefficient is empty.");
+        output->resize(coefficient_size);
+        if (std::abs(max_abs_coef - 0.0) < FPGA_TYPE_EPS)
         {
-            memset(output->data(), 0, coefficientSize * sizeof(uint32_t));
+            memset(output->data(), 0, coefficient_size * sizeof(uint32_t));
             return;
         }
-        for (uint64_t i = 0; i < coefficientSize; i++)
+        for (uint64_t i = 0; i < coefficient_size; i++)
         {
-            (*output)[i] = Q31__DOUBLE_TO_UINT32(input[i] / maxAbsCoef);
+            (*output)[i] = Q31__DOUBLE_TO_UINT32(input[i] / max_abs_coef);
         }
     }
 

@@ -78,12 +78,12 @@ bool vuprs::PROTOCOL_ParseCommandFromMessage(const std::string &message, vuprs::
 			if (!root["params"].contains("beamformer") || !root["params"]["beamformer"].is_string())
 				return false;
 
-			const std::string beamformerName = root["params"]["beamformer"].get<std::string>();
-			if (beamformerName != "mvdr" && beamformerName != "cbf" && beamformerName != "dcrcb")
+			const std::string beamformer_name = root["params"]["beamformer"].get<std::string>();
+			if (beamformer_name != "mvdr" && beamformer_name != "cbf" && beamformer_name != "dcrcb")
 				return false;
 
 			cmd->cmd = vuprs::ServerCommand::SERVER_CMD__CHANGE_BEAMFORMER;
-			cmd->beamformer_name = beamformerName;
+			cmd->beamformer_name = beamformer_name;
 			return true;
 		}
 		else if (command == SERVER_CMD__REDIRECT__STR)
@@ -92,23 +92,16 @@ bool vuprs::PROTOCOL_ParseCommandFromMessage(const std::string &message, vuprs::
 				return false;
 			if (!root["params"].contains("alt") || !root["params"].contains("az"))
 				return false;
-
 			double alt = 0.0;
 			double az = 0.0;
-
 			auto params = root["params"];
-
 			vuprs::__JsonStringParseFLOAT<double>(&alt, params, "alt", true);
 			vuprs::__JsonStringParseFLOAT<double>(&az, params, "az", true);
-
 			cmd->cmd = vuprs::ServerCommand::SERVER_CMD__REDIRECT;
-
 			cmd->config.bf_target__alt = alt;
 			cmd->config.bf_target__az = az;
-
 			cmd->config.mask.m_bf_target__alt = true;
 			cmd->config.mask.m_bf_target__az = true;
-
 			return true;
 		}
 		else if (command == SERVER_CMD__SCAN_FOR_POSITION_POWER__STR)
@@ -119,30 +112,22 @@ bool vuprs::PROTOCOL_ParseCommandFromMessage(const std::string &message, vuprs::
 				return false;
 			if (!root["params"].contains("alt_min") || !root["params"]["alt_min"].is_string())
 				return false;
-
-			int pointsInHalf = 0;
+			int points_in_hemisphere = 0;
 			double alt_min = 0.0;
-
 			auto params = root["params"];
-
-			vuprs::__JsonStringParseINT<int>(&pointsInHalf, params, "points", true);
+			vuprs::__JsonStringParseINT<int>(&points_in_hemisphere, params, "points", true);
 			vuprs::__JsonStringParseFLOAT<double>(&alt_min, params, "alt_min", true);
-
 			if (alt_min < 0.0 || alt_min > 90.0)
 				return false;
-			if (pointsInHalf <= 0)
+			if (points_in_hemisphere <= 0)
 				return false;
-
 			cmd->cmd = vuprs::ServerCommand::SERVER_CMD__SCAN_FOR_POSITION_POWER;
-
-			cmd->scanningConfig.pointsInHalf = pointsInHalf;
-			cmd->scanningConfig.alt_min = alt_min;
-
+			cmd->scan_config.points_in_hemisphere = points_in_hemisphere;
+			cmd->scan_config.alt_min = alt_min;
 			return true;
 		}
 		else if (command == SERVER_CMD__CHANGE_ALG_PARAM__STR)
 		{
-
 			/*
 				[HEADER]
 				{
@@ -158,11 +143,8 @@ bool vuprs::PROTOCOL_ParseCommandFromMessage(const std::string &message, vuprs::
 				}
 				[TAILER]
 			*/
-
 			cmd->cmd = vuprs::ServerCommand::SERVER_CMD__CHANGE_ALG_PARAM;
-
 			auto params = root["params"];
-
 			if (params.contains("fs"))
 			{
 				double fs = 0.0;
@@ -172,9 +154,9 @@ bool vuprs::PROTOCOL_ParseCommandFromMessage(const std::string &message, vuprs::
 			}
 			if (params.contains("wave_velocity"))
 			{
-				double waveVelocity = 0.0;
-				vuprs::__JsonStringParseFLOAT<double>(&waveVelocity, params, "wave_velocity", true);
-				cmd->config.bf_waveVelocity = waveVelocity;
+				double wave_velocity = 0.0;
+				vuprs::__JsonStringParseFLOAT<double>(&wave_velocity, params, "wave_velocity", true);
+				cmd->config.bf_wave_velocity = wave_velocity;
 				cmd->config.mask.m_bf_waveVelocity = true;
 			}
 			if (params.contains("lower_frequency"))
@@ -195,17 +177,16 @@ bool vuprs::PROTOCOL_ParseCommandFromMessage(const std::string &message, vuprs::
 			{
 				int snapshotWindowSize = 0;
 				vuprs::__JsonStringParseFLOAT<int>(&snapshotWindowSize, params, "snapshot_window_size", true);
-				cmd->config.bf_cov_snapshotsWindowSize = snapshotWindowSize;
-				cmd->config.mask.m_bf_cov_snapshotsWindowSize = true;
+				cmd->config.bf_cov_snapshots_window_size = snapshotWindowSize;
+				cmd->config.mask.m_bf_cov_snapshots_window_size = true;
 			}
 			if (params.contains("covariance_average_index"))
 			{
 				double covarianceAverageIndex = 0.0;
 				vuprs::__JsonStringParseFLOAT<double>(&covarianceAverageIndex, params, "covariance_average_index", true);
-				cmd->config.bf_cov_freqAverageIndex = covarianceAverageIndex;
-				cmd->config.mask.m_bf_cov_freqAverageIndex = true;
+				cmd->config.bf_cov_freq_average_index = covarianceAverageIndex;
+				cmd->config.mask.m_bf_cov_freq_average_index = true;
 			}
-
 			return true;
 		}
 		else if (command == SERVER_CMD__GET_ALG_PARAM__STR)
@@ -237,20 +218,20 @@ bool vuprs::PROTOCOL_ParseCommandFromMessage(const std::string &message, vuprs::
 	return false;
 }
 
-std::string vuprs::PROTOCOL_MakeServerOperationResponse(const vuprs::ServerCommandInformation &cmd, const std::string &info, bool operationStatus)
+std::string vuprs::PROTOCOL_MakeServerOperationResponse(const vuprs::ServerCommandInformation &cmd, const std::string &info, bool operation_status)
 {
 	nlohmann::json response;
 	response["response_cmd"] = __ServerCommandToString(cmd.cmd);
-	response["operation_status"] = operationStatus ? "done" : "failed";
+	response["operation_status"] = operation_status ? "done" : "failed";
 	response["info"] = info;
 	return response.dump();
 }
 
-std::string vuprs::PROTOCOL_MakeServerResultDataResponse(const std::string &info, bool operationStatus)
+std::string vuprs::PROTOCOL_MakeServerResultDataResponse(const std::string &info, bool operation_status)
 {
 	nlohmann::json response;
 	response["response_cmd"] = SERVER_CMD__GET_NEW_DATA__STR;
-	response["operation_status"] = operationStatus ? "done" : "failed";
+	response["operation_status"] = operation_status ? "done" : "failed";
 	response["info"] = info;
 	response["params"]["data_format"] = "uint32_t";
 	return response.dump();
@@ -276,17 +257,17 @@ std::string vuprs::PROTOCOL_MakeServerParameterResponse(const vuprs::Collaborati
 	response["response_cmd"] = SERVER_CMD__GET_ALG_PARAM__STR;
 	response["operation_status"] = "done";
 	response["params"]["fs"] = std::to_string(config.fs);
-	response["params"]["wave_velocity"] = std::to_string(config.bf_waveVelocity);
+	response["params"]["wave_velocity"] = std::to_string(config.bf_wave_velocity);
 	response["params"]["lower_frequency"] = std::to_string(config.bf_freq__lower);
 	response["params"]["upper_frequency"] = std::to_string(config.bf_freq__upper);
-	response["params"]["snapshot_window_size"] = std::to_string(config.bf_cov_snapshotsWindowSize);
-	response["params"]["covariance_average_index"] = std::to_string(config.bf_cov_freqAverageIndex);
+	response["params"]["snapshot_window_size"] = std::to_string(config.bf_cov_snapshots_window_size);
+	response["params"]["covariance_average_index"] = std::to_string(config.bf_cov_freq_average_index);
 	return response.dump();
 }
 
-std::string vuprs::PROTOCOL_MakeServerScanningResponse(const vuprs::ScanningConfig &scanningConfig,
-													   double minScanPowerDB, double maxScanPowerDB,
-													   const std::string &info, bool operationStatus)
+std::string vuprs::PROTOCOL_MakeServerScanningResponse(const vuprs::ScanningConfig &scan_config,
+													   double min_scan_power_dB, double max_scan_power_dB,
+													   const std::string &info, bool operation_status)
 {
 	/*
 		{
@@ -303,12 +284,12 @@ std::string vuprs::PROTOCOL_MakeServerScanningResponse(const vuprs::ScanningConf
 	*/
 	nlohmann::json response;
 	response["response_cmd"] = SERVER_CMD__SCAN_FOR_POSITION_POWER__STR;
-	response["operation_status"] = operationStatus ? "done" : "failed";
+	response["operation_status"] = operation_status ? "done" : "failed";
 	response["info"] = info;
-	response["params"]["points"] = std::to_string(scanningConfig.pointsInHalf);
-	response["params"]["min_alt"] = std::to_string(scanningConfig.alt_min);
-	response["params"]["max_power"] = std::to_string(maxScanPowerDB);
-	response["params"]["min_power"] = std::to_string(minScanPowerDB);
+	response["params"]["points"] = std::to_string(scan_config.points_in_hemisphere);
+	response["params"]["min_alt"] = std::to_string(scan_config.alt_min);
+	response["params"]["max_power"] = std::to_string(max_scan_power_dB);
+	response["params"]["min_power"] = std::to_string(min_scan_power_dB);
 	response["params"]["data_format"] = "uint16_t";
 	return response.dump();
 }

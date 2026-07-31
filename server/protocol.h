@@ -46,7 +46,7 @@ namespace vuprs
     struct ServerCommandInformation
     {
         vuprs::CollaborationBeamformerConfig config; /* config info */
-        vuprs::ScanningConfig scanningConfig;        /* scanning config info, which is used when cmd is SERVER_CMD__SCAN_FOR_POSITION_POWER */
+        vuprs::ScanningConfig scan_config;           /* scanning config info, which is used when cmd is SERVER_CMD__SCAN_FOR_POSITION_POWER */
         vuprs::ServerCommand cmd;
         std::string beamformer_name; /* beam former name (for SERVER_CMD__CHANGE_BEAMFORMER) */
         ServerCommandInformation() : cmd(vuprs::ServerCommand::SERVER_CMD__INVALID), beamformer_name("") {}
@@ -74,13 +74,13 @@ namespace vuprs
      *
      * @param cmd Command information.
      * @param info Additional information for the response.
-     * @param operationStatus Operation status of command (true: success, false: failed).
+     * @param operation_status Operation status of command (true: success, false: failed).
      *
      * @retval Server response message.
      */
     std::string PROTOCOL_MakeServerOperationResponse(const ServerCommandInformation &cmd,
                                                      const std::string &info = "",
-                                                     bool operationStatus = true);
+                                                     bool operation_status = true);
 
     /**
      * @brief Make server response message for current algorithm parameters.
@@ -89,13 +89,13 @@ namespace vuprs
      */
     std::string PROTOCOL_MakeServerParameterResponse(const vuprs::CollaborationBeamformerConfig &config);
 
-    std::string PROTOCOL_MakeServerScanningResponse(const vuprs::ScanningConfig &scanningConfig,
-                                                    double minScanPowerDB,
-                                                    double maxScanPowerDB,
+    std::string PROTOCOL_MakeServerScanningResponse(const vuprs::ScanningConfig &scan_config,
+                                                    double min_scan_power_dB,
+                                                    double max_scan_power_dB,
                                                     const std::string &info = "",
-                                                    bool operationStatus = true);
+                                                    bool operation_status = true);
 
-    std::string PROTOCOL_MakeServerResultDataResponse(const std::string &info = "", bool operationStatus = true);
+    std::string PROTOCOL_MakeServerResultDataResponse(const std::string &info = "", bool operation_status = true);
 }
 
 #endif

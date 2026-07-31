@@ -41,11 +41,11 @@ namespace vuprs
 
     struct AXI_DMA_SGDescriptor_Config
     {
-        uint32_t bufferSize;          /* buffer size (4 byte aligned) */
-        uint32_t bufferCount;         /* buffer count */
-        uint32_t ddr_FPGABaseAddr;    /* DDR base address in FPGA */
-        uint32_t sgBRAM_FPGABaseAddr; /* SG BRAM base address in FPGA */
-        bool isCyclicDMAMode;         /* true: Cyclic DMA Mode, false: Normal DMA Mode */
+        uint32_t buffer_size;            /* buffer size (4 byte aligned) */
+        uint32_t buffer_count;           /* buffer count */
+        uint32_t ddr_fpga_base_addr;     /* DDR base address in FPGA */
+        uint32_t sg_bram_fpga_base_addr; /* SG BRAM base address in FPGA */
+        bool is_cyclic_dma_mode;         /* true: Cyclic DMA Mode, false: Normal DMA Mode */
     };
 
     constexpr uint32_t DMA_DESCRIPTOR_ALIGNMENT_16_WORD = (uint32_t)(16 * sizeof(uint32_t)); /* 16-word alignment */
@@ -71,25 +71,25 @@ namespace vuprs
      *
      * @throw std::runtime_error
      */
-    void CreateDMAScatterGatherDescriptorChain(std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> *descriptorList,
+    void CreateDMAScatterGatherDescriptorChain(std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> *descriptor_list,
                                                const vuprs::AXI_DMA_SGDescriptor_Config &config);
 
     /**
      * @brief Match AXI DMA Scatter/Gather Descriptor in the descriptor list by current descriptor address.
      *
-     * @param descriptorList The descriptor list to be matched.
+     * @param descriptor_list The descriptor list to be matched.
      * @param currentDescriptorAddr The current descriptor address to be matched.
-     * @param curDesc Output parameter, the matched current descriptor.
-     * @param nextDesc Output parameter, the matched next descriptor.
-     * @param prevDesc Output parameter, the matched previous descriptor.
+     * @param cur_desc Output parameter, the matched current descriptor.
+     * @param next_desc Output parameter, the matched next descriptor.
+     * @param prev_desc Output parameter, the matched previous descriptor.
      *
      * @return true if match successfully, false if no matched descriptor found.
      * @throw std::runtime_error
      */
-    bool MatchDescriptor(const std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> &descriptorList, uint32_t currentDescriptorAddr,
-                         vuprs::AXI_DMA_ScatterGatherDescriptor *curDesc,
-                         vuprs::AXI_DMA_ScatterGatherDescriptor *nextDesc,
-                         vuprs::AXI_DMA_ScatterGatherDescriptor *prevDesc);
+    bool MatchDescriptor(const std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> &descriptor_list, uint32_t currentDescriptorAddr,
+                         vuprs::AXI_DMA_ScatterGatherDescriptor *cur_desc,
+                         vuprs::AXI_DMA_ScatterGatherDescriptor *next_desc,
+                         vuprs::AXI_DMA_ScatterGatherDescriptor *prev_desc);
 
     enum class AXI_DMA__Registers
     {
@@ -108,7 +108,7 @@ namespace vuprs
     class FPGA_Device__AXIDirectMemoryAccess : public FPGADeviceTemplate<AXI_DMA__Registers>
     {
     private:
-        uint32_t s2mmTransferRegisterLength; /* max = 26 bit */
+        uint32_t s2mm_transfer_register_length; /* max = 26 bit */
 
         uint32_t offset_SG_CTL;
         uint32_t offset_S2MM_DMACR;
@@ -148,9 +148,9 @@ namespace vuprs
     class FPGA_Device__ADCController : public FPGADeviceTemplate<ADC_Controller__Registers>
     {
     private:
-        double maxSamplingFrequencyHz;
-        double voltageRangeRadiusV;
-        double workClockFrequencyHz;
+        double max_fs;
+        double voltage_range_radius;
+        double work_clock_frequency;
 
         uint32_t offset_ADC_SCI;
         uint32_t offset_ADC_SP;
@@ -209,7 +209,7 @@ namespace vuprs
     class FPGA_Device__CircularBuffer : public FPGADeviceTemplate<Circular_Buffer__Registers>
     {
     private:
-        uint32_t signalPoints;
+        uint32_t signal_points;
 
         uint32_t offset_CBUF_FREEZE;
         uint32_t offset_CBUF_RST;

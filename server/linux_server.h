@@ -1,11 +1,3 @@
-/**
- * @brief   This document is the interface of Linux Server of VUPRS.
- * @note    This is the top-level interface of VUPRS system.
- * @version 1.0
- * @author  Shixuan Liu, Tongji University
- * @date    2025-9
- */
-
 #ifndef VUPRS_LINUX_SERVER_H
 #define VUPRS_LINUX_SERVER_H
 
@@ -13,6 +5,7 @@
 #include "server/protocol.h"
 #include "system_tools/string_parse.h"
 #include "collab_bf/collaboration_beamformer.h"
+#include "fault_detect/fault_detector.h"
 
 #define DEFAULT_SENDING_DATA_QUEUE_LENGTH 10U
 
@@ -24,23 +17,23 @@ namespace vuprs
 {
     struct SystemConfigFiles
     {
-        std::string fpgaConfigJsonFile;             /* FPGA config JSON file */
-        std::string beamFormingArrayConfigJsonFile; /* Beam forming config JSON file */
-        std::string firFilterBankConfigJsonFile;    /* FIR filter bank config JSON file */
-        std::string serverConfigJsonFile;           /* Server config JSON file */
+        std::string fpga_config_json;     /* FPGA config JSON file */
+        std::string bf_array_config_json; /* Beam forming config JSON file */
+        std::string fir_config_json;      /* FIR filter bank config JSON file */
+        std::string server_config_json;   /* Server config JSON file */
     };
 
     struct ServerProtocol
     {
-        std::string commandHeader;
-        std::string commandTailer;
+        std::string command_header;
+        std::string command_tailer;
     };
 
     struct ServerConfig
     {
-        uint16_t initializePort;
-        uint16_t maximumPort;
-        uint16_t acceptClientCounts;
+        uint16_t initialize_port;
+        uint16_t maximum_port;
+        uint16_t accept_client_counts;
 
         vuprs::ServerProtocol protocol;
     };
@@ -53,7 +46,7 @@ namespace vuprs
     class LinuxServer
     {
     private:
-        bool configdone; /* Indicate config done */
+        bool config_done; /* Indicate config done */
 
         std::vector<std::thread> threads; /* Server threads */
 
@@ -62,21 +55,24 @@ namespace vuprs
         int server_fd;
         uint16_t server_port;
 
-        std::unique_ptr<vuprs::LinuxSession> server_session; /* socket session */
+        std::unique_ptr<LinuxSession> server_session; /* socket session */
 
-        std::mutex mut_client_io_manager;                          /* mutex for client io manager */
-        std::shared_ptr<vuprs::SocketIOManager> client_io_manager; /* socket io manager for client, controlled by this->mut_client_io_manager */
+        std::mutex mut_client_io_manager;                   /* mutex for client io manager */
+        std::shared_ptr<SocketIOManager> client_io_manager; /* socket io manager for client, controlled by this->mut_client_io_manager */
 
         /* --- Algorithms --- */
 
-        std::mutex mut_bf;                         /* mutex for beam former */
-        vuprs::CollaborationBeamformer beamformer; /* System beam former, controlled by mut_bf */
+        std::mutex mut_bf;                  /* mutex for beam former */
+        CollaborationBeamformer beamformer; /* System beam former, controlled by mut_bf */
 
         std::mutex mut_bf_config;
-        vuprs::CollaborationBeamformerConfig beamFormerConfig; /* Set by client or default value, controlled by mut_bf_config */
+        CollaborationBeamformerConfig bf_config; /* Set by client or default value, controlled by mut_bf_config */
 
         std::mutex mut_scan_config;
-        vuprs::ScanningConfig scanningConfig; /* Set by client or default value, controlled by mut_scan_config */
+        ScanningConfig scan_config; /* Set by client or default value, controlled by mut_scan_config */
+
+        std::mutex mut_npu;
+        FaultDetector fault_detector;
 
         /* --- Thread data --- */
 
@@ -86,22 +82,22 @@ namespace vuprs
         vuprs::ServerConfig server_config; /* controlled by mut_server_config */
 
         std::mutex mut_response;
-        std::atomic<bool> serverResponseIRQ;
-        std::atomic<bool> serverNeedResponse; /* false = no need to send response */
-        std::condition_variable serverResponseCV;
-        std::string serverResponseMessage;
+        std::atomic<bool> server_response_irq;
+        std::atomic<bool> server_need_response; /* false = no need to send response */
+        std::condition_variable server_response_cv;
+        std::string server_response_message;
 
         std::mutex mut_send;
-        std::condition_variable sendingCV;
-        std::atomic<bool> sendingIRQ;        /* true: should send */
-        std::atomic<uint32_t> sendingFormat; /* Sending format: data, current alg param */
+        std::condition_variable sending_cv;
+        std::atomic<bool> sending_irq;        /* true: should send */
+        std::atomic<uint32_t> sending_format; /* Sending format: data, current alg param */
 
         std::mutex mut_control;
-        std::atomic<bool> controlIRQ;
-        std::condition_variable controlCV; /* Beam former parameter CV (when alt, az, ... is change) */
+        std::atomic<bool> control_irq;
+        std::condition_variable control_cv; /* Beam former parameter CV (when alt, az, ... is change) */
 
         std::mutex mut_cmd;
-        vuprs::ServerCommandInformation cmdINFO; /* Command information, parsed from message, controlled by mut_cmd */
+        vuprs::ServerCommandInformation cmd_info; /* Command information, parsed from message, controlled by mut_cmd */
 
         /* --- Threads --- */
 
@@ -111,10 +107,10 @@ namespace vuprs
         void THREAD__AcceptClient();
 
         /**
-         * @brief Send thread, which will block in sendingCV and wait for sendingIRQ, then send data to client.
+         * @brief Send thread, which will block in sending_cv and wait for sending_irq, then send data to client.
          *
-         * @note Fork 1: send result data (when this->sendingFormat is SERVER_CMD__GET_NEW_DATA, send data in this->resultQueue).
-         * @note Fork 2: send current algorithm parameters (when this->sendingFormat is SERVER_CMD__GET_ALG_PARAM, send current algorithm parameters).
+         * @note Fork 1: send result data (when this->sending_format is SERVER_CMD__GET_NEW_DATA, send data in this->result_queue).
+         * @note Fork 2: send current algorithm parameters (when this->sending_format is SERVER_CMD__GET_ALG_PARAM, send current algorithm parameters).
          */
         void THREAD__Send();
 
@@ -122,7 +118,7 @@ namespace vuprs
          * @brief Control thread, handle command from client.
          *
          * @note When receive command, control thread will handle the command and
-         * @note set serverResponseIRQ to true, then notify serverResponseCV to send response to client.
+         * @note set server_response_irq to true, then notify server_response_cv to send response to client.
          */
         void THREAD__Control();
 
@@ -132,17 +128,17 @@ namespace vuprs
          * @note This function is called when receive message from client,
          * @note and the message is parsed to command information.
          *
-         * @note Then the command information is stored in this->cmdINFO,
-         * @note and this->controlIRQ is set to true to notify control thread to handle the command.
+         * @note Then the command information is stored in this->cmd_info,
+         * @note and this->control_irq is set to true to notify control thread to handle the command.
          *
-         * @note After handling the command, control thread will set this->serverResponseIRQ to true
-         * @note and notify this->serverResponseCV to send response of this operation to client.
+         * @note After handling the command, control thread will set this->server_response_irq to true
+         * @note and notify this->server_response_cv to send response of this operation to client.
          */
         void SessionCallback(std::weak_ptr<vuprs::SocketIOManager> manager, const std::string &message);
 
         /* --- Tool functions --- */
 
-        bool LoadServerConfigFromJson(const std::string &jsonFilename);
+        bool LoadServerConfigFromJson(const std::string &json_filename);
 
         bool InitServer();
 

@@ -9,20 +9,15 @@ namespace vuprs
     class FIRCalculator
     {
     private:
-        bool configdone;
+        bool config_done;
         std::mutex mtx;
-
-        uint32_t firLength;
+        uint32_t fir_length;
         uint32_t lastSignalPoints; /* last N */
-        double freqRange_l, freqRange_u;
-        std::vector<vuprs::FFTWManagerComplex> fftManagers; /* FFT manager */
-
-        std::unique_ptr<vuprs::ThreadPool> threadPool;
-
-        std::vector<std::vector<double>> firCoefficient;
-        double maxAbsCoefficient;
-
-        Eigen::Matrix<Eigen::dcomplex, -1, -1> matrixE;
+        double freq_range_l, freq_range_u;
+        std::vector<vuprs::FFTWManagerComplex> fft_managers; /* FFT manager */
+        std::unique_ptr<vuprs::ThreadPool> thread_pool;
+        std::vector<std::vector<double>> fir_coefficient;
+        double max_abs_coefficient;
 
     public:
         FIRCalculator();
@@ -32,7 +27,7 @@ namespace vuprs
         /**
          * @brief Configure FIR filter bank from JSON file.
          */
-        bool ConfigFIRFromJsonFile(const std::string &jsonFilename);
+        bool ConfigFIRFromJsonFile(const std::string &json_filename);
 
         /**
          * @brief Set interest region for frequency.
@@ -50,7 +45,7 @@ namespace vuprs
          * @note Target response size = M x (N/2+1), M = element size & FIR banks, N = signal points.
          *
          * @param response target response (N/2+1).
-         * @param channelName corresponding channel name for [response].
+         * @param channel_name corresponding channel name for [response].
          * @param fs sampling frequency.
          *
          * @throw std::runtime_error
@@ -59,7 +54,7 @@ namespace vuprs
          * @retval false: failed.
          */
         bool SolveCoeffUseExpectedFrequencyResponse(const Eigen::Matrix<Eigen::dcomplex, -1, -1> &response,
-                                                    const std::vector<std::string> &channelName,
+                                                    const std::vector<std::string> &channel_name,
                                                     double fs);
 
         /**
@@ -70,7 +65,7 @@ namespace vuprs
         /**
          * @brief Get FIR filter bank coefficients that are all zero.
          */
-        void GetZeroFIRBankCoefficient(std::vector<std::vector<double>> *dst, uint32_t channelNumber) const;
+        void GetZeroFIRBankCoefficient(std::vector<std::vector<double>> *dst, uint32_t channel_number) const;
 
         /**
          * @brief Get FIR filter length.

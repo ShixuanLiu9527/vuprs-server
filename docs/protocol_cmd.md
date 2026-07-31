@@ -81,13 +81,13 @@ void FibonacciGrid(int points, std::vector<double> *alt, std::vector<double> *az
     double xn, yn, zn, _alt, _az;
     int N = 2 * points + 1, n;
     int start_n = (N + 1) / 2;  /* Number of points in upper hemisphere */
-    int resultSize = N - start_n + 1;
+    int result_size = N - start_n + 1;
     Eigen::Matrix<double, 3, 1> vec;
     alt->clear();
     az->clear();
-    alt->reserve(resultSize);
-    az->reserve(resultSize);
-    for (int i = 0; i < resultSize; i++)
+    alt->reserve(result_size);
+    az->reserve(result_size);
+    for (int i = 0; i < result_size; i++)
     {
         n = start_n + i;
         zn = 2.0 * (double)n / (double)N - 1.0;

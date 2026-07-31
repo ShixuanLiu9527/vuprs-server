@@ -7,36 +7,25 @@
 
 vuprs::AlignedBuffer::AlignedBuffer()
 {
-    this->byteSize = 0;
-    this->byteCapacity = 0;
+    this->byte_size = 0;
+    this->byte_capacity = 0;
     this->allocated = nullptr;
 }
 
-bool vuprs::AlignedBuffer::malloc(uint64_t byteSize)
+bool vuprs::AlignedBuffer::malloc(uint64_t byte_size)
 {
     void *_allocated;
-
     this->release(); /* free all */
-
 #ifdef _WIN32
-
-    /*
-        To ensure address is aligned, size <- size + __DEFAULT_ALIGNMENT_BYTES__
-    */
-    this->allocated = _aligned_malloc(byteSize + __DEFAULT_ALIGNMENT_BYTES__, __DEFAULT_ALIGNMENT_BYTES__);
-
+    /* To ensure address is aligned, size <- size + __DEFAULT_ALIGNMENT_BYTES__ */
+    this->allocated = _aligned_malloc(byte_size + __DEFAULT_ALIGNMENT_BYTES__, __DEFAULT_ALIGNMENT_BYTES__);
 #else
-
-    /*
-        To ensure address is aligned, size <- size + __DEFAULT_ALIGNMENT_BYTES__
-    */
-    if (posix_memalign(&_allocated, __DEFAULT_ALIGNMENT_BYTES__, byteSize + __DEFAULT_ALIGNMENT_BYTES__) != 0)
+    /* To ensure address is aligned, size <- size + __DEFAULT_ALIGNMENT_BYTES__ */
+    if (posix_memalign(&_allocated, __DEFAULT_ALIGNMENT_BYTES__, byte_size + __DEFAULT_ALIGNMENT_BYTES__) != 0)
     {
         _allocated = nullptr;
     }
-
 #endif
-
     if (_allocated == nullptr)
     {
         this->release();
@@ -51,17 +40,15 @@ bool vuprs::AlignedBuffer::malloc(uint64_t byteSize)
             return false;
         }
     }
-
-    this->set_bytesize(byteSize);
-    this->set_capacity(byteSize + __DEFAULT_ALIGNMENT_BYTES__);
+    this->set_bytesize(byte_size);
+    this->set_capacity(byte_size + __DEFAULT_ALIGNMENT_BYTES__);
     this->set_allocated(_allocated);
-
     return true;
 }
 
-vuprs::AlignedBuffer::AlignedBuffer(uint64_t byteSize)
+vuprs::AlignedBuffer::AlignedBuffer(uint64_t byte_size)
 {
-    if (!this->malloc(byteSize))
+    if (!this->malloc(byte_size))
     {
         throw std::bad_alloc();
     }
@@ -74,12 +61,12 @@ vuprs::AlignedBuffer::~AlignedBuffer()
 
 void vuprs::AlignedBuffer::set_bytesize(const uint64_t &bytesize)
 {
-    this->byteSize = bytesize;
+    this->byte_size = bytesize;
 }
 
 void vuprs::AlignedBuffer::set_capacity(const uint64_t &capacity)
 {
-    this->byteCapacity = capacity;
+    this->byte_capacity = capacity;
 }
 
 void vuprs::AlignedBuffer::set_allocated(void *allocated)
@@ -92,29 +79,24 @@ void vuprs::AlignedBuffer::release()
     if (this->allocated != nullptr)
     {
 #ifdef _WIN32
-
         _aligned_free(this->allocated);
-
 #else
-
         free(this->allocated);
-
 #endif
     }
-
-    this->byteSize = 0;
-    this->byteCapacity = 0;
+    this->byte_size = 0;
+    this->byte_capacity = 0;
     this->allocated = nullptr;
 }
 
 uint64_t vuprs::AlignedBuffer::size() const
 {
-    return this->byteSize;
+    return this->byte_size;
 }
 
 uint64_t vuprs::AlignedBuffer::capacity() const
 {
-    return this->byteCapacity;
+    return this->byte_capacity;
 }
 
 void *vuprs::AlignedBuffer::data() const
@@ -127,158 +109,116 @@ bool vuprs::AlignedBuffer::is_allocated() const
     return this->allocated != nullptr;
 }
 
-bool vuprs::AlignedBuffer::to_file(const std::string &fileName)
+bool vuprs::AlignedBuffer::to_file(const std::string &filename)
 {
-    return this->to_file(fileName, 0, this->byteSize);
+    return this->to_file(filename, 0, this->byte_size);
 }
 
-bool vuprs::AlignedBuffer::to_file(const std::string &fileName, const uint64_t &fileOffset, uint64_t writeBytes) const
+bool vuprs::AlignedBuffer::to_file(const std::string &filename, const uint64_t &file_offset, uint64_t write_bytes) const
 {
-    if (!this->is_allocated() || this->byteSize == 0 || writeBytes == 0)
+    if (!this->is_allocated() || this->byte_size == 0 || write_bytes == 0)
     {
         return false;
     }
-    PARAM_CHECK(!fileName.empty(), "system_tools", " in [AlignedBuffer::to_file] Empty filename.");
-
+    PARAM_CHECK(!filename.empty(), "system_tools", " in [AlignedBuffer::to_file] Empty filename.");
     int file_fd = -1;
-    ssize_t currentWriteBytes = 0, seekPosition = -1;
-
-    uint64_t targetWriteBytes = (writeBytes == 0) ? this->byteSize : std::min(this->byteSize, writeBytes);
-
+    ssize_t current_write_bytes = 0, seek_position = -1;
+    uint64_t target_write_bytes = (write_bytes == 0) ? this->byte_size : std::min(this->byte_size, write_bytes);
     /* Open file */
-
 #ifdef _WIN32
-
-    file_fd = open(fileName.c_str(), O_RDWR | O_CREAT | O_BINARY, 0666);
-
+    file_fd = open(filename.c_str(), O_RDWR | O_CREAT | O_BINARY, 0666);
 #else
-
-    file_fd = open(fileName.c_str(), O_RDWR | O_CREAT, 0666);
-
+    file_fd = open(filename.c_str(), O_RDWR | O_CREAT, 0666);
 #endif
-
     if (file_fd < 0)
     {
         return false;
     }
-
-    seekPosition = lseek(file_fd, fileOffset, SEEK_SET);
-
-    if (static_cast<uint64_t>(seekPosition) != fileOffset || seekPosition == (off_t)-1 || seekPosition < 0)
+    seek_position = lseek(file_fd, file_offset, SEEK_SET);
+    if (static_cast<uint64_t>(seek_position) != file_offset || seek_position == (off_t)-1 || seek_position < 0)
     {
         close(file_fd);
         return false;
     }
-
-    currentWriteBytes = write(file_fd, this->allocated, targetWriteBytes);
-
-    if (targetWriteBytes != static_cast<uint64_t>(currentWriteBytes))
+    current_write_bytes = write(file_fd, this->allocated, target_write_bytes);
+    if (target_write_bytes != static_cast<uint64_t>(current_write_bytes))
     {
         close(file_fd);
         return false;
     }
-
     close(file_fd);
     return true;
 }
 
-bool vuprs::AlignedBuffer::from_file(const std::string &fileName)
+bool vuprs::AlignedBuffer::from_file(const std::string &filename)
 {
     struct stat file_stat;
-    if (stat(fileName.c_str(), &file_stat) == -1)
+    if (stat(filename.c_str(), &file_stat) == -1)
     {
         return false;
     }
-
-    off_t fileBytesize = file_stat.st_size;
-
-    if (fileBytesize <= 0)
+    off_t file_bytesize = file_stat.st_size;
+    if (file_bytesize <= 0)
     {
         return false;
     }
-
-    return this->from_file(fileName, 0, static_cast<uint64_t>(fileBytesize));
+    return this->from_file(filename, 0, static_cast<uint64_t>(file_bytesize));
 }
 
-bool vuprs::AlignedBuffer::from_file(const std::string &fileName, const uint64_t &fileOffset, uint64_t loadBytes)
+bool vuprs::AlignedBuffer::from_file(const std::string &filename, const uint64_t &file_offset, uint64_t loadBytes)
 {
-    PARAM_CHECK(!fileName.empty(), "system_tools", " in [AlignedBuffer::from_file] Empty filename.");
+    PARAM_CHECK(!filename.empty(), "system_tools", " in [AlignedBuffer::from_file] Empty filename.");
     if (loadBytes == 0)
     {
         return false;
     }
-
     int file_fd = -1;
-    ssize_t currentReadBytes = 0, seekPosition = -1;
-
+    ssize_t current_read_bytes = 0, seek_position = -1;
     /* malloc */
-
     if (!this->malloc(loadBytes))
     {
         this->release();
         return false;
     }
-
 #ifdef _WIN32
-
-    file_fd = open(fileName.c_str(), O_RDONLY | O_BINARY);
-
+    file_fd = open(filename.c_str(), O_RDONLY | O_BINARY);
 #else
-
-    file_fd = open(fileName.c_str(), O_RDONLY);
-
+    file_fd = open(filename.c_str(), O_RDONLY);
 #endif
-
     if (file_fd < 0)
     {
         return false;
     }
-
-    seekPosition = lseek(file_fd, fileOffset, SEEK_SET);
-
-    if (static_cast<uint64_t>(seekPosition) != fileOffset || seekPosition == (off_t)-1 || seekPosition < 0)
+    seek_position = lseek(file_fd, file_offset, SEEK_SET);
+    if (static_cast<uint64_t>(seek_position) != file_offset || seek_position == (off_t)-1 || seek_position < 0)
     {
         close(file_fd);
         return false;
     }
-
-    currentReadBytes = read(file_fd, this->allocated, loadBytes);
-
-    if (static_cast<uint64_t>(currentReadBytes) != loadBytes)
+    current_read_bytes = read(file_fd, this->allocated, loadBytes);
+    if (static_cast<uint64_t>(current_read_bytes) != loadBytes)
     {
         close(file_fd);
         return false;
     }
-
     close(file_fd);
     return true;
 }
 
-bool vuprs::AlignedBufferDMA::malloc(uint64_t byteSize)
+bool vuprs::AlignedBufferDMA::malloc(uint64_t byte_size)
 {
     void *_allocated;
-
     this->release(); /* free all */
-
 #ifdef _WIN32
-
-    /*
-        To ensure address is aligned, size <- size + __XDMA_DMA_ALIGNMENT_BYTES__
-    */
-    _allocated = _aligned_malloc(byteSize + __XDMA_DMA_ALIGNMENT_BYTES__, __XDMA_DMA_ALIGNMENT_BYTES__);
-
+    /* To ensure address is aligned, size <- size + __XDMA_DMA_ALIGNMENT_BYTES__ */
+    _allocated = _aligned_malloc(byte_size + __XDMA_DMA_ALIGNMENT_BYTES__, __XDMA_DMA_ALIGNMENT_BYTES__);
 #else
-
-    /*
-        To ensure address is aligned, size <- size + __XDMA_DMA_ALIGNMENT_BYTES__
-    */
-    if (posix_memalign(&_allocated, __XDMA_DMA_ALIGNMENT_BYTES__, byteSize + __XDMA_DMA_ALIGNMENT_BYTES__) != 0)
+    /* To ensure address is aligned, size <- size + __XDMA_DMA_ALIGNMENT_BYTES__ */
+    if (posix_memalign(&_allocated, __XDMA_DMA_ALIGNMENT_BYTES__, byte_size + __XDMA_DMA_ALIGNMENT_BYTES__) != 0)
     {
         _allocated = nullptr;
     }
-
 #endif
-
     if (_allocated == nullptr)
     {
         this->release();
@@ -293,39 +233,27 @@ bool vuprs::AlignedBufferDMA::malloc(uint64_t byteSize)
             return false;
         }
     }
-
-    this->set_bytesize(byteSize);
-    this->set_capacity(byteSize + __XDMA_DMA_ALIGNMENT_BYTES__);
+    this->set_bytesize(byte_size);
+    this->set_capacity(byte_size + __XDMA_DMA_ALIGNMENT_BYTES__);
     this->set_allocated(_allocated);
-
     return true;
 }
 
-bool vuprs::AlignedBufferServer::malloc(uint64_t byteSize)
+bool vuprs::AlignedBufferServer::malloc(uint64_t byte_size)
 {
     void *_allocated;
-
     this->release(); /* free all */
-
 #ifdef _WIN32
 
-    /*
-        To ensure address is aligned, size <- size + __SERVER_ALIGNMENT_BYTES__
-    */
-    _allocated = _aligned_malloc(byteSize + __SERVER_ALIGNMENT_BYTES__, __SERVER_ALIGNMENT_BYTES__);
-
+    /* To ensure address is aligned, size <- size + __SERVER_ALIGNMENT_BYTES__ */
+    _allocated = _aligned_malloc(byte_size + __SERVER_ALIGNMENT_BYTES__, __SERVER_ALIGNMENT_BYTES__);
 #else
-
-    /*
-        To ensure address is aligned, size <- size + __SERVER_ALIGNMENT_BYTES__
-    */
-    if (posix_memalign(&_allocated, __SERVER_ALIGNMENT_BYTES__, byteSize + __SERVER_ALIGNMENT_BYTES__) != 0)
+    /* To ensure address is aligned, size <- size + __SERVER_ALIGNMENT_BYTES__ */
+    if (posix_memalign(&_allocated, __SERVER_ALIGNMENT_BYTES__, byte_size + __SERVER_ALIGNMENT_BYTES__) != 0)
     {
         _allocated = nullptr;
     }
-
 #endif
-
     if (_allocated == nullptr)
     {
         this->release();
@@ -340,10 +268,8 @@ bool vuprs::AlignedBufferServer::malloc(uint64_t byteSize)
             return false;
         }
     }
-
-    this->set_bytesize(byteSize);
-    this->set_capacity(byteSize + __SERVER_ALIGNMENT_BYTES__);
+    this->set_bytesize(byte_size);
+    this->set_capacity(byte_size + __SERVER_ALIGNMENT_BYTES__);
     this->set_allocated(_allocated);
-
     return true;
 }

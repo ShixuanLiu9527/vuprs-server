@@ -16,19 +16,19 @@ void vuprs::MelFilterBank::SetFilterParameters(double f_l,
     PARAM_CHECK(f_u > f_l, "inference", "");
     PARAM_CHECK(f_u <= fs / 2.0, "inference", "frequency threshold must be in range (0, nyquist freq).");
     /* Part 1 - Mel-filter bank */
-    bool filterAllocFlag = (std::abs(f_l - this->f_l) > 1e-5) ||
-                           (std::abs(f_u - this->f_u) > 1e-5) ||
-                           (N != this->N) ||
-                           (K != this->K) ||
-                           this->filterFirstAlloc;
-    if (filterAllocFlag)
+    bool filter_alloc_flag = (std::abs(f_l - this->f_l) > 1e-5) ||
+                             (std::abs(f_u - this->f_u) > 1e-5) ||
+                             (N != this->N) ||
+                             (K != this->K) ||
+                             this->filter_first_alloc;
+    if (filter_alloc_flag)
     {
         /* Split the frequency band use freqThreshold */
         double f_l_m = vuprs::f2mel(f_l);
         double f_u_m = vuprs::f2mel(f_u);
         double interval_m = (f_u_m - f_l_m) / ((double)K + 1.0);
         /* Alloc mel filter parameters */
-        this->filterDescriptors.resize(K);
+        this->filter_descriptors.resize(K);
         this->filters.resize(K, N / 2 + 1);
         this->filters.setZero();
         /* Calculate point frequency interval use fs */
@@ -40,7 +40,7 @@ void vuprs::MelFilterBank::SetFilterParameters(double f_l,
             double lower = vuprs::mel2f(interval_m * i + f_l_m);
             double center = vuprs::mel2f(interval_m * (i + 1));
             double upper = vuprs::mel2f(interval_m * (i + 2));
-            this->filterDescriptors[i] = {lower, center, upper};
+            this->filter_descriptors[i] = {lower, center, upper};
             int idx_l = (int)std::floor(lower / freq_per_bin);
             int idx_c = (int)std::floor(center / freq_per_bin + 0.5);
             int idx_u = (int)std::ceil(upper / freq_per_bin);
@@ -61,26 +61,26 @@ void vuprs::MelFilterBank::SetFilterParameters(double f_l,
             if (area > 0.0)
                 this->filters.row(i) /= area;
         }
-        this->filterFirstAlloc = false;
+        this->filter_first_alloc = false;
     }
     /* Part 2 - DCT matrix */
-    bool dctMatrixAllocFlag = (L != this->L) ||
-                              (K != this->K) ||
-                              this->dctMatrixFirstAlloc;
-    if (dctMatrixAllocFlag)
+    bool dct_matrix_alloc_flag = (L != this->L) ||
+                                 (K != this->K) ||
+                                 this->dct_matrix_first_alloc;
+    if (dct_matrix_alloc_flag)
     {
-        this->dctMatrix.resize(L + 1, K);
+        this->dct_matrix.resize(L + 1, K);
         for (int i = 0; i < L + 1; ++i)
         {
             for (int j = 0; j < K; ++j)
             {
-                this->dctMatrix(i, j) = std::cos(PI * (double)i * ((double)j + 0.5) / K);
+                this->dct_matrix(i, j) = std::cos(PI * (double)i * ((double)j + 0.5) / K);
             }
         }
-        this->dctMatrixFirstAlloc = false;
+        this->dct_matrix_first_alloc = false;
     }
     /* Realloc fftw plan */
-    this->fftManager.SetParameters(N, true);
+    this->fft_manager.SetParameters(N, true);
     /* Update parameters */
     this->f_l = f_l;
     this->f_u = f_u;
@@ -92,7 +92,7 @@ void vuprs::MelFilterBank::SetFilterParameters(double f_l,
 
 Eigen::Matrix<double, -1, 1> vuprs::MelFilterBank::ComputeBandEnergy(const Eigen::Matrix<Eigen::dcomplex, -1, 1> &signal, bool log) const
 {
-    PARAM_CHECK(!this->filterFirstAlloc, "inference", "Cannot compute band energy from empty filters.");
+    PARAM_CHECK(!this->filter_first_alloc, "inference", "Cannot compute band energy from empty filters.");
     PARAM_CHECK(signal.rows() == this->filters.cols(), "inference", "Matrix shape mismatch");
     Eigen::Matrix<double, -1, 1> power = signal.array().abs2();
     Eigen::Matrix<double, -1, 1> energy = this->filters * power;
@@ -105,12 +105,12 @@ Eigen::Matrix<double, -1, 1> vuprs::MelFilterBank::ComputeBandEnergy(const Eigen
 
 Eigen::Matrix<double, -1, 1> vuprs::MelFilterBank::ComputeMFCC(const Eigen::Matrix<Eigen::dcomplex, -1, 1> &signal,
                                                                bool include0,
-                                                               bool freqDomain,
-                                                               vuprs::WindowType wType)
+                                                               bool freq_domain,
+                                                               vuprs::WindowType w_type)
 {
     Eigen::Matrix<double, -1, 1> energy;
     Eigen::Matrix<double, -1, 1> mfcc;
-    if (freqDomain)
+    if (freq_domain)
     {
         PARAM_CHECK(signal.rows() == this->filters.cols(), "inference", "Matrix shape mismatch");
         energy = this->ComputeBandEnergy(signal, true); /* K x 1 */
@@ -121,16 +121,16 @@ Eigen::Matrix<double, -1, 1> vuprs::MelFilterBank::ComputeMFCC(const Eigen::Matr
         /* Apply window to signal */
         Eigen::dcomplex mean = signal.mean();
         /* - average */
-        Eigen::Matrix<Eigen::dcomplex, -1, 1> windowedSignal = (signal.array() - mean).matrix();
-        windowedSignal = vuprs::AddWindow(windowedSignal, wType);
-        Eigen::Matrix<Eigen::dcomplex, -1, 1> freqSignal(this->N);
+        Eigen::Matrix<Eigen::dcomplex, -1, 1> windowed_signal = (signal.array() - mean).matrix();
+        windowed_signal = vuprs::AddWindow(windowed_signal, w_type);
+        Eigen::Matrix<Eigen::dcomplex, -1, 1> freq_signal(this->N);
         /* FFT */
-        this->fftManager.DoDFT(windowedSignal.data(), freqSignal.data());
+        this->fft_manager.DoDFT(windowed_signal.data(), freq_signal.data());
         /* Cut first half (frequency in range 0 - fs/2) */
-        vuprs::CutTheFirstHalf(&freqSignal);
-        energy = this->ComputeBandEnergy(freqSignal, true);
+        vuprs::CutTheFirstHalf(&freq_signal);
+        energy = this->ComputeBandEnergy(freq_signal, true);
     }
-    mfcc = this->dctMatrix * energy;
+    mfcc = this->dct_matrix * energy;
     if (include0)
         return mfcc.head(this->L);
     return mfcc.tail(this->L);
@@ -143,12 +143,12 @@ void vuprs::SignalExtractor::SetParameters(uint32_t dims, uint32_t frames, doubl
                         (std::abs(this->frame_time_ms - frame_time_ms) > 1e-5) ||
                         (std::abs(this->f_l - f_l) > 1e-5) ||
                         (std::abs(this->f_u - f_u) > 1e-5) ||
-                        this->firstAlloc;
+                        this->first_alloc;
     if (realloc_flag)
     {
         this->pool_size = frames + 2;
-        this->extractTensorPool.resize(dims, this->pool_size);
-        this->circularPtr = 0;
+        this->extract_tensor_pool.resize(dims, this->pool_size);
+        this->circular_ptr = 0;
         this->total_frames_processed = 0;
         this->flushed = false;
         this->frames = frames;
@@ -173,9 +173,9 @@ void vuprs::SignalExtractor::InputFrameSignal(const Eigen::Matrix<double, -1, 1>
                                                               false,     /* do not include MFCC[0] */
                                                               false,     /* time domain */
                                                               vuprs::WindowType::SIG_WINDOW__HANN);
-    this->extractTensorPool.col(this->circularPtr) = mfcc;
-    this->circularPtr++;
-    this->circularPtr %= this->pool_size;
+    this->extract_tensor_pool.col(this->circular_ptr) = mfcc;
+    this->circular_ptr++;
+    this->circular_ptr %= this->pool_size;
     this->total_frames_processed++;
 }
 
@@ -199,8 +199,8 @@ void vuprs::SignalExtractor::InputSignal(const Eigen::Matrix<double, -1, 1> &sig
     uint32_t frame_number = N_total / N_half_frame;
     for (uint32_t i = 0; i < frame_number; ++i)
     {
-        Eigen::Matrix<double, -1, 1> segmentSignal = signal.segment(i * N_half_frame, N_frame);
-        this->InputFrameSignal(segmentSignal, fs);
+        Eigen::Matrix<double, -1, 1> segment_signal = signal.segment(i * N_half_frame, N_frame);
+        this->InputFrameSignal(segment_signal, fs);
     }
     /* Mark as flushed once we have enough frames for a full tensor extraction */
     if (this->total_frames_processed >= this->frames)
@@ -214,16 +214,16 @@ void vuprs::SignalExtractor::GetExtractTensor(Eigen::Matrix<uint8_t, -1, -1> *te
     RUNTIME_CHECK(this->Flushed(), "inference", "Cannot read tensor from extractor (not flushed).");
     tensor->resize(this->dims, this->frames);
     Eigen::Matrix<double, -1, -1> tensor_d;
-    if (this->circularPtr >= this->frames)
+    if (this->circular_ptr >= this->frames)
     {
-        tensor_d = this->extractTensorPool.middleCols(this->circularPtr - this->frames,
-                                                      this->frames);
+        tensor_d = this->extract_tensor_pool.middleCols(this->circular_ptr - this->frames,
+                                                        this->frames);
     }
     else
     {
-        uint32_t r_start = this->pool_size + this->circularPtr - this->frames;
-        auto tensor_d_l = this->extractTensorPool.middleCols(0, this->circularPtr);
-        auto tensor_d_r = this->extractTensorPool.middleCols(r_start, this->frames - this->circularPtr);
+        uint32_t r_start = this->pool_size + this->circular_ptr - this->frames;
+        auto tensor_d_l = this->extract_tensor_pool.middleCols(0, this->circular_ptr);
+        auto tensor_d_r = this->extract_tensor_pool.middleCols(r_start, this->frames - this->circular_ptr);
         tensor_d << tensor_d_l, tensor_d_r;
     }
     /* Quantization */

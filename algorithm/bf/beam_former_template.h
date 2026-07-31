@@ -10,15 +10,12 @@ namespace vuprs
     class WidebandBeamformerTemplate
     {
     private:
-        std::unique_ptr<ThreadPool> threadPool;
-
-        int COVARIANCE_SNAP_WINDOW_SIZE;
-        double ADJACENT_FREQ_AVERAGE_INDEX;
-
-        double EXP_WEIGHTED_MOVING_AVERAGE_INDEX;
-        double EXP_WEIGHTED_MOVING_AVERAGE_INDEX_1;
-
-        double ADJACENT_FREQ_AVERAGE_INDEX_1;
+        std::unique_ptr<ThreadPool> thread_pool;
+        int covariance_snap_window_size;
+        double adjacent_freq_average_index;
+        double adjacent_freq_average_index_1;
+        double exp_weighed_moving_average_index;
+        double exp_weighed_moving_average_index_1;
 
         void UpdateParameters();
 
@@ -27,61 +24,59 @@ namespace vuprs
          *
          * @note Check PredelayEnable() in advance.
          *
-         * @param firLength FIR filter bank length.
+         * @param fir_length FIR filter bank length.
          * @param fs sampling frequency
-         * @param includeFIRGroupDelay true: include FIR group delay, false: exclude FIR group delay.
-         * @param elementPredelayCount integer delay. (count = -round[delay{m}/Ts + (L-1)/2])
+         * @param include_fir_group_delay true: include FIR group delay, false: exclude FIR group delay.
+         * @param element_predelay_count integer delay. (count = -round[delay{m}/Ts + (L-1)/2])
          * @param elementPredelay integer delay time. (Tm = -round[delay{m}/Ts + (L-1)/2] * Ts)
-         * @param channelName corresponding channel name.
+         * @param channel_name corresponding channel name.
          */
         void UpdateElementPredelay_externalFS(
-            double firLength, double fs, bool includeFIRGroupDelay,
-            std::vector<int> *elementPredelayCount,
-            std::vector<double> *elementPredelayTime,
-            std::vector<std::string> *channelName);
+            double fir_length, double fs, bool include_fir_group_delay,
+            std::vector<int> *element_predelay_count,
+            std::vector<double> *element_predelay_time,
+            std::vector<std::string> *channel_name);
 
     protected:
-        bool firstSnapshot;
+        bool first_snapshot;
 
-        bool is_arrayConfigDone;
-        bool is_signalEmpty, is_covMatrixEmpty;
+        bool is_array_config_done;
+        bool is_signal_empty, is_cov_matrix_empty;
 
         std::mutex mut;
         std::mutex mut_scan;
 
-        Eigen::Matrix<Eigen::dcomplex, -1, -1> imagTimedelay; /* Size: M x numScans, jT{m, s} = j * T{m, s}), controlled by mut_scan */
+        Eigen::Matrix<Eigen::dcomplex, -1, -1> imag_timedelay; /* Size: M x numScans, jT{m, s} = j * T{m, s}), controlled by mut_scan */
 
         vuprs::BeamFormingArray array;
         vuprs::BeamFormingScanArray scan_array; /* for scanning, which has same element position as array but different time delay */
 
-        Eigen::Matrix<Eigen::dcomplex, -1, -1> snap_signalMatrix_freqDomain; /* Size: (M) x (N / 2 + 1) */
-        Eigen::Matrix<Eigen::dcomplex, -1, -1> steeringVectors;              /* Size: (M) x (N / 2 + 1) */
+        Eigen::Matrix<Eigen::dcomplex, -1, -1> snap_signal_matrix_freq_domain; /* Size: (M) x (N / 2 + 1) */
+        Eigen::Matrix<Eigen::dcomplex, -1, -1> steering_vectors;               /* Size: (M) x (N / 2 + 1) */
+        Eigen::Matrix<Eigen::dcomplex, -1, -1> result_weight_vectors;          /* Size: (M) x (N / 2 + 1) */
+        Eigen::Matrix<double, -1, 1> signal_frequency_list;                    /* [F0, F1, ..., FN/2] Size: (N / 2 + 1) */
+        Eigen::Matrix<Eigen::dcomplex, -1, 1> signal_frequency_list_complex;   /* [jF0, jF1, ..., jFN/2] Size: (N / 2 + 1) */
 
-        Eigen::Matrix<Eigen::dcomplex, -1, -1> resultWeightVectors; /* Size: (M) x (N / 2 + 1) */
+        double fs;         /* Current sampling frequency */
+        int signal_points; /* Current signal points */
 
-        Eigen::Matrix<double, -1, 1> signalFrequencyList;                  /* [F0, F1, ..., FN/2] Size: (N / 2 + 1) */
-        Eigen::Matrix<Eigen::dcomplex, -1, 1> signalFrequencyList_complex; /* [jF0, jF1, ..., jFN/2] Size: (N / 2 + 1) */
+        std::vector<int> element_predelay_count;       /* Predelay count (size = M) */
+        std::vector<double> element_predelay_time;     /* Predelay time = count * Ts (size = M) */
+        std::vector<std::string> element_channel_name; /* element channel name list (size = M) */
 
-        double fs;        /* Current sampling frequency */
-        int signalPoints; /* Current signal points */
-
-        std::vector<int> elementPredelayCount;       /* Predelay count (size = M) */
-        std::vector<double> elementPredelayTime;     /* Predelay time = count * Ts (size = M) */
-        std::vector<std::string> elementChannelName; /* element channel name list (size = M) */
-
-        vuprs::AlignedEigenVector<Eigen::Matrix<Eigen::dcomplex, -1, -1>> mean_covMatrix;     /* Size: N / 2 + 1, covMatrix[i] is the mean cov matrix in band [i] */
-        vuprs::AlignedEigenVector<Eigen::Matrix<Eigen::dcomplex, -1, -1>> estimate_covMatrix; /* Size: N / 2 + 1, covMatrix[i] is the mean cov matrix in band [i] */
+        vuprs::AlignedEigenVector<Eigen::Matrix<Eigen::dcomplex, -1, -1>> mean_cov_matrix;     /* Size: N / 2 + 1, cov_matrix[i] is the mean cov matrix in band [i] */
+        vuprs::AlignedEigenVector<Eigen::Matrix<Eigen::dcomplex, -1, -1>> estimate_cov_matrix; /* Size: N / 2 + 1, cov_matrix[i] is the mean cov matrix in band [i] */
 
         /**
          * @brief Calculate beamforming for one frequency.
          *
-         * @note for frequency index [i]: corresponding steering vector = steeringVectors[i];
-         * @note                          corresponding covariance matrix = estimate_covMatrix[i];
-         * @note                          result weight vector = resultWeightVectors.col(i);
+         * @note for frequency index [i]: corresponding steering vector = steering_vectors[i];
+         * @note                          corresponding covariance matrix = estimate_cov_matrix[i];
+         * @note                          result weight vector = result_weight_vectors.col(i);
          *
-         * @param freqIndex frequency index
+         * @param freq_index frequency index
          */
-        virtual void CalculateBeamformingForOneFreq(int freqIndex) = 0;
+        virtual void CalculateBeamformingForOneFreq(int freq_index) = 0;
 
     public:
         WidebandBeamformerTemplate();
@@ -95,9 +90,9 @@ namespace vuprs
          *
          * @note Check ConfigDown() in advance.
          *
-         * @param arrayConfigJsonFilename JSON file name.
+         * @param array_config_json_filename JSON file name.
          */
-        bool ConfigArrayFromJson(const std::string &arrayConfigJsonFilename);
+        bool ConfigArrayFromJson(const std::string &array_config_json_filename);
 
         /* STEP 2: INPUT SIGNAL */
 
@@ -123,7 +118,7 @@ namespace vuprs
          */
         void SetTargetDirection(double alt,
                                 double az,
-                                double waveVelocity);
+                                double wave_velocity);
 
         /* STEP 5: DO BEAM FORMING CALCULATION */
 
@@ -147,17 +142,17 @@ namespace vuprs
          * @brief Get expected frequency response of FIR filter bank.
          *
          * @param dst output expected frequency response.
-         * @param channelName corresponding channel name.
-         * @param considerPredelay if consider predelay in frequency response.
+         * @param channel_name corresponding channel name.
+         * @param consider_predelay if consider predelay in frequency response.
          */
         void GetFIRExpectedFrequencyResponse(Eigen::Matrix<Eigen::dcomplex, -1, -1> *dst,
-                                             std::vector<std::string> *channelName,
-                                             bool considerPredelay) const;
+                                             std::vector<std::string> *channel_name,
+                                             bool consider_predelay) const;
 
         /**
          * @brief Set covariance matrix fitting parameters.
          */
-        void SetCovarianceMatrixFittingParam(int snapsWindowSize = 100, double adjacentFreqAverageIndex = 0.8);
+        void SetCovarianceMatrixFittingParam(int snaps_window_size = 100, double adjacent_freq_average_index = 0.8);
 
         /**
          * @brief Reset covariance matrices.
@@ -172,17 +167,17 @@ namespace vuprs
          * @note e.g. predelay count = [13, 12, 23]
          * @note then: output predelay count = [13 - 12, 12 - 12, 23 - 12] = [1, 0, 11].
          *
-         * @param firLength FIR filter bank length.
-         * @param includeFIRGroupDelay true: include FIR group delay, false: exclude FIR group delay.
-         * @param elementPredelayCount (cannot be NULL) integer delay. (count = -round[delay{m}/Ts + (L-1)/2])
-         * @param elementPredelayTime (cannot be NULL) integer delay time. (Tm = -round[delay{m}/Ts + (L-1)/2] * Ts)
-         * @param channelName (cannot be NULL) corresponding channel name.
+         * @param fir_length FIR filter bank length.
+         * @param include_fir_group_delay true: include FIR group delay, false: exclude FIR group delay.
+         * @param element_predelay_count (cannot be NULL) integer delay. (count = -round[delay{m}/Ts + (L-1)/2])
+         * @param element_predelay_time (cannot be NULL) integer delay time. (Tm = -round[delay{m}/Ts + (L-1)/2] * Ts)
+         * @param channel_name (cannot be NULL) corresponding channel name.
          */
-        void UpdateAndGetElementPredelay(double firLength,
-                                         bool includeFIRGroupDelay,
-                                         std::vector<int> *elementPredelayCount,
-                                         std::vector<double> *elementPredelayTime,
-                                         std::vector<std::string> *channelName);
+        void UpdateAndGetElementPredelay(double fir_length,
+                                         bool include_fir_group_delay,
+                                         std::vector<int> *element_predelay_count,
+                                         std::vector<double> *element_predelay_time,
+                                         std::vector<std::string> *channel_name);
 
         /**
          * @brief Get element predelay parameters.
@@ -191,19 +186,19 @@ namespace vuprs
          * @note e.g. predelay count = [13, 12, 23]
          * @note then: output predelay count = [13 - 12, 12 - 12, 23 - 12] = [1, 0, 11].
          *
-         * @param firLength FIR filter bank length.
+         * @param fir_length FIR filter bank length.
          * @param fs sampling frequency.
-         * @param includeFIRGroupDelay true: include FIR group delay, false: exclude FIR group delay.
-         * @param elementPredelayCount (cannot be NULL) integer delay. (count = -round[delay{m}/Ts + (L-1)/2])
-         * @param elementPredelayTime (cannot be NULL) integer delay time. (Tm = -round[delay{m}/Ts + (L-1)/2] * Ts)
-         * @param channelName (cannot be NULL) corresponding channel name.
+         * @param include_fir_group_delay true: include FIR group delay, false: exclude FIR group delay.
+         * @param element_predelay_count (cannot be NULL) integer delay. (count = -round[delay{m}/Ts + (L-1)/2])
+         * @param element_predelay_time (cannot be NULL) integer delay time. (Tm = -round[delay{m}/Ts + (L-1)/2] * Ts)
+         * @param channel_name (cannot be NULL) corresponding channel name.
          */
-        void UpdateAndGetElementPredelay(double firLength,
+        void UpdateAndGetElementPredelay(double fir_length,
                                          double fs,
-                                         bool includeFIRGroupDelay,
-                                         std::vector<int> *elementPredelayCount,
-                                         std::vector<double> *elementPredelayTime,
-                                         std::vector<std::string> *channelName);
+                                         bool include_fir_group_delay,
+                                         std::vector<int> *element_predelay_count,
+                                         std::vector<double> *element_predelay_time,
+                                         std::vector<std::string> *channel_name);
 
         bool ConfigDone() const;
         bool CalculateEnable() const;
@@ -212,24 +207,24 @@ namespace vuprs
          * @brief Scan for position power.
          *
          * @param res output position power result. Size: alt.size()
-         * @param maxValue output max power value in scan result. (optional, can be NULL)
-         * @param minValue output min power value in scan result. (optional, can be NULL)
+         * @param max_value output max power value in scan result. (optional, can be NULL)
+         * @param min_value output min power value in scan result. (optional, can be NULL)
          * @param alt altitude list (degree).
          * @param az azimuth list (degree).
-         * @param waveVelocity wave velocity (m/s).
-         * @param needRegenerate true: regenerate scan points, false: do not regenerate scan points.
+         * @param wave_velocity wave velocity (m/s).
+         * @param need_regenerate true: regenerate scan points, false: do not regenerate scan points.
          * @param log true: log, false: do not log.
          *
          * @retval true: success.
          * @retval false: failed.
          */
         bool ScanForPositionPower(std::vector<double> *res,
-                                  double *maxValue,
-                                  double *minValue,
+                                  double *max_value,
+                                  double *min_value,
                                   const std::vector<double> &alt,
                                   const std::vector<double> &az,
-                                  double waveVelocity,
-                                  bool needRegenerate,
+                                  double wave_velocity,
+                                  bool need_regenerate,
                                   bool log = true);
 
         /**

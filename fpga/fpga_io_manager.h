@@ -52,7 +52,7 @@ namespace vuprs
     {
     protected:
         std::atomic<int> fd;
-        std::string deviceFilename;
+        std::string device_filename;
         std::mutex mut;
 
         virtual int OpenFlags() = 0;
@@ -68,18 +68,18 @@ namespace vuprs
         FPGA_IOManagerBase(const FPGA_IOManagerBase &) = delete;
         FPGA_IOManagerBase &operator=(const FPGA_IOManagerBase &) = delete;
 
-        FPGA_IOManagerBase(const std::string &deviceFilename);
+        FPGA_IOManagerBase(const std::string &device_filename);
         FPGA_IOManagerBase();
         virtual ~FPGA_IOManagerBase();
 
         /**
          * @brief Open FPGA device file.
          *
-         * @param deviceFilename xdma device file.
+         * @param device_filename xdma device file.
          *
          * @retval true: success, false: failed.
          */
-        bool Open(const std::string &deviceFilename) noexcept;
+        bool Open(const std::string &device_filename) noexcept;
 
         /**
          * @brief Close FPGA device file.
@@ -102,7 +102,7 @@ namespace vuprs
     class FPGA_IOManagerForDevice : public FPGA_IOManagerBase
     {
     private:
-        std::atomic<bool> isMemoryMapped;
+        std::atomic<bool> is_mmapped;
         void *mmap_base; /* memory map base address */
 
         /**
@@ -120,7 +120,7 @@ namespace vuprs
 
     public:
         FPGA_IOManagerForDevice();
-        FPGA_IOManagerForDevice(const std::string &deviceFilename);
+        FPGA_IOManagerForDevice(const std::string &device_filename);
         ~FPGA_IOManagerForDevice();
 
         /**
@@ -129,17 +129,17 @@ namespace vuprs
          * @note 1st: mmap(), 2nd: read/write, 3rd: munmap().
          * @note AXI-Lite only, cannot be used in AXI-Full reading/writing.
          *
-         * @param ioValue read/write value.
-         * @param absoluteAddress address of the register in FPGA (= PCIe BAR-address + register offset).
-         * @param isRead true: read, false: write.
+         * @param io_value read/write value.
+         * @param absolute_address address of the register in FPGA (= PCIe BAR-address + register offset).
+         * @param is_read true: read, false: write.
          *
          * @retval true: success, false: failed.
          *
          * @throw std::runtime_error
          */
-        bool RegisterIO(uint32_t *ioValue,
-                        uint32_t absoluteAddress,
-                        bool isRead);
+        bool RegisterIO(uint32_t *io_value,
+                        uint32_t absolute_address,
+                        bool is_read);
 
         /**
          * @brief Read/Write value list from/to FPGA registers.
@@ -147,17 +147,17 @@ namespace vuprs
          * @note 1st: mmap(), 2nd: read/write, 3rd: munmap().
          * @note AXI-Lite only, cannot be used in AXI-Full reading/writing.
          *
-         * @param ioValueList read/write value list.
-         * @param absoluteAddressList address list of registers in FPGA (= PCIe BAR-address + register offset).
-         * @param isRead true: read, false: write.
+         * @param io_value_list read/write value list.
+         * @param absolute_address_list address list of registers in FPGA (= PCIe BAR-address + register offset).
+         * @param is_read true: read, false: write.
          *
          * @retval true: success, false: failed.
          *
          * @throw std::runtime_error
          */
-        bool RegisterListIO(std::vector<uint32_t> *ioValueList,
-                            const std::vector<uint32_t> &absoluteAddressList,
-                            bool isRead);
+        bool RegisterListIO(std::vector<uint32_t> *io_value_list,
+                            const std::vector<uint32_t> &absolute_address_list,
+                            bool is_read);
     };
 
     /**
@@ -173,7 +173,7 @@ namespace vuprs
 
     public:
         FPGA_IOManagerForMemory();
-        FPGA_IOManagerForMemory(const std::string &deviceFilename);
+        FPGA_IOManagerForMemory(const std::string &device_filename);
         ~FPGA_IOManagerForMemory();
 
         /**
@@ -183,15 +183,15 @@ namespace vuprs
          * @note AXI-Full only, cannot be used in AXI-Lite reading/writing.
          *
          * @param source buffer.data()
-         * @param absoluteAddress starting addressing for reading/writing (= FPGA-address of memory + user offset).
+         * @param absolute_address starting addressing for reading/writing (= FPGA-address of memory + user offset).
          * @param transferBytes transfer size in bytes.
-         * @param isRead true: read, false: write.
+         * @param is_read true: read, false: write.
          *
          * @retval true: success, false: failed.
          *
          * @throw std::runtime_error
          */
-        bool BufferIO(void *source, uint32_t absoluteAddress, uint32_t transferBytes, bool isRead);
+        bool BufferIO(void *source, uint32_t absolute_address, uint32_t transferBytes, bool is_read);
     };
 
     /**
@@ -209,12 +209,12 @@ namespace vuprs
 
     public:
         FPGA_IOManagerForInterrput();
-        FPGA_IOManagerForInterrput(const std::string &deviceFilename);
+        FPGA_IOManagerForInterrput(const std::string &device_filename);
         ~FPGA_IOManagerForInterrput();
 
         bool SetTimeout(uint32_t timeout_ms = 100);
 
-        bool ReadEvent(uint32_t *readValue);
+        bool ReadEvent(uint32_t *read_value);
     };
 }
 

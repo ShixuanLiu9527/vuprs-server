@@ -64,59 +64,59 @@ namespace vuprs
      * @brief Convert Eigen column vector to std::vector.
      */
     template <typename T>
-    void eigenVector2stdVector(const Eigen::Matrix<T, -1, 1> &eigenvector, std::vector<T> *stdvector)
+    void eigenVector2stdVector(const Eigen::Matrix<T, -1, 1> &eigen_vector, std::vector<T> *std_vector)
     {
-        if (eigenvector.rows() == 0)
+        if (eigen_vector.rows() == 0)
         {
-            stdvector->clear();
+            std_vector->clear();
             return;
         }
-        PARAM_CHECK(eigenvector.cols() == 1, "signal_processing", " Invalid shape of eigen (expected: Nx1)");
-        stdvector->assign(eigenvector.data(), eigenvector.data() + eigenvector.size());
+        PARAM_CHECK(eigen_vector.cols() == 1, "signal_processing", " Invalid shape of eigen (expected: Nx1)");
+        std_vector->assign(eigen_vector.data(), eigen_vector.data() + eigen_vector.size());
     }
 
     /**
      * @brief Convert Eigen row vector to std::vector.
      */
     template <typename T>
-    void eigenRow2stdVector(const Eigen::Matrix<T, 1, -1> &eigenrow, std::vector<T> *stdvector)
+    void eigenRow2stdVector(const Eigen::Matrix<T, 1, -1> &eigen_row, std::vector<T> *std_vector)
     {
-        if (eigenrow.cols() == 0)
+        if (eigen_row.cols() == 0)
         {
-            stdvector->clear();
+            std_vector->clear();
             return;
         }
-        PARAM_CHECK(eigenrow.rows() == 1, "signal_processing", " Invalid shape of eigen (expected: 1xN)");
+        PARAM_CHECK(eigen_row.rows() == 1, "signal_processing", " Invalid shape of eigen (expected: 1xN)");
 
-        stdvector->assign(eigenrow.data(), eigenrow.data() + eigenrow.size());
+        std_vector->assign(eigen_row.data(), eigen_row.data() + eigen_row.size());
     }
 
     /**
      * @brief Convert std::vector to Eigen column vector.
      */
     template <typename T>
-    void stdVector2eigenVector(const std::vector<T> &stdvector, Eigen::Matrix<T, -1, 1> *eigenvector)
+    void stdVector2eigenVector(const std::vector<T> &std_vector, Eigen::Matrix<T, -1, 1> *eigen_vector)
     {
-        if (stdvector.empty())
+        if (std_vector.empty())
         {
-            eigenvector->resize(0);
+            eigen_vector->resize(0);
             return;
         }
-        *eigenvector = Eigen::Map<const Eigen::Matrix<T, -1, 1>>(stdvector.data(), stdvector.size());
+        *eigen_vector = Eigen::Map<const Eigen::Matrix<T, -1, 1>>(std_vector.data(), std_vector.size());
     }
 
     /**
      * @brief Convert std::vector to Eigen row vector.
      */
     template <typename T>
-    void stdVector2eigenRow(const std::vector<T> &stdvector, Eigen::Matrix<T, 1, -1> *eigenrow)
+    void stdVector2eigenRow(const std::vector<T> &std_vector, Eigen::Matrix<T, 1, -1> *eigen_row)
     {
-        if (stdvector.empty())
+        if (std_vector.empty())
         {
-            eigenrow->resize(1, 0);
+            eigen_row->resize(1, 0);
             return;
         }
-        *eigenrow = Eigen::Map<const Eigen::Matrix<T, 1, -1>>(stdvector.data(), stdvector.size());
+        *eigen_row = Eigen::Map<const Eigen::Matrix<T, 1, -1>>(std_vector.data(), std_vector.size());
     }
 
     /**
@@ -124,26 +124,26 @@ namespace vuprs
      *
      * @note Use FFTW3.
      *
-     * @param inputData the input data.
-     * @param outputData the output data.
+     * @param input_data the input data.
+     * @param output_data the output data.
      * @param inverse true: IDFT, false: DFT.
      *
      * @throw std::runtime_error when input data is empty.
      */
-    void FFT(const std::vector<std::complex<double>> &inputData, std::vector<std::complex<double>> *outputData, bool inverse = false);
+    void FFT(const std::vector<std::complex<double>> &input_data, std::vector<std::complex<double>> *output_data, bool inverse = false);
 
     /**
      * @brief Do FFT.
      *
      * @note Use FFTW3.
      *
-     * @param inputData the input data.
-     * @param outputData the output data.
+     * @param input_data the input data.
+     * @param output_data the output data.
      * @param inverse true: IDFT, false: DFT.
      *
      * @throw std::runtime_error when input data is empty.
      */
-    void FFT(const Eigen::Matrix<Eigen::dcomplex, -1, 1> &inputData, Eigen::Matrix<Eigen::dcomplex, -1, 1> *outputData, bool inverse = false);
+    void FFT(const Eigen::Matrix<Eigen::dcomplex, -1, 1> &input_data, Eigen::Matrix<Eigen::dcomplex, -1, 1> *output_data, bool inverse = false);
 
     /**
      * @brief Cut half size (return size = N / 2 + 1).
@@ -151,7 +151,7 @@ namespace vuprs
      * @note input: [1, 2, 3, 4, 5, 6]
      * @note output: [1, 2, 3, 4]
      */
-    void CutTheFirstHalf(std::vector<std::complex<double>> *inputData);
+    void CutTheFirstHalf(std::vector<std::complex<double>> *input_data);
 
     /**
      * @brief Cut half size (return size = N / 2 + 1).
@@ -159,7 +159,7 @@ namespace vuprs
      * @note input: [1, 2, 3, 4, 5, 6]
      * @note output: [1, 2, 3, 4]
      */
-    void CutTheFirstHalf(Eigen::Matrix<Eigen::dcomplex, -1, 1> *inputData);
+    void CutTheFirstHalf(Eigen::Matrix<Eigen::dcomplex, -1, 1> *input_data);
 
     /**
      * @brief In-place conjugate symmetric completion (for IDFT).
@@ -168,9 +168,9 @@ namespace vuprs
      * @note input: [1j, 2j, 3j, 4j]
      * @note output: [1j, 2j, 3j, 4j, -3j, -2j]
      *
-     * @param inputData input data.
+     * @param input_data input data.
      */
-    void CompleteConjugateSymmetric(std::vector<std::complex<double>> *inputData);
+    void CompleteConjugateSymmetric(std::vector<std::complex<double>> *input_data);
 
     /**
      * @brief In-place conjugate symmetric completion (for IDFT).
@@ -179,9 +179,9 @@ namespace vuprs
      * @note input: [1j, 2j, 3j, 4j]
      * @note output: [1j, 2j, 3j, 4j, -3j, -2j]
      *
-     * @param inputData input data.
+     * @param input_data input data.
      */
-    void CompleteConjugateSymmetric(Eigen::Matrix<Eigen::dcomplex, -1, 1> *inputData);
+    void CompleteConjugateSymmetric(Eigen::Matrix<Eigen::dcomplex, -1, 1> *input_data);
 
     /**
      * @brief In-place conjugate symmetric completion.
@@ -190,29 +190,29 @@ namespace vuprs
      * @note input: [1, 2, 3, 4]
      * @note output: [1, 2, 3, 4, 3, 2]
      *
-     * @param inputData input data.
+     * @param input_data input data.
      */
-    void CompleteSymmetric(Eigen::Matrix<double, -1, 1> *inputData);
+    void CompleteSymmetric(Eigen::Matrix<double, -1, 1> *input_data);
 
     /**
      * @brief Frequency vector.
      *
-     * @note [f_1 * j, f_2 * j, ..., f_F * j], F = dataNumber / 2 + 1
+     * @note [f_1 * j, f_2 * j, ..., f_F * j], F = data_number / 2 + 1
      *
-     * @param dataNumber total data number (input to FFT).
-     * @param samplingFrequency sampling frequency, unit: Hz.
+     * @param data_number total data number (input to FFT).
+     * @param fs sampling frequency, unit: Hz.
      */
-    Eigen::Matrix<Eigen::dcomplex, -1, 1> GenerateComplexFrequencyList(int dataNumber, double samplingFrequency);
+    Eigen::Matrix<Eigen::dcomplex, -1, 1> GenerateComplexFrequencyList(int data_number, double fs);
 
     /**
      * @brief Frequency vector.
      *
-     * @note [f_1, f_2, ..., f_F], F = dataNumber / 2 + 1
+     * @note [f_1, f_2, ..., f_F], F = data_number / 2 + 1
      *
-     * @param dataNumber total data number (input to FFT).
-     * @param samplingFrequency sampling frequency, unit: Hz.
+     * @param data_number total data number (input to FFT).
+     * @param fs sampling frequency, unit: Hz.
      */
-    Eigen::Matrix<double, -1, 1> GenerateRealFrequencyList(int dataNumber, double samplingFrequency);
+    Eigen::Matrix<double, -1, 1> GenerateRealFrequencyList(int data_number, double fs);
 
     enum class WindowType
     {
@@ -221,7 +221,7 @@ namespace vuprs
         SIG_WINDOW__BLACKMAN
     };
 
-    Eigen::Matrix<double, -1, 1> GetWindow(vuprs::WindowType type, int signalLength);
+    Eigen::Matrix<double, -1, 1> GetWindow(vuprs::WindowType type, int signal_length);
 
     /**
      * @brief Add window for signal.

@@ -28,39 +28,39 @@ namespace vuprs
     class BeamFormingElement
     {
     private:
-        vuprs::FFTWManagerComplex fftManager;
+        vuprs::FFTWManagerComplex fft_manager;
 
         void AddWindowForSignal();
 
     public:
-        Eigen::Matrix<double, 3, 1> positionVector; /* [x; y; z], relative to the reference point, unit: m */
-        double timeDelay = 0.0;                     /* time delay of signal, relative to the reference point, unit: sec */
-        std::string adcChannel = "";                /* "" = empty */
+        Eigen::Matrix<double, 3, 1> position_vector; /* [x; y; z], relative to the reference point, unit: m */
+        double time_delay = 0.0;                     /* time delay of signal, relative to the reference point, unit: sec */
+        std::string adc_channel = "";                /* "" = empty */
 
-        double samplingFrequency = 0.0; /* sampling frequency for this signal, unit: Hz */
-        double samplingTime = 0.0;      /* sampling time for this signal, unit: sec */
+        double fs = 0.0;            /* sampling frequency for this signal, unit: Hz */
+        double sampling_time = 0.0; /* sampling time for this signal, unit: sec */
 
-        std::vector<std::complex<double>> elementSignalTimeDomain;                /* raw data */
-        Eigen::Matrix<Eigen::dcomplex, -1, 1> windowedSignal_eigen;               /* windowed raw data */
-        Eigen::Matrix<Eigen::dcomplex, -1, 1> elementSignalFrequencyDomain_eigen; /* First half in frequency domain */
+        std::vector<std::complex<double>> element_signal_time_domain;                /* raw data */
+        Eigen::Matrix<Eigen::dcomplex, -1, 1> windowed_signal_eigen;                 /* windowed raw data */
+        Eigen::Matrix<Eigen::dcomplex, -1, 1> element_signal_frequency_domain_eigen; /* First half in frequency domain */
 
         BeamFormingElement();
 
         /**
          * @brief Calculate time delay for this element.
          *
-         * @note Initialize positionVector in advance.
+         * @note Initialize position_vector in advance.
          *
-         * @param targetAlt alt of the target position (relative to array), unit: deg.
-         * @param targetAz az of the target position (relative to array), unit: deg.
-         * @param waveVelocity velocity of wave, unit: m/sec.
+         * @param target_alt alt of the target position (relative to array), unit: deg.
+         * @param target_az az of the target position (relative to array), unit: deg.
+         * @param wave_velocity velocity of wave, unit: m/sec.
          */
-        void UpdataTimeDelay(double targetAlt, double targetAz, double waveVelocity);
+        void UpdataTimeDelay(double target_alt, double target_az, double wave_velocity);
 
         /**
-         * @brief FFT for the signal: this->elementSignalTimeDomain
+         * @brief FFT for the signal: this->element_signal_time_domain
          *
-         * @note this->elementSignalTimeDomain (Size: N) ---> DFT ---> this->elementSignalFrequencyDomain_eigen (size: (N/2+1, 1)).
+         * @note this->element_signal_time_domain (Size: N) ---> DFT ---> this->element_signal_frequency_domain_eigen (size: (N/2+1, 1)).
          */
         bool RunDFT();
 
@@ -77,13 +77,13 @@ namespace vuprs
     class BeamFormingArray
     {
     private:
-        std::unique_ptr<vuprs::ThreadPool> threadPool;
-        double maxElementPositionError;
-        Eigen::Matrix<Eigen::dcomplex, -1, 1> timeDelayVector;
-        vuprs::AlignedEigenVector<vuprs::BeamFormingElement> elementArray;
-        double fs = 0.0;           /* sampling frequency for this signal, unit: Hz */
-        double samplingTime = 0.0; /* sampling time for this signal, unit: sec */
-        int signalPointCounts = 0; /* sampling points for this signal */
+        std::unique_ptr<vuprs::ThreadPool> thread_pool;
+        double max_element_position_error;
+        Eigen::Matrix<Eigen::dcomplex, -1, 1> time_delay_vector;
+        vuprs::AlignedEigenVector<vuprs::BeamFormingElement> element_array;
+        double fs = 0.0;             /* sampling frequency for this signal, unit: Hz */
+        double sampling_time = 0.0;  /* sampling time for this signal, unit: sec */
+        int signal_point_counts = 0; /* sampling points for this signal */
 
     public:
         BeamFormingArray();
@@ -100,13 +100,13 @@ namespace vuprs
         /**
          * @brief Calculate time delay for this array.
          *
-         * @note Initialize positionVector in advance.
+         * @note Initialize position_vector in advance.
          *
-         * @param targetAlt alt of the target position (relative to array), unit: deg.
-         * @param targetAz az of the target position (relative to array), unit: deg.
-         * @param waveVelocity velocity of wave, unit: m/sec.
+         * @param target_alt alt of the target position (relative to array), unit: deg.
+         * @param target_az az of the target position (relative to array), unit: deg.
+         * @param wave_velocity velocity of wave, unit: m/sec.
          */
-        void UpdateTimeDelay(double targetAlt, double targetAz, double waveVelocity);
+        void UpdateTimeDelay(double target_alt, double target_az, double wave_velocity);
 
         /**
          * @brief Input all signal to the beam forming array and bind the signal to certain element.
@@ -114,9 +114,9 @@ namespace vuprs
          * @note index = 0: latest data;
          * @note index = data points: newest data.
          *
-         * @param adcData adc data
+         * @param adc_data adc data
          */
-        void InputElementSignal(const vuprs::SignalData &adcData);
+        void InputElementSignal(const vuprs::SignalData &adc_data);
 
         /**
          * @brief Calculate steering vector.
@@ -154,31 +154,31 @@ namespace vuprs
          * @note If FFT not used, the resulting data will be M x N.
          * @note Corresponding element of each rows: [element[0], element[1], ..., element[M]].
          *
-         * @param signalMatrix [output] signal matrix.
-         * @param samplingFrequency [output] sampling frequency.
-         * @param frequencyDomain true: do FFT for all data, false: do not FFT.
+         * @param signal_matrix [output] signal matrix.
+         * @param fs [output] sampling frequency.
+         * @param frequency_domain true: do FFT for all data, false: do not FFT.
          *
-         * @retval frequencyDomain = true: Array signal matrix (frequency domain, size = (M) x (N / 2 + 1)).
-         * @retval frequencyDomain = false: Array signal matrix (time domain, size = (M)x(N))
+         * @retval frequency_domain = true: Array signal matrix (frequency domain, size = (M) x (N / 2 + 1)).
+         * @retval frequency_domain = false: Array signal matrix (time domain, size = (M)x(N))
          */
-        void GetArraySignalMatrix(Eigen::Matrix<Eigen::dcomplex, -1, -1> *signalMatrix,
-                                  double *samplingFrequency = nullptr,
-                                  bool frequencyDomain = true);
+        void GetArraySignalMatrix(Eigen::Matrix<Eigen::dcomplex, -1, -1> *signal_matrix,
+                                  double *fs = nullptr,
+                                  bool frequency_domain = true);
 
         double GetMaxAbsoluteTimeDelay() const;
 
         /**
          * @brief Calculate steering vector error radius.
          *
-         * @param signalFrequency signal frequency.
+         * @param signal_frequency signal frequency.
          */
-        double CalculateSteeringVectorErrorRadius(double signalFrequency) const;
+        double CalculateSteeringVectorErrorRadius(double signal_frequency) const;
 
         bool empty() const;
 
-        BeamFormingElement &operator[](size_t idx) { return this->elementArray[idx]; }
-        const BeamFormingElement &operator[](size_t idx) const { return this->elementArray[idx]; }
-        size_t size() const { return this->elementArray.size(); }
+        BeamFormingElement &operator[](size_t idx) { return this->element_array[idx]; }
+        const BeamFormingElement &operator[](size_t idx) const { return this->element_array[idx]; }
+        size_t size() const { return this->element_array.size(); }
 
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };
@@ -191,7 +191,7 @@ namespace vuprs
     class BeamFormingScanArray
     {
     private:
-        vuprs::AlignedEigenVector<vuprs::BeamFormingElement> elementArray;
+        vuprs::AlignedEigenVector<vuprs::BeamFormingElement> element_array;
 
     public:
         BeamFormingScanArray();
@@ -212,13 +212,13 @@ namespace vuprs
          * @param alt alt of the target position (relative to array), unit: deg.
          * @param az az of the target position (relative to array), unit: deg.
          * @param frequency signal frequency (unit: Hz), omega = 2 * pi * f.
-         * @param waveVelocity velocity of wave, unit: m/sec.
+         * @param wave_velocity velocity of wave, unit: m/sec.
          */
         void GetSteeringVectorMatrix(Eigen::Matrix<Eigen::dcomplex, -1, -1> *matrix,
                                      const std::vector<double> &alt,
                                      const std::vector<double> &az,
                                      double frequency,
-                                     double waveVelocity) const;
+                                     double wave_velocity) const;
 
         /**
          * @brief Calculate steering vector for one frequency domain.
@@ -228,11 +228,11 @@ namespace vuprs
          * @param matrix output steering vector.
          * @param alt alt of the target position (relative to array), unit: deg.
          * @param az az of the target position (relative to array), unit: deg.
-         * @param waveVelocity velocity of wave, unit: m/sec.
+         * @param wave_velocity velocity of wave, unit: m/sec.
          */
         Eigen::Matrix<Eigen::dcomplex, -1, -1> GetImagTimedelay(const std::vector<double> &alt,
                                                                 const std::vector<double> &az,
-                                                                double waveVelocity) const;
+                                                                double wave_velocity) const;
 
         bool empty() const;
 

@@ -14,7 +14,7 @@ vuprs::FPGA_Device__AXIDirectMemoryAccess::FPGA_Device__AXIDirectMemoryAccess()
 void vuprs::FPGA_Device__AXIDirectMemoryAccess::GenerateRegisterTable()
 {
     std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
-    this->registerTable = {
+    this->register_table = {
         {&this->offset_SG_CTL, "SG_CTL", vuprs::AXI_DMA__Registers::SG_CTL},
         {&this->offset_S2MM_DMACR, "S2MM_DMACR", vuprs::AXI_DMA__Registers::S2MM_DMACR},
         {&this->offset_S2MM_DMASR, "S2MM_DMASR", vuprs::AXI_DMA__Registers::S2MM_DMASR},
@@ -32,9 +32,9 @@ bool vuprs::FPGA_Device__AXIDirectMemoryAccess::LoadFromJsonObj(const nlohmann::
     this->LoadMainInfoFromJsonObj(obj);
     {
         std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
-        vuprs::__JsonStringParseINT<uint32_t>(&this->s2mmTransferRegisterLength, obj, "s2mm-length-register-width", true);
+        vuprs::__JsonStringParseINT<uint32_t>(&this->s2mm_transfer_register_length, obj, "s2mm-length-register-width", true);
     }
-    this->configdone = true;
+    this->config_done = true;
     return true;
 }
 
@@ -43,76 +43,76 @@ void vuprs::AXI_DMA_ScatterGatherDescriptor_ToDefault(vuprs::AXI_DMA_ScatterGath
     memset(descriptor, 0, sizeof(vuprs::AXI_DMA_ScatterGatherDescriptor));
 }
 
-void vuprs::CreateDMAScatterGatherDescriptorChain(std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> *descriptorList,
+void vuprs::CreateDMAScatterGatherDescriptorChain(std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> *descriptor_list,
                                                   const vuprs::AXI_DMA_SGDescriptor_Config &config)
 {
-    PARAM_CHECK(!(config.bufferSize == 0 || config.bufferCount == 0), "fpga", " in [vuprs::CreateDMAScatterGatherDescriptorChain] Buffer size or buffer count should not be 0.");
-    PARAM_CHECK(config.bufferSize % vuprs::DMA_BUFFER_ALIGNMENT_1_WORD == 0, "fpga", " in [vuprs::CreateDMAScatterGatherDescriptorChain] Buffer size must aligned to 1 word");
-    PARAM_CHECK(config.bufferSize <= vuprs::DMA_MAX_BUFFER_LENGTH, "fpga", " in [vuprs::CreateDMAScatterGatherDescriptorChain] Buffer size must be smaller than " + std::to_string(vuprs::DMA_MAX_BUFFER_LENGTH) + " bytes.");
+    PARAM_CHECK(!(config.buffer_size == 0 || config.buffer_count == 0), "fpga", " in [vuprs::CreateDMAScatterGatherDescriptorChain] Buffer size or buffer count should not be 0.");
+    PARAM_CHECK(config.buffer_size % vuprs::DMA_BUFFER_ALIGNMENT_1_WORD == 0, "fpga", " in [vuprs::CreateDMAScatterGatherDescriptorChain] Buffer size must aligned to 1 word");
+    PARAM_CHECK(config.buffer_size <= vuprs::DMA_MAX_BUFFER_LENGTH, "fpga", " in [vuprs::CreateDMAScatterGatherDescriptorChain] Buffer size must be smaller than " + std::to_string(vuprs::DMA_MAX_BUFFER_LENGTH) + " bytes.");
 
-    descriptorList->resize(config.bufferCount);
+    descriptor_list->resize(config.buffer_count);
     /* Operate as normal link list */
-    for (uint32_t i = 0; i < config.bufferCount; i++)
+    for (uint32_t i = 0; i < config.buffer_count; i++)
     {
-        vuprs::AXI_DMA_ScatterGatherDescriptor_ToDefault(&(*descriptorList)[i]);
+        vuprs::AXI_DMA_ScatterGatherDescriptor_ToDefault(&(*descriptor_list)[i]);
         /* Next descriptor address (in bytes) = (i + 1) * 64U. */
-        (*descriptorList)[i].NXTDESC = (i + 1) * sizeof(vuprs::AXI_DMA_ScatterGatherDescriptor) + config.sgBRAM_FPGABaseAddr;
+        (*descriptor_list)[i].NXTDESC = (i + 1) * sizeof(vuprs::AXI_DMA_ScatterGatherDescriptor) + config.sg_bram_fpga_base_addr;
         /* Current descriptor address */
-        (*descriptorList)[i].ALIGNMENT_0_CURRENT_ADDR = i * sizeof(vuprs::AXI_DMA_ScatterGatherDescriptor) + config.sgBRAM_FPGABaseAddr;
+        (*descriptor_list)[i].ALIGNMENT_0_CURRENT_ADDR = i * sizeof(vuprs::AXI_DMA_ScatterGatherDescriptor) + config.sg_bram_fpga_base_addr;
         /* Previous descriptor address */
         if (i == 0)
         {
-            (*descriptorList)[i].ALIGNMENT_1_PREVIOUS_ADDR = INVALID_SG_DESCRIPTOR_POINTER;
+            (*descriptor_list)[i].ALIGNMENT_1_PREVIOUS_ADDR = INVALID_SG_DESCRIPTOR_POINTER;
         }
         else
         {
-            (*descriptorList)[i].ALIGNMENT_1_PREVIOUS_ADDR = (i - 1) * sizeof(vuprs::AXI_DMA_ScatterGatherDescriptor) + config.sgBRAM_FPGABaseAddr;
+            (*descriptor_list)[i].ALIGNMENT_1_PREVIOUS_ADDR = (i - 1) * sizeof(vuprs::AXI_DMA_ScatterGatherDescriptor) + config.sg_bram_fpga_base_addr;
         }
         /* Current buffer address (in bytes) = i * buffer size */
-        (*descriptorList)[i].BUFFER_ADDRESS = i * config.bufferSize + config.ddr_FPGABaseAddr;
-        (*descriptorList)[i].ALIGNMENT_2_BUFFER_SIZE = config.bufferSize;
+        (*descriptor_list)[i].BUFFER_ADDRESS = i * config.buffer_size + config.ddr_fpga_base_addr;
+        (*descriptor_list)[i].ALIGNMENT_2_BUFFER_SIZE = config.buffer_size;
         /* Current buffer length CONTROL[25:0] = buffer size */
-        (*descriptorList)[i].CONTROL |= (config.bufferSize & vuprs::DMA_BUFFER_LENGTH_MASK);
+        (*descriptor_list)[i].CONTROL |= (config.buffer_size & vuprs::DMA_BUFFER_LENGTH_MASK);
     }
     /* Special operation for Cyclic DMA Mode */
-    if (config.isCyclicDMAMode)
+    if (config.is_cyclic_dma_mode)
     {
-        (*descriptorList)[0].ALIGNMENT_1_PREVIOUS_ADDR = (*descriptorList)[config.bufferCount - 1].ALIGNMENT_0_CURRENT_ADDR;
-        (*descriptorList)[config.bufferCount - 1].NXTDESC = (*descriptorList)[0].ALIGNMENT_0_CURRENT_ADDR; /* point to begining */
+        (*descriptor_list)[0].ALIGNMENT_1_PREVIOUS_ADDR = (*descriptor_list)[config.buffer_count - 1].ALIGNMENT_0_CURRENT_ADDR;
+        (*descriptor_list)[config.buffer_count - 1].NXTDESC = (*descriptor_list)[0].ALIGNMENT_0_CURRENT_ADDR; /* point to begining */
     }
 }
 
-bool vuprs::MatchDescriptor(const std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> &descriptorList, uint32_t currentDescriptorAddr,
-                            vuprs::AXI_DMA_ScatterGatherDescriptor *curDesc,
-                            vuprs::AXI_DMA_ScatterGatherDescriptor *nextDesc,
-                            vuprs::AXI_DMA_ScatterGatherDescriptor *prevDesc)
+bool vuprs::MatchDescriptor(const std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> &descriptor_list, uint32_t currentDescriptorAddr,
+                            vuprs::AXI_DMA_ScatterGatherDescriptor *cur_desc,
+                            vuprs::AXI_DMA_ScatterGatherDescriptor *next_desc,
+                            vuprs::AXI_DMA_ScatterGatherDescriptor *prev_desc)
 {
-    uint32_t nextAddr, previousAddr;
+    uint32_t next_addr, previous_addr;
     bool find_cur = false, find_next = false, find_prev = false;
-    PARAM_CHECK(curDesc != nullptr && nextDesc != nullptr && prevDesc != nullptr, "fpga", " in [vuprs::MatchDescriptor] target descriptor is NULL.");
-    for (auto &desc : descriptorList)
+    PARAM_CHECK(cur_desc != nullptr && next_desc != nullptr && prev_desc != nullptr, "fpga", " in [vuprs::MatchDescriptor] target descriptor is NULL.");
+    for (auto &desc : descriptor_list)
     {
         if (desc.ALIGNMENT_0_CURRENT_ADDR == currentDescriptorAddr)
         {
-            nextAddr = desc.NXTDESC;
-            previousAddr = desc.ALIGNMENT_1_PREVIOUS_ADDR;
-            *curDesc = desc;
+            next_addr = desc.NXTDESC;
+            previous_addr = desc.ALIGNMENT_1_PREVIOUS_ADDR;
+            *cur_desc = desc;
             find_cur = true;
             break;
         }
     }
-    for (auto &desc : descriptorList)
+    for (auto &desc : descriptor_list)
     {
-        if (desc.ALIGNMENT_0_CURRENT_ADDR == nextAddr)
+        if (desc.ALIGNMENT_0_CURRENT_ADDR == next_addr)
         {
-            *nextDesc = desc;
+            *next_desc = desc;
             find_next = true;
             if (find_prev)
                 break;
         }
-        if (desc.ALIGNMENT_0_CURRENT_ADDR == previousAddr)
+        if (desc.ALIGNMENT_0_CURRENT_ADDR == previous_addr)
         {
-            *prevDesc = desc;
+            *prev_desc = desc;
             find_prev = true;
             if (find_next)
                 break;
@@ -130,9 +130,9 @@ vuprs::FPGA_Device__ADCController::FPGA_Device__ADCController()
 {
     {
         std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
-        this->maxSamplingFrequencyHz = 10000.0;
-        this->voltageRangeRadiusV = 10.0;
-        this->workClockFrequencyHz = 50000000.0;
+        this->max_fs = 10000.0;
+        this->voltage_range_radius = 10.0;
+        this->work_clock_frequency = 50000000.0;
     }
 
     this->GenerateRegisterTable();
@@ -142,7 +142,7 @@ vuprs::FPGA_Device__ADCController::FPGA_Device__ADCController()
 void vuprs::FPGA_Device__ADCController::GenerateRegisterTable()
 {
     std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
-    this->registerTable = {
+    this->register_table = {
         {&this->offset_ADC_SCI, "ADC_SCI", vuprs::ADC_Controller__Registers::ADC_SCI},
         {&this->offset_ADC_SP, "ADC_SP", vuprs::ADC_Controller__Registers::ADC_SP},
         {&this->offset_ADC_SF, "ADC_SF", vuprs::ADC_Controller__Registers::ADC_SF},
@@ -158,25 +158,25 @@ bool vuprs::FPGA_Device__ADCController::LoadFromJsonObj(const nlohmann::json &ob
     this->LoadMainInfoFromJsonObj(obj);
     {
         std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
-        vuprs::__JsonStringParseFLOAT<double>(&this->maxSamplingFrequencyHz, obj, "max-sampling-frequency-hz", true);
-        vuprs::__JsonStringParseFLOAT<double>(&this->voltageRangeRadiusV, obj, "voltage-range-radius-v", true);
-        vuprs::__JsonStringParseFLOAT<double>(&this->workClockFrequencyHz, obj, "work-clock-frequency-hz", true);
+        vuprs::__JsonStringParseFLOAT<double>(&this->max_fs, obj, "max-sampling-frequency-hz", true);
+        vuprs::__JsonStringParseFLOAT<double>(&this->voltage_range_radius, obj, "voltage-range-radius-v", true);
+        vuprs::__JsonStringParseFLOAT<double>(&this->work_clock_frequency, obj, "work-clock-frequency-hz", true);
     }
-    this->configdone = true;
+    this->config_done = true;
     return true;
 }
 
 uint32_t vuprs::FPGA_Device__ADCController::GetSCIValueForSamplingFrequency(double fs) const
 {
-    PARAM_CHECK(this->configdone, "fpga", " in [vuprs::FPGA_Device__ADCController] Config not complete.");
-    if (fs > this->maxSamplingFrequencyHz || fs <= 1e-2)
+    PARAM_CHECK(this->config_done, "fpga", " in [vuprs::FPGA_Device__ADCController] Config not complete.");
+    if (fs > this->max_fs || fs <= 1e-2)
     {
         return 0xFFFFFFFF;
     }
     uint32_t SCI;
     {
         std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
-        SCI = std::round(this->workClockFrequencyHz / (2.0 * fs));
+        SCI = std::round(this->work_clock_frequency / (2.0 * fs));
     }
     uint32_t SCI_u = SCI + 1;
     uint32_t SCI_l = SCI - 1;
@@ -204,25 +204,25 @@ uint32_t vuprs::FPGA_Device__ADCController::GetSCIValueForSamplingFrequency(doub
 double vuprs::FPGA_Device__ADCController::SCI2FS(uint32_t SCI) const
 {
     std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
-    return this->workClockFrequencyHz / (2.0 * static_cast<double>(SCI));
+    return this->work_clock_frequency / (2.0 * static_cast<double>(SCI));
 }
 
 double vuprs::FPGA_Device__ADCController::MaxSamplingFrequency() const
 {
     std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
-    return this->maxSamplingFrequencyHz;
+    return this->max_fs;
 }
 
 double vuprs::FPGA_Device__ADCController::VoltageRangeRadius() const
 {
     std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
-    return this->voltageRangeRadiusV;
+    return this->voltage_range_radius;
 }
 
 double vuprs::FPGA_Device__ADCController::WorkFrequency() const
 {
     std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
-    return this->workClockFrequencyHz;
+    return this->work_clock_frequency;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -238,7 +238,7 @@ vuprs::FPGA_Device__CircularBuffer::FPGA_Device__CircularBuffer()
 void vuprs::FPGA_Device__CircularBuffer::GenerateRegisterTable()
 {
     std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
-    this->registerTable = {
+    this->register_table = {
         {&this->offset_CBUF_FREEZE, "CBUF_FREEZE", vuprs::Circular_Buffer__Registers::CBUF_FREEZE},
         {&this->offset_CBUF_RST, "CBUF_RST", vuprs::Circular_Buffer__Registers::CBUF_RST},
         {&this->offset_CBUF_RS, "CBUF_RS", vuprs::Circular_Buffer__Registers::CBUF_RS},
@@ -250,24 +250,24 @@ bool vuprs::FPGA_Device__CircularBuffer::LoadFromJsonObj(const nlohmann::json &o
     this->LoadMainInfoFromJsonObj(obj);
     {
         std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
-        vuprs::__JsonStringParseINT<uint32_t>(&this->signalPoints, obj, "signal-points", true);
+        vuprs::__JsonStringParseINT<uint32_t>(&this->signal_points, obj, "signal-points", true);
     }
-    this->configdone = true;
+    this->config_done = true;
     return true;
 }
 
 uint32_t vuprs::FPGA_Device__CircularBuffer::SignalPoints() const
 {
     std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
-    return this->signalPoints;
+    return this->signal_points;
 }
 
 bool vuprs::FPGA_Device__CircularBuffer::Refreshed()
 {
     uint32_t r_val;
-    bool operationStatus;
-    operationStatus = this->ReadSingleRegisterBIT(vuprs::Circular_Buffer__Registers::CBUF_RS, 1, &r_val);
-    RUNTIME_CHECK(operationStatus, "fpga", " in [FPGA_Device__CircularBuffer::Refreshed] Cannot read circular buffer.");
+    bool operation_status;
+    operation_status = this->ReadSingleRegisterBIT(vuprs::Circular_Buffer__Registers::CBUF_RS, 1, &r_val);
+    RUNTIME_CHECK(operation_status, "fpga", " in [FPGA_Device__CircularBuffer::Refreshed] Cannot read circular buffer.");
     return r_val == 1;
 }
 
@@ -284,7 +284,7 @@ vuprs::FPGA_Device__FIRFilterBank::FPGA_Device__FIRFilterBank()
 void vuprs::FPGA_Device__FIRFilterBank::GenerateRegisterTable()
 {
     std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
-    this->registerTable = {
+    this->register_table = {
         {&this->offset_FIR_RST, "FIR_RST", vuprs::FIR_Filter_Bank__Registers::FIR_RST},
         {&this->offset_FIR_U_FIR_LEN, "FIR_U_FIR_LEN", vuprs::FIR_Filter_Bank__Registers::FIR_U_FIR_LEN},
         {&this->offset_FIR_U_FIR_COEF, "FIR_U_FIR_COEF", vuprs::FIR_Filter_Bank__Registers::FIR_U_FIR_COEF},
@@ -298,7 +298,7 @@ void vuprs::FPGA_Device__FIRFilterBank::GenerateRegisterTable()
 bool vuprs::FPGA_Device__FIRFilterBank::LoadFromJsonObj(const nlohmann::json &obj)
 {
     this->LoadMainInfoFromJsonObj(obj);
-    this->configdone = true;
+    this->config_done = true;
     return true;
 }
 
@@ -315,7 +315,7 @@ vuprs::FPGA_Device__PreDelayUnit::FPGA_Device__PreDelayUnit()
 void vuprs::FPGA_Device__PreDelayUnit::GenerateRegisterTable()
 {
     std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
-    this->registerTable = {
+    this->register_table = {
         {&this->offset_PREDLY_CH1_CH2, "PREDLY_CH1_CH2", vuprs::PreDelay_Unit__Registers::PREDLY_CH1_CH2},
         {&this->offset_PREDLY_CH3_CH4, "PREDLY_CH3_CH4", vuprs::PreDelay_Unit__Registers::PREDLY_CH3_CH4},
         {&this->offset_PREDLY_CH5_CH6, "PREDLY_CH5_CH6", vuprs::PreDelay_Unit__Registers::PREDLY_CH5_CH6},
@@ -333,6 +333,6 @@ void vuprs::FPGA_Device__PreDelayUnit::GenerateRegisterTable()
 bool vuprs::FPGA_Device__PreDelayUnit::LoadFromJsonObj(const nlohmann::json &obj)
 {
     this->LoadMainInfoFromJsonObj(obj);
-    this->configdone = true;
+    this->config_done = true;
     return true;
 }

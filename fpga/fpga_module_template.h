@@ -71,77 +71,77 @@ namespace vuprs
     class FPGADeviceTemplate
     {
     private:
-        std::atomic<bool> isIOManagerBind;
-        std::atomic<bool> isIOManagerBind_Interrupt;
+        std::atomic<bool> is_io_manager_bind;
+        std::atomic<bool> is_io_manager_bind_interrupt;
 
-        std::weak_ptr<vuprs::FPGA_IOManagerForDevice> bindIOManager_Device;
-        std::weak_ptr<vuprs::FPGA_IOManagerForInterrput> bindIOManager_Interrput;
+        std::weak_ptr<vuprs::FPGA_IOManagerForDevice> bind_io_manager_device;
+        std::weak_ptr<vuprs::FPGA_IOManagerForInterrput> bind_io_manager_interrput;
 
-        std::string controlDeviceFilename;
-        std::string eventDeviceFilename;
+        std::string control_device_filename;
+        std::string event_device_filename;
 
-        bool RegisterIO(uint32_t registerAddress, uint32_t *ioValue, bool isRead)
+        bool RegisterIO(uint32_t reg_addr, uint32_t *io_value, bool is_read)
         {
             /* Security Check */
-            PARAM_CHECK(this->isIOManagerBind, "fpga", " in [FPGADeviceTemplate::RegisterIO] FPGA file manager is NULL.");
+            PARAM_CHECK(this->is_io_manager_bind, "fpga", " in [FPGADeviceTemplate::RegisterIO] FPGA file manager is NULL.");
             std::shared_ptr<vuprs::FPGA_IOManagerForDevice> manager;
             {
                 std::unique_lock<std::mutex> lock(this->mut_dev); /* LOCK */
-                manager = this->bindIOManager_Device.lock();
+                manager = this->bind_io_manager_device.lock();
             }
             if (!manager)
                 return false;
-            return manager->RegisterIO(ioValue, registerAddress, isRead);
+            return manager->RegisterIO(io_value, reg_addr, is_read);
         }
 
-        bool RegisterIO(const std::vector<REG_SEL_ENUM> &mulRegisterSelection, std::vector<uint32_t> *ioValue, bool isRead)
+        bool RegisterIO(const std::vector<REG_SEL_ENUM> &mul_reg_selection, std::vector<uint32_t> *io_value, bool is_read)
         {
             /* Security Check */
-            int registerNumber = mulRegisterSelection.size();
-            PARAM_CHECK(this->isIOManagerBind, "fpga", " in [FPGADeviceTemplate::RegisterIO] FPGA file manager is NULL.");
-            PARAM_CHECK(registerNumber > 0, "fpga", " in [FPGADeviceTemplate::RegisterIO] No registers read or written.");
-            PARAM_CHECK(isRead || ioValue->size() == registerNumber, "fpga", " in [FPGADeviceTemplate::RegisterIO] mulReadValue.size() != register count to read.");
+            int reg_num = mul_reg_selection.size();
+            PARAM_CHECK(this->is_io_manager_bind, "fpga", " in [FPGADeviceTemplate::RegisterIO] FPGA file manager is NULL.");
+            PARAM_CHECK(reg_num > 0, "fpga", " in [FPGADeviceTemplate::RegisterIO] No registers read or written.");
+            PARAM_CHECK(is_read || io_value->size() == reg_num, "fpga", " in [FPGADeviceTemplate::RegisterIO] mul_read_value.size() != register count to read.");
             std::shared_ptr<vuprs::FPGA_IOManagerForDevice> manager;
             {
                 std::unique_lock<std::mutex> lock(this->mut_dev); /* LOCK */
-                manager = this->bindIOManager_Device.lock();
+                manager = this->bind_io_manager_device.lock();
             }
             if (!manager)
                 return false;
             /* Operation */
-            std::vector<uint32_t> multiRegisterAddressOffset;
-            multiRegisterAddressOffset.resize(registerNumber);
-            for (int i = 0; i < registerNumber; i++)
+            std::vector<uint32_t> multi_reg_addr_offset;
+            multi_reg_addr_offset.resize(reg_num);
+            for (int i = 0; i < reg_num; i++)
             {
-                multiRegisterAddressOffset[i] = this->GetRegisterAbsoluteAddress(mulRegisterSelection[i]);
+                multi_reg_addr_offset[i] = this->GetRegisterAbsoluteAddress(mul_reg_selection[i]);
             }
-            return manager->RegisterListIO(ioValue, multiRegisterAddressOffset, isRead);
+            return manager->RegisterListIO(io_value, multi_reg_addr_offset, is_read);
         }
 
-        bool EventIO(uint32_t *readValue)
+        bool EventIO(uint32_t *read_value)
         {
-            PARAM_CHECK(this->isIOManagerBind_Interrupt, "fpga", " in [FPGADeviceTemplate::EventIO] FPGA event file manager is NULL.");
+            PARAM_CHECK(this->is_io_manager_bind_interrupt, "fpga", " in [FPGADeviceTemplate::EventIO] FPGA event file manager is NULL.");
             std::shared_ptr<vuprs::FPGA_IOManagerForInterrput> manager;
-            *readValue = 0;
+            *read_value = 0;
             {
                 std::unique_lock<std::mutex> lock(this->mut_event); /* LOCK */
-                manager = this->bindIOManager_Interrput.lock();
+                manager = this->bind_io_manager_interrput.lock();
             }
             if (!manager)
                 return false;
-            return manager->ReadEvent(readValue);
+            return manager->ReadEvent(read_value);
         }
 
     protected:
-        FPGABus controlBus;
-        FPGABus dataBus;
-        std::atomic<uint32_t> fpgaAddress;
-        std::atomic<uint32_t> barOffset;
-        std::vector<vuprs::_DeviceRegisterConfig<REG_SEL_ENUM>> registerTable;
+        FPGABus control_bus;
+        FPGABus data_bus;
+        std::atomic<uint32_t> fpga_address;
+        std::atomic<uint32_t> bar_offset;
+        std::vector<vuprs::_DeviceRegisterConfig<REG_SEL_ENUM>> register_table;
         mutable std::mutex mut;       /* Global lock */
         mutable std::mutex mut_dev;   /* Device IO manager lock */
         mutable std::mutex mut_event; /* Event IO manager lock */
-        std::atomic<bool> configdone;
+        std::atomic<bool> config_done;
 
         virtual void GenerateRegisterTable() = 0;
 
@@ -151,10 +151,10 @@ namespace vuprs
         void SetRegisterOffsetDefault()
         {
             std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
-            int registerNumber = this->registerTable.size();
-            for (int i = 0; i < registerNumber; i++)
+            int reg_num = this->register_table.size();
+            for (int i = 0; i < reg_num; i++)
             {
-                *(this->registerTable[i].offsetVal) = 0;
+                *(this->register_table[i].offsetVal) = 0;
             }
         }
 
@@ -165,20 +165,20 @@ namespace vuprs
             /* Operation */
             {
                 std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
-                int registerNumber = this->registerTable.size();
+                int reg_num = this->register_table.size();
                 auto registers = obj["register-offset"];
-                for (int i = 0; i < registerNumber; i++)
+                for (int i = 0; i < reg_num; i++)
                 {
-                    vuprs::__JsonStringParseINT<uint32_t>(this->registerTable[i].offsetVal, registers, this->registerTable[i].name, true);
+                    vuprs::__JsonStringParseINT<uint32_t>(this->register_table[i].offsetVal, registers, this->register_table[i].name, true);
                 }
                 /* Base Address */
-                uint32_t fpgaAddress, barOffset;
-                vuprs::__JsonStringParseINT<uint32_t>(&fpgaAddress, obj, "fpga-address", true);
-                vuprs::__JsonStringParseINT<uint32_t>(&barOffset, obj, "bar-offset", true);
-                this->fpgaAddress = fpgaAddress;
-                this->barOffset = barOffset;
-                vuprs::__JsonParseString(&this->controlDeviceFilename, obj, "control-device-file", true);
-                vuprs::__JsonParseString(&this->eventDeviceFilename, obj, "event-device-file", false); /* event is not required for all devices */
+                uint32_t fpga_address, bar_offset;
+                vuprs::__JsonStringParseINT<uint32_t>(&fpga_address, obj, "fpga-address", true);
+                vuprs::__JsonStringParseINT<uint32_t>(&bar_offset, obj, "bar-offset", true);
+                this->fpga_address = fpga_address;
+                this->bar_offset = bar_offset;
+                vuprs::__JsonParseString(&this->control_device_filename, obj, "control-device-file", true);
+                vuprs::__JsonParseString(&this->event_device_filename, obj, "event-device-file", false); /* event is not required for all devices */
             }
             return true;
         }
@@ -194,22 +194,22 @@ namespace vuprs
         {
             {
                 std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
-                this->controlBus = vuprs::FPGABus::AXI_LITE;
-                this->dataBus = vuprs::FPGABus::AXI_STREAM;
-                this->fpgaAddress = 0;
-                this->barOffset = 0;
-                this->configdone = false;
-                this->registerTable.clear();
-                this->isIOManagerBind = false;
-                this->isIOManagerBind_Interrupt = false;
+                this->control_bus = vuprs::FPGABus::AXI_LITE;
+                this->data_bus = vuprs::FPGABus::AXI_STREAM;
+                this->fpga_address = 0;
+                this->bar_offset = 0;
+                this->config_done = false;
+                this->register_table.clear();
+                this->is_io_manager_bind = false;
+                this->is_io_manager_bind_interrupt = false;
             }
             {
                 std::unique_lock<std::mutex> lock(this->mut_dev); /* LOCK */
-                this->bindIOManager_Device.reset();
+                this->bind_io_manager_device.reset();
             }
             {
                 std::unique_lock<std::mutex> lock(this->mut_event); /* LOCK */
-                this->bindIOManager_Interrput.reset();
+                this->bind_io_manager_interrput.reset();
             }
         }
 
@@ -219,37 +219,37 @@ namespace vuprs
         std::string ControlDeviceFilename() const
         {
             std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
-            return this->controlDeviceFilename;
+            return this->control_device_filename;
         }
 
         std::string EventDeviceFilename() const
         {
             std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
-            return this->eventDeviceFilename;
+            return this->event_device_filename;
         }
 
         /**
          * @brief Bind FPGA file manager.
          */
-        bool BindFPGAFileManager(std::shared_ptr<vuprs::FPGA_IOManagerForDevice> ioManager)
+        bool BindFPGAFileManager(std::shared_ptr<vuprs::FPGA_IOManagerForDevice> io_manager)
         {
-            if (!ioManager)
+            if (!io_manager)
             {
                 return false;
             }
             std::shared_ptr<vuprs::FPGA_IOManagerForDevice> manager;
             {
                 std::unique_lock<std::mutex> lock(this->mut_dev); /* LOCK */
-                manager = this->bindIOManager_Device.lock();
+                manager = this->bind_io_manager_device.lock();
             }
-            if (manager && manager != ioManager)
+            if (manager && manager != io_manager)
             {
                 this->UnbindFileManager();
             }
-            this->isIOManagerBind = true;
+            this->is_io_manager_bind = true;
             {
                 std::unique_lock<std::mutex> lock(this->mut_dev); /* LOCK */
-                this->bindIOManager_Device = ioManager;
+                this->bind_io_manager_device = io_manager;
             }
 
             return true;
@@ -267,16 +267,16 @@ namespace vuprs
             std::shared_ptr<vuprs::FPGA_IOManagerForInterrput> manager;
             {
                 std::unique_lock<std::mutex> lock(this->mut_event); /* LOCK */
-                manager = this->bindIOManager_Interrput.lock();
+                manager = this->bind_io_manager_interrput.lock();
             }
             if (manager && manager != ioManager_interrupt)
             {
                 this->UnbindFileManager();
             }
-            this->isIOManagerBind_Interrupt = true;
+            this->is_io_manager_bind_interrupt = true;
             {
                 std::unique_lock<std::mutex> lock(this->mut_event); /* LOCK */
-                this->bindIOManager_Interrput = ioManager_interrupt;
+                this->bind_io_manager_interrput = ioManager_interrupt;
             }
             return true;
         }
@@ -288,9 +288,9 @@ namespace vuprs
         {
             {
                 std::unique_lock<std::mutex> lock(this->mut_dev); /* LOCK */
-                this->bindIOManager_Device.reset();
+                this->bind_io_manager_device.reset();
             }
-            this->isIOManagerBind = false;
+            this->is_io_manager_bind = false;
         }
 
         /**
@@ -300,37 +300,37 @@ namespace vuprs
         {
             {
                 std::unique_lock<std::mutex> lock(this->mut_event); /* LOCK */
-                this->bindIOManager_Interrput.reset();
+                this->bind_io_manager_interrput.reset();
             }
-            this->isIOManagerBind_Interrupt = false;
+            this->is_io_manager_bind_interrupt = false;
         }
 
         /**
          * @brief Get absolute address of register (= device bar address + register offset).
          */
-        uint32_t GetRegisterAbsoluteAddress(REG_SEL_ENUM registerSelection)
+        uint32_t GetRegisterAbsoluteAddress(REG_SEL_ENUM reg_selection)
         {
             /* Security Check */
-            PARAM_CHECK(this->configdone, "fpga", " in [FPGADeviceTemplate::GetRegisterAbsoluteAddress] Config not complete.");
+            PARAM_CHECK(this->config_done, "fpga", " in [FPGADeviceTemplate::GetRegisterAbsoluteAddress] Config not complete.");
             /* Operation */
-            uint32_t registerOffset = 0;
-            bool registerFound = false;
-            int registerNumber;
+            uint32_t reg_offset = 0;
+            bool reg_found = false;
+            int reg_num;
             {
                 std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
-                registerNumber = this->registerTable.size();
-                for (int i = 0; i < registerNumber; i++)
+                reg_num = this->register_table.size();
+                for (int i = 0; i < reg_num; i++)
                 {
-                    if (registerSelection == this->registerTable[i].enumVal)
+                    if (reg_selection == this->register_table[i].enumVal)
                     {
-                        registerOffset = *(this->registerTable[i].offsetVal);
-                        registerFound = true;
+                        reg_offset = *(this->register_table[i].offsetVal);
+                        reg_found = true;
                         break;
                     }
                 }
             }
-            PARAM_CHECK(registerFound, "fpga", " in [FPGADeviceTemplate::GetRegisterAbsoluteAddress] Invalid register selection.");
-            return registerOffset + this->barOffset;
+            PARAM_CHECK(reg_found, "fpga", " in [FPGADeviceTemplate::GetRegisterAbsoluteAddress] Invalid register selection.");
+            return reg_offset + this->bar_offset;
         }
 
         /* ------------------------------ Single Register IO ------------------------------ */
@@ -338,111 +338,111 @@ namespace vuprs
         /**
          * @brief Read single register (use register selection).
          *
-         * @param registerSelection register to read.
-         * @param readValue read value pointer.
+         * @param reg_selection register to read.
+         * @param read_value read value pointer.
          *
          * @retval true: success, false: failed.
          */
-        bool ReadSingleRegister(REG_SEL_ENUM registerSelection, uint32_t *readValue)
+        bool ReadSingleRegister(REG_SEL_ENUM reg_selection, uint32_t *read_value)
         {
-            uint32_t registerAddress = this->GetRegisterAbsoluteAddress(registerSelection);
-            return this->RegisterIO(registerAddress, readValue, true);
+            uint32_t reg_addr = this->GetRegisterAbsoluteAddress(reg_selection);
+            return this->RegisterIO(reg_addr, read_value, true);
         }
 
         /**
          * @brief Read single register (use offset).
          *
          * @param offset register offset (must aligned to 4 bytes).
-         * @param readValue read value pointer.
+         * @param read_value read value pointer.
          *
          * @retval true: success, false: failed.
          */
-        bool ReadSingleRegister(uint32_t offset, uint32_t *readValue)
+        bool ReadSingleRegister(uint32_t offset, uint32_t *read_value)
         {
             PARAM_CHECK(offset % sizeof(uint32_t) == 0, "fpga", " in [FPGADeviceTemplate::ReadSingleRegister] Offset must aligned to 4 bytes.");
-            uint32_t registerAddress = offset + this->barOffset;
-            return this->RegisterIO(registerAddress, readValue, true);
+            uint32_t reg_addr = offset + this->bar_offset;
+            return this->RegisterIO(reg_addr, read_value, true);
         }
 
         /**
          * @brief Write single register (use register selection).
          *
-         * @param registerSelection register to write.
-         * @param writeValue write value.
+         * @param reg_selection register to write.
+         * @param write_value write value.
          *
          * @retval true: success, false: failed.
          */
-        bool WriteSingleRegister(REG_SEL_ENUM registerSelection, uint32_t writeValue)
+        bool WriteSingleRegister(REG_SEL_ENUM reg_selection, uint32_t write_value)
         {
-            uint32_t registerAddress = this->GetRegisterAbsoluteAddress(registerSelection);
-            return this->RegisterIO(registerAddress, &writeValue, false);
+            uint32_t reg_addr = this->GetRegisterAbsoluteAddress(reg_selection);
+            return this->RegisterIO(reg_addr, &write_value, false);
         }
 
         /**
          * @brief Write single register (use offset).
          *
          * @param offset register offset (must aligned to 4 bytes).
-         * @param writeValue write value.
+         * @param write_value write value.
          *
          * @retval true: success, false: failed.
          */
-        bool WriteSingleRegister(uint32_t offset, uint32_t writeValue)
+        bool WriteSingleRegister(uint32_t offset, uint32_t write_value)
         {
             PARAM_CHECK(offset % sizeof(uint32_t) == 0, "fpga", " in [FPGADeviceTemplate::WriteSingleRegister] Offset must aligned to 4 bytes.");
-            uint32_t registerAddress = offset + this->barOffset;
-            return this->RegisterIO(registerAddress, &writeValue, false);
+            uint32_t reg_addr = offset + this->bar_offset;
+            return this->RegisterIO(reg_addr, &write_value, false);
         }
 
         /**
          * @brief Read one bit of certain register.
          *
-         * @param registerSelection register to operate.
+         * @param reg_selection register to operate.
          * @param bit bit select (valid value: 0, 1, ..., 31).
          * @param value read result.
          *
          * @retval true: success, false: failed.
          */
-        bool ReadSingleRegisterBIT(REG_SEL_ENUM registerSelection, uint32_t bit, uint32_t *value)
+        bool ReadSingleRegisterBIT(REG_SEL_ENUM reg_selection, uint32_t bit, uint32_t *value)
         {
-            uint32_t registerAddress = this->GetRegisterAbsoluteAddress(registerSelection);
-            return this->ReadSingleRegisterBIT(registerAddress, bit, value);
+            uint32_t reg_addr = this->GetRegisterAbsoluteAddress(reg_selection);
+            return this->ReadSingleRegisterBIT(reg_addr, bit, value);
         }
 
         /**
          * @brief Read one bit of certain register.
          *
-         * @param registerAddress register address.
+         * @param reg_addr register address.
          * @param bit bit select (valid value: 0, 1, ..., 31).
          * @param value read result.
          *
          * @retval true: success, false: failed.
          */
-        bool ReadSingleRegisterBIT(uint32_t registerAddress, uint32_t bit, uint32_t *value)
+        bool ReadSingleRegisterBIT(uint32_t reg_addr, uint32_t bit, uint32_t *value)
         {
             PARAM_CHECK(bit <= 31, "fpga", " in [FPGADeviceTemplate::ReadSingleRegisterBIT] Invalid Bit position (valid <= 31).");
-            bool operateStatus = true;
+            bool operate_status = true;
             uint32_t r_val;
-            operateStatus &= this->RegisterIO(registerAddress, &r_val, true); /* read */
+            operate_status &= this->RegisterIO(reg_addr, &r_val, true); /* read */
             *value = FPGA_REG_BIT(r_val, bit);
-            return operateStatus;
+            return operate_status;
         }
 
         /**
          * @brief Set/Clear one bit of certain register.
          *
-         * @param registerSelection register to operate.
+         * @param reg_selection register to operate.
          * @param bit bit select (valid value: 0, 1, ..., 31).
          * @param isSet true: set this bit to 1, false: set this bit to 0.
          *
          * @retval true: success, false: failed.
          */
-        bool WriteSingleRegisterBIT(REG_SEL_ENUM registerSelection, uint32_t bit, bool isSet)
+        bool WriteSingleRegisterBIT(REG_SEL_ENUM reg_selection, uint32_t bit, bool isSet)
         {
             PARAM_CHECK(bit <= 31, "fpga", " in [FPGADeviceTemplate::WriteSingleRegisterBIT] Invalid Bit position (valid <= 31).");
-            bool operateStatus = true;
+            bool operate_status = true;
             uint32_t r_val, w_val;
-            uint32_t registerAddress = this->GetRegisterAbsoluteAddress(registerSelection);
-            operateStatus &= this->RegisterIO(registerAddress, &r_val, true); /* read */
+            uint32_t reg_addr = this->GetRegisterAbsoluteAddress(reg_selection);
+            operate_status &= this->RegisterIO(reg_addr, &r_val, true); /* read */
             if (isSet)
             {
                 w_val = FPGA_SET_REG_BIT(r_val, bit);
@@ -451,48 +451,48 @@ namespace vuprs
             {
                 w_val = FPGA_CLEAR_REG_BIT(r_val, bit);
             }
-            operateStatus &= this->RegisterIO(registerAddress, &w_val, false);
-            return operateStatus;
+            operate_status &= this->RegisterIO(reg_addr, &w_val, false);
+            return operate_status;
         }
 
         /**
          * @brief Wait for register bit to certain value.
          *
-         * @param registerSelection register to operate.
+         * @param reg_selection register to operate.
          * @param bit bit select (valid value: 0, 1, ..., 31).
-         * @param waitForValue 0 or 1.
+         * @param wait_for_value 0 or 1.
          * @param timeout_us timeout (unit: us).
          *
          * @retval true: success, false: failed.
          */
-        bool WaitForRegisterBIT(REG_SEL_ENUM registerSelection, uint32_t bit, uint32_t waitForValue, uint32_t timeout_us = 1000)
+        bool WaitForRegisterBIT(REG_SEL_ENUM reg_selection, uint32_t bit, uint32_t wait_for_value, uint32_t timeout_us = 1000)
         {
             PARAM_CHECK(bit <= 31, "fpga", " in [FPGADeviceTemplate::WaitForRegisterBIT] Invalid Bit position (valid <= 31).");
             uint32_t waitTime = 0;
             uint32_t r_val;
-            uint32_t registerOffset = this->GetRegisterAbsoluteAddress(registerSelection);
-            bool operateStatus = true;
+            uint32_t reg_offset = this->GetRegisterAbsoluteAddress(reg_selection);
+            bool operate_status = true;
             if (timeout_us <= 0)
             {
                 timeout_us = 100;
             }
             do
             {
-                operateStatus &= this->ReadSingleRegisterBIT(registerOffset, bit, &r_val);
-                if (r_val == waitForValue)
+                operate_status &= this->ReadSingleRegisterBIT(reg_offset, bit, &r_val);
+                if (r_val == wait_for_value)
                     break;
                 if (waitTime > timeout_us)
                     break;
                 usleep(100);
                 waitTime += 100;
-            } while (r_val != waitForValue);
-            return operateStatus & (r_val == waitForValue);
+            } while (r_val != wait_for_value);
+            return operate_status & (r_val == wait_for_value);
         }
 
         /**
          * @brief Read value to bits of certain register.
          *
-         * @param registerSelection register to operate.
+         * @param reg_selection register to operate.
          * @param lower lower boundary of written.
          * @param upper upper boundary of written.
          * @param value read value.
@@ -504,27 +504,27 @@ namespace vuprs
          *
          * @retval true: success, false: failed.
          */
-        bool ReadSingleRegisterBITRegion(REG_SEL_ENUM registerSelection, uint32_t lower, uint32_t upper, uint32_t *value)
+        bool ReadSingleRegisterBITRegion(REG_SEL_ENUM reg_selection, uint32_t lower, uint32_t upper, uint32_t *value)
         {
             PARAM_CHECK(lower <= 31 && upper <= 31, "fpga", " in [FPGADeviceTemplate::ReadSingleRegisterBITRegion] Invalid Bit position (valid <= 31).");
             if (lower == upper)
             {
-                return this->ReadSingleRegisterBIT(registerSelection, lower, value);
+                return this->ReadSingleRegisterBIT(reg_selection, lower, value);
             }
-            bool operateStatus = true;
+            bool operate_status = true;
             uint32_t r_val;
-            uint32_t registerAddress = this->GetRegisterAbsoluteAddress(registerSelection);
-            operateStatus &= this->RegisterIO(registerAddress, &r_val, true); /* read */
-            uint32_t bitCount = upper - lower + 1;
-            uint32_t mask = ((1 << bitCount) - 1) << lower;
+            uint32_t reg_addr = this->GetRegisterAbsoluteAddress(reg_selection);
+            operate_status &= this->RegisterIO(reg_addr, &r_val, true); /* read */
+            uint32_t bit_count = upper - lower + 1;
+            uint32_t mask = ((1 << bit_count) - 1) << lower;
             *value = (r_val & mask) >> lower;
-            return operateStatus;
+            return operate_status;
         }
 
         /**
          * @brief Write value to bits of certain register.
          *
-         * @param registerSelection register to operate.
+         * @param reg_selection register to operate.
          * @param lower lower boundary of written.
          * @param upper upper boundary of written.
          * @param value write value.
@@ -536,24 +536,24 @@ namespace vuprs
          *
          * @retval true: success, false: failed.
          */
-        bool WriteSingleRegisterBITRegion(REG_SEL_ENUM registerSelection, uint32_t lower, uint32_t upper, uint32_t value)
+        bool WriteSingleRegisterBITRegion(REG_SEL_ENUM reg_selection, uint32_t lower, uint32_t upper, uint32_t value)
         {
             PARAM_CHECK(lower <= 31 && upper <= 31, "fpga", " in [FPGADeviceTemplate::WriteSingleRegisterBITRegion] Invalid Bit position (valid <= 31).");
             if (lower == upper)
             {
-                return this->WriteSingleRegisterBIT(registerSelection, lower, (bool)(value & 0x01));
+                return this->WriteSingleRegisterBIT(reg_selection, lower, (bool)(value & 0x01));
             }
-            bool operateStatus = true;
+            bool operate_status = true;
             uint32_t r_val, w_val;
-            uint32_t registerAddress = this->GetRegisterAbsoluteAddress(registerSelection);
-            operateStatus &= this->RegisterIO(registerAddress, &r_val, true); /* read */
-            uint32_t bitCount = upper - lower + 1;
-            uint32_t mask = ((1 << bitCount) - 1) << lower;
-            uint32_t maxValue = (1 << bitCount) - 1;
-            uint32_t safeValue = value & maxValue;
-            w_val = (r_val & ~mask) | (safeValue << lower);
-            operateStatus &= this->RegisterIO(registerAddress, &w_val, false);
-            return operateStatus;
+            uint32_t reg_addr = this->GetRegisterAbsoluteAddress(reg_selection);
+            operate_status &= this->RegisterIO(reg_addr, &r_val, true); /* read */
+            uint32_t bit_count = upper - lower + 1;
+            uint32_t mask = ((1 << bit_count) - 1) << lower;
+            uint32_t max_value = (1 << bit_count) - 1;
+            uint32_t safe_value = value & max_value;
+            w_val = (r_val & ~mask) | (safe_value << lower);
+            operate_status &= this->RegisterIO(reg_addr, &w_val, false);
+            return operate_status;
         }
 
         /* ----------------------------- Multiple Register IO ----------------------------- */
@@ -561,58 +561,58 @@ namespace vuprs
         /**
          * @brief Read multiple register.
          *
-         * @param registerSelection register to read.
-         * @param readValue read value pointer.
+         * @param mul_reg_selection register to read.
+         * @param mul_read_value read value pointer.
          *
          * @retval true: success, false: failed.
          */
-        bool ReadMultipleRegister(const std::vector<REG_SEL_ENUM> &mulRegisterSelection, std::vector<uint32_t> *mulReadValue)
+        bool ReadMultipleRegister(const std::vector<REG_SEL_ENUM> &mul_reg_selection, std::vector<uint32_t> *mul_read_value)
         {
-            return this->RegisterIO(mulRegisterSelection, mulReadValue, true);
+            return this->RegisterIO(mul_reg_selection, mul_read_value, true);
         }
 
         /**
          * @brief Write multiple register.
          *
-         * @param registerSelection register to write.
-         * @param writeValue write value.
+         * @param reg_selection register to write.
+         * @param write_value write value.
          *
          * @retval true: success, false: failed.
          */
-        bool WriteMultipleRegister(const std::vector<REG_SEL_ENUM> &mulRegisterSelection, const std::vector<uint32_t> &mulWriteValue)
+        bool WriteMultipleRegister(const std::vector<REG_SEL_ENUM> &mul_reg_selection, const std::vector<uint32_t> &mul_write_value)
         {
-            std::vector<uint32_t> writeValueList = mulWriteValue;
-            return this->RegisterIO(mulRegisterSelection, &writeValueList, false);
+            std::vector<uint32_t> write_value_list = mul_write_value;
+            return this->RegisterIO(mul_reg_selection, &write_value_list, false);
         }
 
         /**
          * @brief Read all register info from device.
          *
-         * @param registerName output register name.
-         * @param registerOffset output register offset.
-         * @param readValue output register value.
+         * @param register_name output register name.
+         * @param reg_offset output register offset.
+         * @param read_value output register value.
          *
          * @retval true: success.
          * @retval false: failed.
          */
-        bool ReadAllRegisters(std::vector<std::string> *registerName, std::vector<uint32_t> *registerOffset, std::vector<uint32_t> *readValue)
+        bool ReadAllRegisters(std::vector<std::string> *register_name, std::vector<uint32_t> *reg_offset, std::vector<uint32_t> *read_value)
         {
-            std::vector<REG_SEL_ENUM> mulRegisterSelection;
-            int registerNumber;
+            std::vector<REG_SEL_ENUM> mul_reg_selection;
+            int reg_num;
             {
                 std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
-                registerNumber = this->registerTable.size();
-                registerName->resize(registerNumber);
-                registerOffset->resize(registerNumber);
-                mulRegisterSelection.resize(registerNumber);
-                for (int i = 0; i < registerNumber; i++)
+                reg_num = this->register_table.size();
+                register_name->resize(reg_num);
+                reg_offset->resize(reg_num);
+                mul_reg_selection.resize(reg_num);
+                for (int i = 0; i < reg_num; i++)
                 {
-                    mulRegisterSelection[i] = this->registerTable[i].enumVal;
-                    (*registerName)[i] = this->registerTable[i].name;
-                    (*registerOffset)[i] = *this->registerTable[i].offsetVal;
+                    mul_reg_selection[i] = this->register_table[i].enumVal;
+                    (*register_name)[i] = this->register_table[i].name;
+                    (*reg_offset)[i] = *this->register_table[i].offsetVal;
                 }
             }
-            this->ReadMultipleRegister(mulRegisterSelection, readValue);
+            this->ReadMultipleRegister(mul_reg_selection, read_value);
             return true;
         }
 
@@ -621,14 +621,14 @@ namespace vuprs
         /**
          * @brief Read hardware interrupt.
          *
-         * @param readValue read value (1: interrupt detected, 0: no interrupt).
+         * @param read_value read value (1: interrupt detected, 0: no interrupt).
          *
          * @retval true: success.
          * @retval false: failed.
          */
-        bool ReadEvent(uint32_t *readValue)
+        bool ReadEvent(uint32_t *read_value)
         {
-            return this->EventIO(readValue);
+            return this->EventIO(read_value);
         }
 
         /**
@@ -641,11 +641,11 @@ namespace vuprs
          */
         bool SetInterruptTimeout(uint32_t timeout_ms)
         {
-            PARAM_CHECK(this->isIOManagerBind_Interrupt, "fpga", " in [FPGADeviceTemplate::SetInterruptTimeout] FPGA event file manager is NULL.");
+            PARAM_CHECK(this->is_io_manager_bind_interrupt, "fpga", " in [FPGADeviceTemplate::SetInterruptTimeout] FPGA event file manager is NULL.");
             std::shared_ptr<vuprs::FPGA_IOManagerForInterrput> manager;
             {
                 std::unique_lock<std::mutex> lock(this->mut_event); /* LOCK */
-                manager = this->bindIOManager_Interrput.lock();
+                manager = this->bind_io_manager_interrput.lock();
             }
             if (!manager)
                 return false;
@@ -656,7 +656,7 @@ namespace vuprs
 
         bool ConfigDone() const
         {
-            return this->configdone;
+            return this->config_done;
         }
     };
 
@@ -677,94 +677,94 @@ namespace vuprs
     class FPGAMemoryTemplate
     {
     private:
-        std::atomic<bool> isIOManagerBind;
-        std::weak_ptr<vuprs::FPGA_IOManagerForMemory> bindIOManager_h2c;
-        std::weak_ptr<vuprs::FPGA_IOManagerForMemory> bindIOManager_c2h;
-        std::string h2c_controlDeviceFilename, c2h_controlDeviceFilename;
+        std::atomic<bool> is_io_manager_bind;
+        std::weak_ptr<vuprs::FPGA_IOManagerForMemory> bind_io_manager_h2c;
+        std::weak_ptr<vuprs::FPGA_IOManagerForMemory> bind_io_manager_c2h;
+        std::string h2c_control_device_filename, c2h_control_device_filename;
 
-        bool BufferIO(uint32_t offset, vuprs::AlignedBufferDMA *buffer, uint64_t transferByteSize, bool isRead)
+        bool BufferIO(uint32_t offset, vuprs::AlignedBufferDMA *buffer, uint64_t transfer_byte_size, bool is_read)
         {
             /* Security Check */
-            PARAM_CHECK(this->isIOManagerBind, "fpga", " in [FPGAMemoryTemplate::BufferIO] FPGA file manager is NULL.");
-            PARAM_CHECK(transferByteSize <= __LINUX_DMA_MAX_TRANSFER_BYTES__, "fpga", " in [FPGAMemoryTemplate::BufferIO] Too big transfer size.");
-            PARAM_CHECK((transferByteSize + offset) <= static_cast<uint32_t>(this->maxCapacityKB * __KILOBYTES__ - 1), "fpga", " in [FPGAMemoryTemplate::BufferIO] Invalid transfer size (valid: <= " + std::to_string(this->maxCapacityKB * __KILOBYTES__ - offset) + ")");
-            if (transferByteSize <= 0)
+            PARAM_CHECK(this->is_io_manager_bind, "fpga", " in [FPGAMemoryTemplate::BufferIO] FPGA file manager is NULL.");
+            PARAM_CHECK(transfer_byte_size <= __LINUX_DMA_MAX_TRANSFER_BYTES__, "fpga", " in [FPGAMemoryTemplate::BufferIO] Too big transfer size.");
+            PARAM_CHECK((transfer_byte_size + offset) <= static_cast<uint32_t>(this->max_capacity_kB * __KILOBYTES__ - 1), "fpga", " in [FPGAMemoryTemplate::BufferIO] Invalid transfer size (valid: <= " + std::to_string(this->max_capacity_kB * __KILOBYTES__ - offset) + ")");
+            if (transfer_byte_size <= 0)
             {
                 return true;
             }
             PARAM_CHECK(buffer != nullptr, "fpga", " in [FPGAMemoryTemplate::BufferIO] *Buffer is nullptr.");
             /* Operation */
-            uint32_t targetOffset = offset + this->fpgaAddress;
-            if (isRead)
+            uint32_t target_offset = offset + this->fpga_address;
+            if (is_read)
             {
-                buffer->malloc(transferByteSize);
+                buffer->malloc(transfer_byte_size);
                 std::shared_ptr<vuprs::FPGA_IOManagerForMemory> c2h_manager;
                 {
                     std::unique_lock<std::mutex> lock(this->mut_c2h); /* LOCK */
-                    c2h_manager = this->bindIOManager_c2h.lock();
+                    c2h_manager = this->bind_io_manager_c2h.lock();
                 }
-                return c2h_manager->BufferIO(buffer->data(), targetOffset, transferByteSize, true);
+                return c2h_manager->BufferIO(buffer->data(), target_offset, transfer_byte_size, true);
             }
             else
             {
                 std::shared_ptr<vuprs::FPGA_IOManagerForMemory> h2c_manager;
                 {
                     std::unique_lock<std::mutex> lock(this->mut_h2c); /* LOCK */
-                    h2c_manager = this->bindIOManager_h2c.lock();
+                    h2c_manager = this->bind_io_manager_h2c.lock();
                 }
-                return h2c_manager->BufferIO(buffer->data(), targetOffset, transferByteSize, false);
+                return h2c_manager->BufferIO(buffer->data(), target_offset, transfer_byte_size, false);
             }
         }
 
-        bool WordIO(uint32_t offset, uint32_t *ioValue, bool isRead)
+        bool WordIO(uint32_t offset, uint32_t *io_value, bool is_read)
         {
             /* Security Check */
-            PARAM_CHECK(this->isIOManagerBind, "fpga", " in [FPGAMemoryTemplate::WordIO] FPGA file manager is NULL.");
-            PARAM_CHECK(offset <= static_cast<uint32_t>(this->maxCapacityKB * __KILOBYTES__ - 1), "fpga", " in [FPGAMemoryTemplate::WordIO] Invalid offset (valid: <= " + std::to_string(this->maxCapacityKB * __KILOBYTES__ - 1) + ")");
-            PARAM_CHECK(ioValue != nullptr, "fpga", " in [FPGAMemoryTemplate::WordIO] *readValue is nullptr.");
+            PARAM_CHECK(this->is_io_manager_bind, "fpga", " in [FPGAMemoryTemplate::WordIO] FPGA file manager is NULL.");
+            PARAM_CHECK(offset <= static_cast<uint32_t>(this->max_capacity_kB * __KILOBYTES__ - 1), "fpga", " in [FPGAMemoryTemplate::WordIO] Invalid offset (valid: <= " + std::to_string(this->max_capacity_kB * __KILOBYTES__ - 1) + ")");
+            PARAM_CHECK(io_value != nullptr, "fpga", " in [FPGAMemoryTemplate::WordIO] *read_value is nullptr.");
             /* Operation */
-            uint32_t targetOffset = offset + this->fpgaAddress;
-            if (isRead)
+            uint32_t target_offset = offset + this->fpga_address;
+            if (is_read)
             {
                 std::shared_ptr<vuprs::FPGA_IOManagerForMemory> c2h_manager;
                 {
                     std::unique_lock<std::mutex> lock(this->mut_c2h); /* LOCK */
-                    c2h_manager = this->bindIOManager_c2h.lock();
+                    c2h_manager = this->bind_io_manager_c2h.lock();
                 }
-                return c2h_manager->BufferIO(ioValue, targetOffset, sizeof(uint32_t), true);
+                return c2h_manager->BufferIO(io_value, target_offset, sizeof(uint32_t), true);
             }
             else
             {
                 std::shared_ptr<vuprs::FPGA_IOManagerForMemory> h2c_manager;
                 {
                     std::unique_lock<std::mutex> lock(this->mut_h2c); /* LOCK */
-                    h2c_manager = this->bindIOManager_h2c.lock();
+                    h2c_manager = this->bind_io_manager_h2c.lock();
                 }
-                return h2c_manager->BufferIO(ioValue, targetOffset, sizeof(uint32_t), false);
+                return h2c_manager->BufferIO(io_value, target_offset, sizeof(uint32_t), false);
             }
         }
 
     protected:
-        FPGABus dataBus;
-        std::atomic<uint32_t> fpgaAddress;
-        std::atomic<uint32_t> maxCapacityKB;
+        FPGABus data_bus;
+        std::atomic<uint32_t> fpga_address;
+        std::atomic<uint32_t> max_capacity_kB;
 
         mutable std::mutex mut;     /* Global mutex lock */
         mutable std::mutex mut_c2h; /* C2H mutex lock */
         mutable std::mutex mut_h2c; /* H2C mutex lock */
 
-        std::atomic<bool> configdone;
+        std::atomic<bool> config_done;
 
         bool LoadMainInfoFromJsonObj(const nlohmann::json &obj)
         {
             std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
-            uint32_t fpgaAddress, maxCapacityKB;
-            vuprs::__JsonStringParseINT<uint32_t>(&fpgaAddress, obj, "fpga-address", true);
-            vuprs::__JsonStringParseINT<uint32_t>(&maxCapacityKB, obj, "memory-capacity-kilobytes", true);
-            vuprs::__JsonParseString(&this->h2c_controlDeviceFilename, obj, "h2c-device-file", true);
-            vuprs::__JsonParseString(&this->c2h_controlDeviceFilename, obj, "c2h-device-file", true);
-            this->fpgaAddress = fpgaAddress;
-            this->maxCapacityKB = maxCapacityKB;
+            uint32_t fpga_address, max_capacity_kB;
+            vuprs::__JsonStringParseINT<uint32_t>(&fpga_address, obj, "fpga-address", true);
+            vuprs::__JsonStringParseINT<uint32_t>(&max_capacity_kB, obj, "memory-capacity-kilobytes", true);
+            vuprs::__JsonParseString(&this->h2c_control_device_filename, obj, "h2c-device-file", true);
+            vuprs::__JsonParseString(&this->c2h_control_device_filename, obj, "c2h-device-file", true);
+            this->fpga_address = fpga_address;
+            this->max_capacity_kB = max_capacity_kB;
             return true;
         }
 
@@ -773,19 +773,19 @@ namespace vuprs
         {
             {
                 std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
-                this->dataBus = vuprs::FPGABus::AXI_FULL;
-                this->fpgaAddress = 0;
-                this->maxCapacityKB = 1;
-                this->configdone = false;
-                this->isIOManagerBind = false;
+                this->data_bus = vuprs::FPGABus::AXI_FULL;
+                this->fpga_address = 0;
+                this->max_capacity_kB = 1;
+                this->config_done = false;
+                this->is_io_manager_bind = false;
             }
             {
                 std::unique_lock<std::mutex> lock(this->mut_c2h); /* LOCK */
-                this->bindIOManager_c2h.reset();
+                this->bind_io_manager_c2h.reset();
             }
             {
                 std::unique_lock<std::mutex> lock(this->mut_h2c); /* LOCK */
-                this->bindIOManager_h2c.reset();
+                this->bind_io_manager_h2c.reset();
             }
         }
 
@@ -795,13 +795,13 @@ namespace vuprs
         std::string H2C_ControlDeviceFilename() const
         {
             std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
-            return this->h2c_controlDeviceFilename;
+            return this->h2c_control_device_filename;
         }
 
         std::string C2H_ControlDeviceFilename() const
         {
             std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
-            return this->c2h_controlDeviceFilename;
+            return this->c2h_control_device_filename;
         }
 
         /**
@@ -810,17 +810,16 @@ namespace vuprs
         uint32_t MaxSizeBytes() const
         {
             std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
-            return this->maxCapacityKB * __KILOBYTES__;
+            return this->max_capacity_kB * __KILOBYTES__;
         }
 
         /**
          * @brief Bind FPGA file manager.
          */
-        bool BindFPGAFileManager(std::shared_ptr<vuprs::FPGA_IOManagerForMemory> ioManager_h2c,
-                                 std::shared_ptr<vuprs::FPGA_IOManagerForMemory> ioManager_c2h)
+        bool BindFPGAFileManager(std::shared_ptr<vuprs::FPGA_IOManagerForMemory> io_manager_h2c,
+                                 std::shared_ptr<vuprs::FPGA_IOManagerForMemory> io_manager_c2h)
         {
-
-            if (ioManager_h2c == nullptr || ioManager_c2h == nullptr)
+            if (io_manager_h2c == nullptr || io_manager_c2h == nullptr)
             {
                 return false;
             }
@@ -828,28 +827,28 @@ namespace vuprs
             std::shared_ptr<vuprs::FPGA_IOManagerForMemory> current_c2h;
             {
                 std::unique_lock<std::mutex> lock(this->mut_h2c); /* LOCK */
-                current_h2c = this->bindIOManager_h2c.lock();
+                current_h2c = this->bind_io_manager_h2c.lock();
             }
             {
                 std::unique_lock<std::mutex> lock(this->mut_c2h); /* LOCK */
-                current_c2h = this->bindIOManager_c2h.lock();
+                current_c2h = this->bind_io_manager_c2h.lock();
             }
-            if (this->isIOManagerBind)
+            if (this->is_io_manager_bind)
             {
-                if ((current_h2c && current_h2c != ioManager_h2c) || (current_c2h && current_c2h != ioManager_c2h))
+                if ((current_h2c && current_h2c != io_manager_h2c) || (current_c2h && current_c2h != io_manager_c2h))
                 {
                     this->UnbindFileManager();
                 }
             }
             {
                 std::unique_lock<std::mutex> lock(this->mut_h2c); /* LOCK */
-                this->bindIOManager_h2c = ioManager_h2c;
+                this->bind_io_manager_h2c = io_manager_h2c;
             }
             {
                 std::unique_lock<std::mutex> lock(this->mut_c2h); /* LOCK */
-                this->bindIOManager_c2h = ioManager_c2h;
+                this->bind_io_manager_c2h = io_manager_c2h;
             }
-            this->isIOManagerBind = true;
+            this->is_io_manager_bind = true;
             return true;
         }
 
@@ -860,13 +859,13 @@ namespace vuprs
         {
             {
                 std::unique_lock<std::mutex> lock(this->mut_h2c); /* LOCK */
-                this->bindIOManager_h2c.reset();
+                this->bind_io_manager_h2c.reset();
             }
             {
                 std::unique_lock<std::mutex> lock(this->mut_c2h); /* LOCK */
-                this->bindIOManager_c2h.reset();
+                this->bind_io_manager_c2h.reset();
             }
-            this->isIOManagerBind = false;
+            this->is_io_manager_bind = false;
         }
 
         /**
@@ -876,15 +875,15 @@ namespace vuprs
          *
          * @param buffer the buffer to store data.
          * @param offset offset from base address of the memory.
-         * @param transferByteSize transfer size in bytes.
+         * @param transfer_byte_size transfer size in bytes.
          *
          * @retval true: success, false: failed.
          *
          * @throw std::runtime_error
          */
-        bool ReadMemory(vuprs::AlignedBufferDMA *buffer, uint32_t offset, uint64_t transferByteSize)
+        bool ReadMemory(vuprs::AlignedBufferDMA *buffer, uint32_t offset, uint64_t transfer_byte_size)
         {
-            return this->BufferIO(offset, buffer, transferByteSize, true);
+            return this->BufferIO(offset, buffer, transfer_byte_size, true);
         }
 
         /**
@@ -894,55 +893,55 @@ namespace vuprs
          *
          * @param buffer data buffer.
          * @param offset offset from base address of the memory.
-         * @param transferByteSize transfer size in bytes.
+         * @param transfer_byte_size transfer size in bytes.
          *
          * @retval true: success, false: failed.
          *
          * @throw std::runtime_error
          */
-        bool WriteMemory(vuprs::AlignedBufferDMA *buffer, uint32_t offset, uint64_t transferByteSize)
+        bool WriteMemory(vuprs::AlignedBufferDMA *buffer, uint32_t offset, uint64_t transfer_byte_size)
         {
-            return this->BufferIO(offset, buffer, transferByteSize, false);
+            return this->BufferIO(offset, buffer, transfer_byte_size, false);
         }
 
         /**
          * @brief Read 4 bytes data from memory.
          *
          * @param offset offset from base address of the memory.
-         * @param readValue read value.
+         * @param read_value read value.
          *
          * @retval true: success, false: failed.
          *
          * @throw std::runtime_error
          */
-        bool ReadMemory(uint32_t offset, uint32_t *readValue)
+        bool ReadMemory(uint32_t offset, uint32_t *read_value)
         {
-            return this->WordIO(offset, readValue, true);
+            return this->WordIO(offset, read_value, true);
         }
 
         /**
          * @brief Write 4 bytes data to memory.
          *
          * @param offset offset from base address of the memory.
-         * @param writeValue write value.
+         * @param write_value write value.
          *
          * @retval true: success, false: failed.
          *
          * @throw std::runtime_error
          */
-        bool WriteMemory(uint32_t offset, uint32_t writeValue)
+        bool WriteMemory(uint32_t offset, uint32_t write_value)
         {
-            return this->WordIO(offset, &writeValue, false);
+            return this->WordIO(offset, &write_value, false);
         }
 
         bool ConfigDone() const
         {
-            return this->configdone;
+            return this->config_done;
         }
 
         uint32_t FPGAAddress() const
         {
-            return this->fpgaAddress;
+            return this->fpga_address;
         }
     };
 }

@@ -6,6 +6,9 @@
 
 namespace vuprs
 {
+    /**
+     * @note Tensor layout NCHW
+     */
     class RknnModel
     {
     public:
@@ -20,7 +23,11 @@ namespace vuprs
 
         void InitModel(const std::string &model_path);
         void run();
-        void SetInput(uint32_t index, void *buffer, uint32_t size);
+        void SetInput(uint32_t index,
+                      void *buffer,
+                      uint32_t size,
+                      _rknn_tensor_type type = _rknn_tensor_type::RKNN_TENSOR_UINT8,
+                      _rknn_tensor_format layout = _rknn_tensor_format::RKNN_TENSOR_NCHW);
         void GetOutput(uint32_t index, void *buffer, uint32_t size);
         bool ModelReady() const { return this->ctx_ != 0; }
 

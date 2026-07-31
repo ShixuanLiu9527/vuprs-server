@@ -4,12 +4,12 @@
 
 #define LINUX_SESSION_CPP__DEBUG_PRINT false /* print something @ debug mode */
 
-vuprs::LinuxSession::LinuxSession(const std::string &frameHeader, const std::string &frameTailer)
+vuprs::LinuxSession::LinuxSession(const std::string &frame_header, const std::string &frame_tailer)
 {
     this->running = false;
-    this->isIOManagerBind = false;
-    this->frameHeader = frameHeader;
-    this->frameTailer = frameTailer;
+    this->is_io_manager_bind = false;
+    this->frame_header = frame_header;
+    this->frame_tailer = frame_tailer;
 }
 
 vuprs::LinuxSession::~LinuxSession()
@@ -22,7 +22,7 @@ bool vuprs::LinuxSession::SendMessage(const std::string &message)
     std::shared_ptr<vuprs::SocketIOManager> manager;
     {
         std::unique_lock<std::mutex> lock(this->mut);
-        manager = this->socketIOManager.lock();
+        manager = this->socket_io_manager.lock();
     }
     PARAM_CHECK(manager != nullptr, "server", " in [LinuxSession::SendMessage] IO Manager is NULL.");
     return manager->SendMessage(message);
@@ -33,7 +33,7 @@ void vuprs::LinuxSession::ReceiveMessage(const std::string &tailer, vuprs::Socke
     std::shared_ptr<vuprs::SocketIOManager> manager;
     {
         std::unique_lock<std::mutex> lock(this->mut);
-        manager = this->socketIOManager.lock();
+        manager = this->socket_io_manager.lock();
     }
     PARAM_CHECK(manager != nullptr, "server", " in [LinuxSession::ReceiveMessage] IO Manager is NULL.");
     manager->ReceiveMessage(tailer, data);
@@ -44,7 +44,7 @@ std::string vuprs::LinuxSession::ClientInformation() const
     std::shared_ptr<vuprs::SocketIOManager> manager;
     {
         std::unique_lock<std::mutex> lock(this->mut);
-        manager = this->socketIOManager.lock();
+        manager = this->socket_io_manager.lock();
     }
     PARAM_CHECK(manager != nullptr, "server", " in [LinuxSession::ClientInformation] IO Manager is NULL.");
     return manager->ClientInformation();
@@ -64,25 +64,25 @@ void vuprs::LinuxSession::Stop()
     std::shared_ptr<vuprs::SocketIOManager> manager;
     {
         std::unique_lock<std::mutex> lock(this->mut);
-        manager = this->socketIOManager.lock();
-        this->socketIOManager.reset();
+        manager = this->socket_io_manager.lock();
+        this->socket_io_manager.reset();
     }
     if (manager != nullptr)
     {
         manager->CloseSocket();
     }
-    this->isIOManagerBind = false;
+    this->is_io_manager_bind = false;
 }
 
-bool vuprs::LinuxSession::BindIOManager(std::shared_ptr<vuprs::SocketIOManager> ioManager)
+bool vuprs::LinuxSession::BindIOManager(std::shared_ptr<vuprs::SocketIOManager> io_manager)
 {
-    PARAM_CHECK(ioManager != nullptr, "server", " in [LinuxSession::BindIOManager] Socket IO Manager is NULL.");
+    PARAM_CHECK(io_manager != nullptr, "server", " in [LinuxSession::BindIOManager] Socket IO Manager is NULL.");
     this->UnbindIOManager();
     {
         std::unique_lock<std::mutex> lock(this->mut);
-        this->socketIOManager = ioManager;
+        this->socket_io_manager = io_manager;
     }
-    this->isIOManagerBind = true;
+    this->is_io_manager_bind = true;
     return true;
 }
 
@@ -90,9 +90,9 @@ void vuprs::LinuxSession::UnbindIOManager()
 {
     {
         std::unique_lock<std::mutex> lock(this->mut);
-        this->socketIOManager.reset();
+        this->socket_io_manager.reset();
     }
-    this->isIOManagerBind = false;
+    this->is_io_manager_bind = false;
 }
 
 bool vuprs::LinuxSession::IsRun() const
@@ -102,35 +102,35 @@ bool vuprs::LinuxSession::IsRun() const
 
 void vuprs::LinuxSession::SetMessageHandler(vuprs::SessionMessageHandler handler)
 {
-    this->messageHandler = std::move(handler);
+    this->message_handler = std::move(handler);
 }
 
 void vuprs::LinuxSession::ReceiveLoop()
 {
     vuprs::SocketReceiveData data; /* received data */
-    std::string clientInfo = "unknown-client";
+    std::string client_info = "unknown-client";
     try
     {
-        clientInfo = this->ClientInformation();
+        client_info = this->ClientInformation();
     }
     catch (...)
     {
     }
     while (this->running)
     {
-        this->ReceiveMessage(this->frameTailer, &data);
-        if (data.is_connect && data.receiveBytes > 0)
+        this->ReceiveMessage(this->frame_tailer, &data);
+        if (data.is_connect && data.receive_bytes > 0)
         {
             std::string message;
-            if (vuprs::CheckFrameFormat(data, this->frameHeader, this->frameTailer, &message))
+            if (vuprs::CheckFrameFormat(data, this->frame_header, this->frame_tailer, &message))
             {
                 /* Get message from client */
-                if (this->messageHandler != nullptr)
+                if (this->message_handler != nullptr)
                 {
 #if DEBUG
-                    std::cout << "[session][" << clientInfo << "] received message: " << message << std::endl;
+                    std::cout << "[session][" << client_info << "] received message: " << message << std::endl;
 #endif
-                    this->messageHandler(this->socketIOManager, message); /* Call user function */
+                    this->message_handler(this->socket_io_manager, message); /* Call user function */
                 }
                 else
                 {
@@ -141,13 +141,13 @@ void vuprs::LinuxSession::ReceiveLoop()
         }
         else if (!data.is_connect) /* Connect shut down */
         {
-            std::cout << "[session][" << clientInfo << "] disconnected." << std::endl;
+            std::cout << "[session][" << client_info << "] disconnected." << std::endl;
             break;
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     this->running = false;
-    std::cout << "[session][" << clientInfo << "] client service end." << std::endl;
+    std::cout << "[session][" << client_info << "] client service end." << std::endl;
 }
 
 std::string vuprs::LinuxSession::DefaultMessageProcess(const std::string &message)

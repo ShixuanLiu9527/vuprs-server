@@ -8,7 +8,7 @@ namespace vuprs
     class Beamformer_DCRCB : public vuprs::WidebandBeamformerTemplate
     {
     protected:
-        void CalculateBeamformingForOneFreq(int freqIndex) override;
+        void CalculateBeamformingForOneFreq(int freq_index) override;
 
     public:
         Beamformer_DCRCB();
@@ -21,7 +21,7 @@ namespace vuprs
     class Beamformer_CBF : public vuprs::WidebandBeamformerTemplate
     {
     protected:
-        void CalculateBeamformingForOneFreq(int freqIndex) override;
+        void CalculateBeamformingForOneFreq(int freq_index) override;
 
     public:
         Beamformer_CBF();
@@ -34,7 +34,7 @@ namespace vuprs
     class Beamformer_MVDR : public vuprs::WidebandBeamformerTemplate
     {
     protected:
-        void CalculateBeamformingForOneFreq(int freqIndex) override;
+        void CalculateBeamformingForOneFreq(int freq_index) override;
 
     public:
         Beamformer_MVDR();

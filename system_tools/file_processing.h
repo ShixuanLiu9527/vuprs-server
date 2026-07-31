@@ -13,8 +13,8 @@
 
 namespace vuprs
 {
-    std::string FileAbsolutePath(const std::string &path, const std::string &fileName);
-    std::string AddPath(const std::string &basePath, const std::string &addedPath);
+    std::string FileAbsolutePath(const std::string &path, const std::string &filename);
+    std::string AddPath(const std::string &base_path, const std::string &added_path);
     void SplitFile(const std::string &fullpath, std::string *dir, std::string *filename, std::string *extension);
     bool PathExist(const std::string &path);
     bool FileExist(const std::string &file);

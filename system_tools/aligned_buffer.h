@@ -47,8 +47,8 @@ namespace vuprs
     class AlignedBuffer
     {
     private:
-        uint64_t byteSize;
-        uint64_t byteCapacity;
+        uint64_t byte_size;
+        uint64_t byte_capacity;
         void *allocated;
 
     protected:
@@ -59,7 +59,7 @@ namespace vuprs
     public:
         AlignedBuffer();
 
-        explicit AlignedBuffer(uint64_t byteSize);
+        explicit AlignedBuffer(uint64_t byte_size);
 
         virtual ~AlignedBuffer();
 
@@ -80,14 +80,14 @@ namespace vuprs
          *
          * @note release() will be called in this method before malloc, and do not need release in external.
          *
-         * @param byteSize buffer size in bytes.
+         * @param byte_size buffer size in bytes.
          *
          * @retval true: create success.
          * @retval false: create failed.
          *
          * @throw std::bad_loc() when error occurred.
          */
-        virtual bool malloc(uint64_t byteSize);
+        virtual bool malloc(uint64_t byte_size);
 
         /**
          * @brief Indicates whether the memory has been allocated.
@@ -115,37 +115,37 @@ namespace vuprs
         /**
          * @brief Save data from memory to file.
          *
-         * @param fileName target file name.
-         * @param fileOffset offset of file of the first data is saved.
-         * @param writeBytes length of saved data.
+         * @param filename target file name.
+         * @param file_offset offset of file of the first data is saved.
+         * @param write_bytes length of saved data.
          *
          * @retval true, save success.
          * @retval false, save failed.
          *
          * @throw std::runtime_error() when the file name is invalid.
          */
-        bool to_file(const std::string &fileName, const uint64_t &fileOffset, uint64_t writeBytes) const;
+        bool to_file(const std::string &filename, const uint64_t &file_offset, uint64_t write_bytes) const;
 
         /**
          * @brief Save data from memory to file.
          *
          * @note Save all of the data to file.
          *
-         * @param fileName target file name.
+         * @param filename target file name.
          *
          * @retval true, save success.
          * @retval false, save failed.
          *
          * @throw std::runtime_error() when the file name is invalid.
          */
-        bool to_file(const std::string &fileName);
+        bool to_file(const std::string &filename);
 
         /**
          * @brief Load data from file.
          *
-         * @param fileName target file name.
-         * @param fileOffset offset of file of the first data is loaded.
-         * @param writeBytes length of loaded data.
+         * @param filename target file name.
+         * @param file_offset offset of file of the first data is loaded.
+         * @param write_bytes length of loaded data.
          *
          * @retval true, load success.
          * @retval false, load failed.
@@ -153,13 +153,13 @@ namespace vuprs
          * @throw std::runtime_error() when the file name is invalid.
          * @throw std::bad_loc() when failed to allocate.
          */
-        bool from_file(const std::string &fileName, const uint64_t &fileOffset, uint64_t loadBytes);
+        bool from_file(const std::string &filename, const uint64_t &file_offset, uint64_t loadBytes);
 
         /**
          * @brief Load data from file.
          * @note Load all of the data from the certain file.
          *
-         * @param fileName target file name.
+         * @param filename target file name.
          *
          * @retval true, load success.
          * @retval false, load failed.
@@ -167,29 +167,29 @@ namespace vuprs
          * @throw std::runtime_error() when the file name is invalid.
          * @throw std::bad_loc() when failed to allocate.
          */
-        bool from_file(const std::string &fileName);
+        bool from_file(const std::string &filename);
 
         /**
          * @brief Convert buffer to vector
          *
-         * @note must ensure: elementCounts * sizeof(T) <= this->byteSize
+         * @note must ensure: element_counts * sizeof(T) <= this->byte_size
          *
-         * @param elementCounts element counts of generated vector
+         * @param element_counts element counts of generated vector
          *
          * @retval vector
          *
          * @throw std::out_of_range
          */
         template <typename T>
-        std::vector<T> to_vector(uint64_t elementCounts) const
+        std::vector<T> to_vector(uint64_t element_counts) const
         {
-            if (elementCounts * sizeof(T) > this->byteSize)
+            if (element_counts * sizeof(T) > this->byte_size)
             {
                 throw std::out_of_range("in [AlignedBuffer::to_vector] Requested size exceeds buffer capacity");
             }
 
             T *data_ptr = reinterpret_cast<T *>(this->allocated);
-            return std::vector<T>(data_ptr, data_ptr + elementCounts);
+            return std::vector<T>(data_ptr, data_ptr + element_counts);
         }
 
         /**
@@ -202,15 +202,13 @@ namespace vuprs
         template <typename T>
         std::vector<T> to_vector() const
         {
-            if (this->byteSize == 0)
+            if (this->byte_size == 0)
             {
                 throw std::out_of_range("in [AlignedBuffer::to_vector] Buffer size is 0.");
             }
-
-            uint64_t elementCounts = this->byteSize / sizeof(T);
-
+            uint64_t element_counts = this->byte_size / sizeof(T);
             T *data_ptr = reinterpret_cast<T *>(this->allocated);
-            return std::vector<T>(data_ptr, data_ptr + elementCounts);
+            return std::vector<T>(data_ptr, data_ptr + element_counts);
         }
 
         template <typename T>
@@ -220,16 +218,14 @@ namespace vuprs
             {
                 throw std::out_of_range("in [AlignedBuffer::from_vector] No data to convert.");
             }
-
             uint64_t required_bytes = vec.size() * sizeof(T);
-            if (required_bytes > this->byteSize)
+            if (required_bytes > this->byte_size)
             {
                 if (!this->malloc(required_bytes))
                 {
                     throw std::bad_alloc();
                 }
             }
-
             std::memcpy(this->allocated, vec.data(), required_bytes);
         }
 
@@ -256,11 +252,11 @@ namespace vuprs
     {
     public:
         AlignedBufferDMA() = default;
-        explicit AlignedBufferDMA(uint64_t byteSize) : AlignedBuffer(byteSize) {}
+        explicit AlignedBufferDMA(uint64_t byte_size) : AlignedBuffer(byte_size) {}
 
         ~AlignedBufferDMA() override = default;
 
-        bool malloc(uint64_t byteSize) override;
+        bool malloc(uint64_t byte_size) override;
     };
 
     /**
@@ -272,11 +268,11 @@ namespace vuprs
     {
     public:
         AlignedBufferServer() = default;
-        explicit AlignedBufferServer(uint64_t byteSize) : AlignedBuffer(byteSize) {}
+        explicit AlignedBufferServer(uint64_t byte_size) : AlignedBuffer(byte_size) {}
 
         ~AlignedBufferServer() override = default;
 
-        bool malloc(uint64_t byteSize) override;
+        bool malloc(uint64_t byte_size) override;
     };
 }
 

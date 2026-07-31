@@ -99,7 +99,11 @@ void vuprs::RknnModel::InitTensorAttrs()
     }
 }
 
-void vuprs::RknnModel::SetInput(uint32_t index, void *buffer, uint32_t size)
+void vuprs::RknnModel::SetInput(uint32_t index,
+                                void *buffer,
+                                uint32_t size,
+                                _rknn_tensor_type type = _rknn_tensor_type::RKNN_TENSOR_UINT8,
+                                _rknn_tensor_format layout = _rknn_tensor_format::RKNN_TENSOR_NCHW)
 {
     RUNTIME_CHECK(index < this->io_num_.n_input, "inference", "Invalid input index.");
     rknn_input input;
@@ -107,9 +111,9 @@ void vuprs::RknnModel::SetInput(uint32_t index, void *buffer, uint32_t size)
     input.index = index;
     input.buf = buffer;
     input.size = size;
-    input.pass_through = 0;         /* adjust for certain model */
-    input.type = RKNN_TENSOR_UINT8; /* adjust for certain model */
-    input.fmt = RKNN_TENSOR_NCHW;   /* adjust for certain model */
+    input.pass_through = 0; /* adjust for certain model */
+    input.type = type;      /* adjust for certain model */
+    input.fmt = layout;     /* adjust for certain model */
     int ret = rknn_inputs_set(this->ctx_, 1, &input);
     RUNTIME_CHECK(ret == RKNN_SUCC, "inference", "rknn_inputs_set failed");
 }
