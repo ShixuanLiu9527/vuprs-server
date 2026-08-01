@@ -210,7 +210,6 @@ namespace vuprs
     {
     private:
         uint32_t signal_points;
-
         uint32_t offset_CBUF_FREEZE;
         uint32_t offset_CBUF_RST;
         uint32_t offset_CBUF_RS;

@@ -1,5 +1,5 @@
 #include "algorithm/signal_processing/signal_processing.h"
-#include "logger/log_manager.h"
+#include "logger/check.h"
 
 std::mutex vuprs::FFTWManagerComplex::fftw_mtx;
 

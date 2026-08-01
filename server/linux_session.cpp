@@ -1,6 +1,6 @@
 #include "config.h"
 #include "server/linux_session.h"
-#include "logger/log_manager.h"
+#include "logger/check.h"
 
 #define LINUX_SESSION_CPP__DEBUG_PRINT false /* print something @ debug mode */
 

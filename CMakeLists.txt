@@ -35,7 +35,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/algorithm/bf
     ${CMAKE_CURRENT_SOURCE_DIR}/algorithm/signal_processing
     ${CMAKE_CURRENT_SOURCE_DIR}/algorithm/inference
-    ${CMAKE_CURRENT_SOURCE_DIR}/collab_bf
+    ${CMAKE_CURRENT_SOURCE_DIR}/hybrid
     ${CMAKE_CURRENT_SOURCE_DIR}/system_tools
 )
 
@@ -44,7 +44,7 @@ file(GLOB_RECURSE SYS_TOOL_SRC "${CMAKE_CURRENT_SOURCE_DIR}/system_tools/*.cpp")
 file(GLOB_RECURSE LOGGER_SRC "${CMAKE_CURRENT_SOURCE_DIR}/logger/*.cpp")
 file(GLOB_RECURSE ALGORITHM_SRC "${CMAKE_CURRENT_SOURCE_DIR}/algorithm/*.cpp")
 file(GLOB_RECURSE SERVER_SRC "${CMAKE_CURRENT_SOURCE_DIR}/server/*.cpp")
-file(GLOB_RECURSE COLLAB_BF_SRC "${CMAKE_CURRENT_SOURCE_DIR}/collab_bf/*.cpp")
+file(GLOB_RECURSE HYBRID_BF_SRC "${CMAKE_CURRENT_SOURCE_DIR}/hybrid/*.cpp")
 
 add_executable(server main.cpp 
     ${FPGA_SRC} 
@@ -52,7 +52,7 @@ add_executable(server main.cpp
     ${LOGGER_SRC} 
     ${ALGORITHM_SRC} 
     ${SERVER_SRC} 
-    ${COLLAB_BF_SRC})
+    ${HYBRID_BF_SRC})
 target_link_directories(server PRIVATE 
 ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/rknpu2/librknn_api/aarch64)
 target_link_libraries(server PRIVATE Threads::Threads m fftw3 rknnrt)

@@ -5,7 +5,7 @@
 #ifdef __linux__
 #include <arpa/inet.h>
 #endif
-#include "collab_bf/collaboration_configs.h"
+#include "hybrid/hybrid_bf_config.h"
 #include "3rdparty/nlohmann/json.hpp"
 
 #define SERVER_CMD__INVALID__STR "invalid"
@@ -45,8 +45,8 @@ namespace vuprs
      */
     struct ServerCommandInformation
     {
-        vuprs::CollaborationBeamformerConfig config; /* config info */
-        vuprs::ScanningConfig scan_config;           /* scanning config info, which is used when cmd is SERVER_CMD__SCAN_FOR_POSITION_POWER */
+        vuprs::HybridBeamformerConfig config; /* config info */
+        vuprs::ScanningConfig scan_config;    /* scanning config info, which is used when cmd is SERVER_CMD__SCAN_FOR_POSITION_POWER */
         vuprs::ServerCommand cmd;
         std::string beamformer_name; /* beam former name (for SERVER_CMD__CHANGE_BEAMFORMER) */
         ServerCommandInformation() : cmd(vuprs::ServerCommand::SERVER_CMD__INVALID), beamformer_name("") {}
@@ -74,28 +74,28 @@ namespace vuprs
      *
      * @param cmd Command information.
      * @param info Additional information for the response.
-     * @param operation_status Operation status of command (true: success, false: failed).
+     * @param operation-status Operation status of command (true: success, false: failed).
      *
      * @retval Server response message.
      */
     std::string PROTOCOL_MakeServerOperationResponse(const ServerCommandInformation &cmd,
                                                      const std::string &info = "",
-                                                     bool operation_status = true);
+                                                     bool operation - status = true);
 
     /**
      * @brief Make server response message for current algorithm parameters.
      *
      * @param config Current algorithm parameters.
      */
-    std::string PROTOCOL_MakeServerParameterResponse(const vuprs::CollaborationBeamformerConfig &config);
+    std::string PROTOCOL_MakeServerParameterResponse(const vuprs::HybridBeamformerConfig &config);
 
     std::string PROTOCOL_MakeServerScanningResponse(const vuprs::ScanningConfig &scan_config,
                                                     double min_scan_power_dB,
                                                     double max_scan_power_dB,
                                                     const std::string &info = "",
-                                                    bool operation_status = true);
+                                                    bool operation - status = true);
 
-    std::string PROTOCOL_MakeServerResultDataResponse(const std::string &info = "", bool operation_status = true);
+    std::string PROTOCOL_MakeServerResultDataResponse(const std::string &info = "", bool operation - status = true);
 }
 
 #endif

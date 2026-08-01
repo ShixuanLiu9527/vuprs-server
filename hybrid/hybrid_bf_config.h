@@ -1,5 +1,5 @@
-#ifndef COLLABORATION_CONFIGS_H
-#define COLLABORATION_CONFIGS_H
+#ifndef HYBRID_BF_CONFIG_H
+#define HYBRID_BF_CONFIG_H
 
 #include <stdint.h>
 #include <vector>
@@ -13,7 +13,7 @@ namespace vuprs
      *
      * @note false as default.
      */
-    struct CollaborationBeamformerConfigMask
+    struct HybridBeamformerConfigMask
     {
         bool m_fs;                                    /* Mask of [fs] */
         bool m_bf_target__alt;                        /* Mask of [bf_target__alt] */
@@ -28,7 +28,7 @@ namespace vuprs
         bool m_queue__circular_buffer_queue_size_max; /* Mask of [queue__circular_buffer_queue_size_max] */
         bool m_queue__result_queue_size_max;          /* Mask of [queue__result_queue_size_max] */
 
-        CollaborationBeamformerConfigMask() { this->Reset(); }
+        HybridBeamformerConfigMask() { this->Reset(); }
 
         /**
          * @brief Reset all mask to false.
@@ -36,7 +36,7 @@ namespace vuprs
         void Reset();
     };
 
-    class CollaborationBeamformerConfig
+    class HybridBeamformerConfig
     {
     private:
         void SetDefault();
@@ -58,9 +58,9 @@ namespace vuprs
         uint32_t dma__buffer_count;                     /* [internal param] AXI DMA descriptor buffer count */
         uint32_t queue__circular_buffer_queue_size_max; /* [internal param] MAX size of circular buffer data queue */
         uint32_t queue__result_queue_size_max;          /* [internal param] MAX size of result data queue */
-        vuprs::CollaborationBeamformerConfigMask mask;
+        vuprs::HybridBeamformerConfigMask mask;
 
-        CollaborationBeamformerConfig() { this->SetDefault(); }
+        HybridBeamformerConfig() { this->SetDefault(); }
 
         /**
          * @brief Merger config with another config.
@@ -68,7 +68,7 @@ namespace vuprs
          * @note For each field, if the corresponding mask in other.mask is true,
          * @note then use the value in other, otherwise keep the current value.
          */
-        void operator+=(const CollaborationBeamformerConfig &other)
+        void operator+=(const HybridBeamformerConfig &other)
         {
             this->fs = other.mask.m_fs ? other.fs : this->fs;
             this->bf_target__alt = other.mask.m_bf_target__alt ? other.bf_target__alt : this->bf_target__alt;
@@ -108,7 +108,7 @@ namespace vuprs
     };
 
     bool CheckCollaborationBeamformerConfigValid(vuprs::FPGAController *controller,
-                                                 const vuprs::CollaborationBeamformerConfig &config);
+                                                 const vuprs::HybridBeamformerConfig &config);
 }
 
 #endif

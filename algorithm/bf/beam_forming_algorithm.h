@@ -12,7 +12,7 @@
 #include <future>
 #include <iostream>
 #include "algorithm/signal_processing/signal_processing.h"
-#include "logger/log_manager.h"
+#include "logger/check.h"
 
 namespace vuprs
 {
@@ -36,9 +36,9 @@ namespace vuprs
         bool stop;
 
     public:
-        ThreadPool(size_t numThreads) : stop(false)
+        ThreadPool(size_t num_threads) : stop(false)
         {
-            for (size_t i = 0; i < numThreads; ++i)
+            for (size_t i = 0; i < num_threads; ++i)
             {
                 /* Create one thread */
                 workers.emplace_back(

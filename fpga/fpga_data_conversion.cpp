@@ -1,5 +1,5 @@
 #include "fpga/fpga_data_conversion.h"
-#include "logger/log_manager.h"
+#include "logger/check.h"
 
 vuprs::SignalData::SignalData()
 {

@@ -1,5 +1,5 @@
 #include "algorithm/bf/beam_forming_algorithm.h"
-#include "logger/log_manager.h"
+#include "logger/check.h"
 
 #define BEAM_FORMING_ALGORITHM_DEBUG_PRINT false
 

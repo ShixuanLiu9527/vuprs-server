@@ -1,5 +1,5 @@
 #include <fstream>
-#include "logger/log_manager.h"
+#include "logger/check.h"
 #include "3rdparty/nlohmann/json.hpp"
 #include "fault_detect/fault_detector.h"
 #include "system_tools/string_parse.h"

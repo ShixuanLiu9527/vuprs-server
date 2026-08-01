@@ -1,6 +1,6 @@
 #include "config.h"
 #include "algorithm/bf/beam_former_template.h"
-#include "logger/log_manager.h"
+#include "logger/check.h"
 
 vuprs::WidebandBeamformerTemplate::WidebandBeamformerTemplate()
 {

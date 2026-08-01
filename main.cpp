@@ -1,12 +1,11 @@
 #include <signal.h>
-#include "linux_server.h"
-#include "logger/log_manager.h"
+#include "server/linux_server.h"
+#include "logger/check.h"
 
 static void ParseConfigFIlesFromARGV(const std::vector<std::string> &args, vuprs::SystemConfigFiles *configs)
 {
     PARAM_CHECK(args.size() == 9, "vuprs-server", " Invalid command with arg size = " + std::to_string(args.size()));
     PARAM_CHECK(args[1] == "--server-config" && args[3] == "--fpga-config" && args[5] == "--array-config" && args[7] == "--fir-config", "vuprs-server", " Invalid command.");
-
     configs->server_config_json = args[2];
     configs->fpga_config_json = args[4];
     configs->bf_array_config_json = args[6];

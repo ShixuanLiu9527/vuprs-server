@@ -1,7 +1,7 @@
 #include "config.h"
 #include "system_tools/file_processing.h"
 #include "algorithm/bf/beam_forming_basic.h"
-#include "logger/log_manager.h"
+#include "logger/check.h"
 
 /* --------------------------------------------------------------------------------------------------------------- */
 /* ------------------------------------------- Beam Forming Element ---------------------------------------------- */
@@ -97,7 +97,6 @@ bool vuprs::BeamFormingArray::LoadArrayFromJson(const std::string &filename)
     RUNTIME_CHECK(json_data["beam_forming_array"].contains("array"), "bf", "Missing key.");
     RUNTIME_CHECK(json_data["beam_forming_array"].contains("info"), "bf", "Missing key.");
     RUNTIME_CHECK(json_data["beam_forming_array"]["array"].is_array(), "bf", "array_data is not array.");
-
     auto array_data = json_data["beam_forming_array"]["array"];
     auto info = json_data["beam_forming_array"]["info"];
     int array_size = array_data.size();
@@ -105,20 +104,20 @@ bool vuprs::BeamFormingArray::LoadArrayFromJson(const std::string &filename)
     this->element_array.reserve(array_size);
     for (int i = 0; i < array_size; i++)
     {
-        RUNTIME_CHECK(array_data[i].contains("position_x"), "bf", "Missing key position_x");
-        RUNTIME_CHECK(array_data[i].contains("position_y"), "bf", "Missing key position_y");
-        RUNTIME_CHECK(array_data[i].contains("position_z"), "bf", "Missing key position_z");
-        RUNTIME_CHECK(array_data[i].contains("adc_channel"), "bf", "Missing key adc_channel");
+        RUNTIME_CHECK(array_data[i].contains("position-x"), "bf", "Missing key position_x");
+        RUNTIME_CHECK(array_data[i].contains("position-y"), "bf", "Missing key position_y");
+        RUNTIME_CHECK(array_data[i].contains("position-z"), "bf", "Missing key position_z");
+        RUNTIME_CHECK(array_data[i].contains("adc-channel"), "bf", "Missing key adc_channel");
         double x = 0, y = 0, z = 0;
         std::string adc_channel;
         vuprs::BeamFormingElement one_element;
-        vuprs::__JsonStringParseFLOAT<double>(&x, array_data[i], "position_x", true);
-        vuprs::__JsonStringParseFLOAT<double>(&y, array_data[i], "position_y", true);
-        vuprs::__JsonStringParseFLOAT<double>(&z, array_data[i], "position_z", true);
+        vuprs::__JsonStringParseFLOAT<double>(&x, array_data[i], "position-x", true);
+        vuprs::__JsonStringParseFLOAT<double>(&y, array_data[i], "position-y", true);
+        vuprs::__JsonStringParseFLOAT<double>(&z, array_data[i], "position-z", true);
         one_element.position_vector(0, 0) = x;
         one_element.position_vector(1, 0) = y;
         one_element.position_vector(2, 0) = z;
-        vuprs::__JsonParseString(&adc_channel, array_data[i], "adc_channel", true);
+        vuprs::__JsonParseString(&adc_channel, array_data[i], "adc-channel", true);
         one_element.adc_channel = adc_channel;
         RUNTIME_CHECK(IS_ADC_CHANNEL_NAME(adc_channel), "bf", " in [BeamFormingArray::LoadArrayFromJson] Invalid ADC channel name in file: " + filename);
         this->element_array.push_back(std::move(one_element));
@@ -250,27 +249,26 @@ bool vuprs::BeamFormingScanArray::LoadArrayFromJson(const std::string &filename)
     RUNTIME_CHECK(json_data.contains("beam_forming_array"), "bf", "Missing keys.");
     RUNTIME_CHECK(json_data["beam_forming_array"].contains("array"), "bf", "Missing key.");
     RUNTIME_CHECK(json_data["beam_forming_array"]["array"].is_array(), "bf", "array_data is not array.");
-
     auto array_data = json_data["beam_forming_array"]["array"];
     int array_size = array_data.size();
     this->element_array.clear();
     this->element_array.reserve(array_size);
     for (int i = 0; i < array_size; i++)
     {
-        RUNTIME_CHECK(array_data[i].contains("position_x"), "bf", "Missing key position_x");
-        RUNTIME_CHECK(array_data[i].contains("position_y"), "bf", "Missing key position_y");
-        RUNTIME_CHECK(array_data[i].contains("position_z"), "bf", "Missing key position_z");
-        RUNTIME_CHECK(array_data[i].contains("adc_channel"), "bf", "Missing key adc_channel");
+        RUNTIME_CHECK(array_data[i].contains("position-x"), "bf", "Missing key position_x");
+        RUNTIME_CHECK(array_data[i].contains("position-y"), "bf", "Missing key position_y");
+        RUNTIME_CHECK(array_data[i].contains("position-z"), "bf", "Missing key position_z");
+        RUNTIME_CHECK(array_data[i].contains("adc-channel"), "bf", "Missing key adc_channel");
         double x = 0, y = 0, z = 0;
         std::string adc_channel;
         vuprs::BeamFormingElement one_element;
-        vuprs::__JsonStringParseFLOAT<double>(&x, array_data[i], "position_x", true);
-        vuprs::__JsonStringParseFLOAT<double>(&y, array_data[i], "position_y", true);
-        vuprs::__JsonStringParseFLOAT<double>(&z, array_data[i], "position_z", true);
+        vuprs::__JsonStringParseFLOAT<double>(&x, array_data[i], "position-x", true);
+        vuprs::__JsonStringParseFLOAT<double>(&y, array_data[i], "position-y", true);
+        vuprs::__JsonStringParseFLOAT<double>(&z, array_data[i], "position-z", true);
         one_element.position_vector(0, 0) = x;
         one_element.position_vector(1, 0) = y;
         one_element.position_vector(2, 0) = z;
-        vuprs::__JsonParseString(&adc_channel, array_data[i], "adc_channel", true);
+        vuprs::__JsonParseString(&adc_channel, array_data[i], "adc-channel", true);
         one_element.adc_channel = adc_channel;
         RUNTIME_CHECK(IS_ADC_CHANNEL_NAME(adc_channel), "bf", " in [BeamFormingArray::LoadArrayFromJson] Invalid ADC channel name in file: " + filename);
         this->element_array.push_back(std::move(one_element));

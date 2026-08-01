@@ -12,7 +12,7 @@ namespace vuprs
         bool config_done;
         std::mutex mtx;
         uint32_t fir_length;
-        uint32_t lastSignalPoints; /* last N */
+        uint32_t last_signal_points; /* last N */
         double freq_range_l, freq_range_u;
         std::vector<vuprs::FFTWManagerComplex> fft_managers; /* FFT manager */
         std::unique_ptr<vuprs::ThreadPool> thread_pool;

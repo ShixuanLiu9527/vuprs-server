@@ -1,5 +1,5 @@
 #include "fpga/fpga_io_manager.h"
-#include "logger/log_manager.h"
+#include "logger/check.h"
 
 vuprs::FPGA_IOManagerBase::FPGA_IOManagerBase(const std::string &device_filename)
 {
@@ -22,7 +22,6 @@ void vuprs::FPGA_IOManagerBase::Close() noexcept
 {
     {
         std::lock_guard<std::mutex> lock(this->mut); /* LOCK */
-
         if (this->IsOpen())
         {
             ::close(this->fd);

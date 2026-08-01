@@ -12,9 +12,7 @@ namespace vuprs
 
     public:
         Beamformer_DCRCB();
-
         ~Beamformer_DCRCB();
-
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };
 
@@ -25,9 +23,7 @@ namespace vuprs
 
     public:
         Beamformer_CBF();
-
         ~Beamformer_CBF();
-
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };
 
@@ -38,9 +34,7 @@ namespace vuprs
 
     public:
         Beamformer_MVDR();
-
         ~Beamformer_MVDR();
-
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };
 }

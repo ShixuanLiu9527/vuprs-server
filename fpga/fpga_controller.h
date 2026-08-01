@@ -21,7 +21,6 @@ namespace vuprs
         std::vector<std::shared_ptr<vuprs::FPGA_IOManagerForDevice>> io_manager_list_dev;
         std::vector<std::shared_ptr<vuprs::FPGA_IOManagerForMemory>> io_manager_list_mem;
         std::atomic<bool> config_done;
-
         std::mutex mut;
 
         /**
@@ -54,7 +53,6 @@ namespace vuprs
 
     public:
         /* FPGA Devices */
-
         vuprs::FPGA_Device__AXIDirectMemoryAccess dev__axi_dma;  /* AXI Direct Memory Access */
         vuprs::FPGA_Device__ADCController dev__adc_controller;   /* ADC Controller */
         vuprs::FPGA_Device__CircularBuffer dev__circular_buffer; /* Circular Buffer */
@@ -62,13 +60,10 @@ namespace vuprs
         vuprs::FPGA_Device__PreDelayUnit dev__predelay_unit;     /* Pre-delay Unit */
 
         /* FPGA Memories */
-
         vuprs::FPGA_Memory__DDR mem__ddr;                                  /* System DDR in FPGA */
         vuprs::FPGA_Memory__FIRBram mem__fir_bram;                         /* FIR Coefficient BRAM */
         vuprs::FPGA_Memory__SGBram mem__sg_bram;                           /* AXI DMA SG BRAM */
         vuprs::FPGA_Memory__CircularBufferBram mem___circular_buffer_bram; /* Circular Buffer BRAM */
-
-        /* Interfaces */
 
         FPGAController(const FPGAController &) = delete;
         FPGAController(FPGAController &&) = delete;
@@ -115,7 +110,7 @@ namespace vuprs
         /**
          * @brief Indicate config is down.
          */
-        bool ConfigDown() const;
+        bool ConfigDone() const;
     };
 }
 

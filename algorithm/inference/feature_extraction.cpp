@@ -1,6 +1,6 @@
 #include <algorithm>
 #include "algorithm/inference/feature_extraction.h"
-#include "logger/log_manager.h"
+#include "logger/check.h"
 
 void vuprs::MelFilterBank::SetFilterParameters(double f_l,
                                                double f_u,

@@ -39,31 +39,23 @@ namespace vuprs
 
     protected:
         bool first_snapshot;
-
         bool is_array_config_done;
         bool is_signal_empty, is_cov_matrix_empty;
-
         std::mutex mut;
         std::mutex mut_scan;
-
-        Eigen::Matrix<Eigen::dcomplex, -1, -1> imag_timedelay; /* Size: M x numScans, jT{m, s} = j * T{m, s}), controlled by mut_scan */
-
-        vuprs::BeamFormingArray array;
-        vuprs::BeamFormingScanArray scan_array; /* for scanning, which has same element position as array but different time delay */
-
-        Eigen::Matrix<Eigen::dcomplex, -1, -1> snap_signal_matrix_freq_domain; /* Size: (M) x (N / 2 + 1) */
-        Eigen::Matrix<Eigen::dcomplex, -1, -1> steering_vectors;               /* Size: (M) x (N / 2 + 1) */
-        Eigen::Matrix<Eigen::dcomplex, -1, -1> result_weight_vectors;          /* Size: (M) x (N / 2 + 1) */
-        Eigen::Matrix<double, -1, 1> signal_frequency_list;                    /* [F0, F1, ..., FN/2] Size: (N / 2 + 1) */
-        Eigen::Matrix<Eigen::dcomplex, -1, 1> signal_frequency_list_complex;   /* [jF0, jF1, ..., jFN/2] Size: (N / 2 + 1) */
-
-        double fs;         /* Current sampling frequency */
-        int signal_points; /* Current signal points */
-
-        std::vector<int> element_predelay_count;       /* Predelay count (size = M) */
-        std::vector<double> element_predelay_time;     /* Predelay time = count * Ts (size = M) */
-        std::vector<std::string> element_channel_name; /* element channel name list (size = M) */
-
+        Eigen::Matrix<Eigen::dcomplex, -1, -1> imag_timedelay;                                 /* Size: M x numScans, jT{m, s} = j * T{m, s}), controlled by mut_scan */
+        vuprs::BeamFormingArray array;                                                         /* beamforming array */
+        vuprs::BeamFormingScanArray scan_array;                                                /* for scanning, which has same element position as array but different time delay */
+        Eigen::Matrix<Eigen::dcomplex, -1, -1> snap_signal_matrix_freq_domain;                 /* Size: (M) x (N / 2 + 1) */
+        Eigen::Matrix<Eigen::dcomplex, -1, -1> steering_vectors;                               /* Size: (M) x (N / 2 + 1) */
+        Eigen::Matrix<Eigen::dcomplex, -1, -1> result_weight_vectors;                          /* Size: (M) x (N / 2 + 1) */
+        Eigen::Matrix<double, -1, 1> signal_frequency_list;                                    /* [F0, F1, ..., FN/2] Size: (N / 2 + 1) */
+        Eigen::Matrix<Eigen::dcomplex, -1, 1> signal_frequency_list_complex;                   /* [jF0, jF1, ..., jFN/2] Size: (N / 2 + 1) */
+        double fs;                                                                             /* Current sampling frequency */
+        int signal_points;                                                                     /* Current signal points */
+        std::vector<int> element_predelay_count;                                               /* Predelay count (size = M) */
+        std::vector<double> element_predelay_time;                                             /* Predelay time = count * Ts (size = M) */
+        std::vector<std::string> element_channel_name;                                         /* element channel name list (size = M) */
         vuprs::AlignedEigenVector<Eigen::Matrix<Eigen::dcomplex, -1, -1>> mean_cov_matrix;     /* Size: N / 2 + 1, cov_matrix[i] is the mean cov matrix in band [i] */
         vuprs::AlignedEigenVector<Eigen::Matrix<Eigen::dcomplex, -1, -1>> estimate_cov_matrix; /* Size: N / 2 + 1, cov_matrix[i] is the mean cov matrix in band [i] */
 
@@ -88,7 +80,7 @@ namespace vuprs
         /**
          * @brief Config beam forming array from JSON file.
          *
-         * @note Check ConfigDown() in advance.
+         * @note Check ConfigDone() in advance.
          *
          * @param array_config_json_filename JSON file name.
          */

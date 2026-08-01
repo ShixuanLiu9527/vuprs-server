@@ -4,7 +4,7 @@
 #include "server/linux_session.h"
 #include "server/protocol.h"
 #include "system_tools/string_parse.h"
-#include "collab_bf/collaboration_beamformer.h"
+#include "hybrid/hybrid_bf.h"
 #include "fault_detect/fault_detector.h"
 
 #define DEFAULT_SENDING_DATA_QUEUE_LENGTH 10U
@@ -17,10 +17,11 @@ namespace vuprs
 {
     struct SystemConfigFiles
     {
-        std::string fpga_config_json;     /* FPGA config JSON file */
-        std::string bf_array_config_json; /* Beam forming config JSON file */
-        std::string fir_config_json;      /* FIR filter bank config JSON file */
-        std::string server_config_json;   /* Server config JSON file */
+        std::string fpga_config_json;            /* FPGA config JSON file */
+        std::string bf_array_config_json;        /* Beam forming config JSON file */
+        std::string fir_config_json;             /* FIR filter bank config JSON file */
+        std::string server_config_json;          /* Server config JSON file */
+        std::string inference_model_config_json; /* Inference model config json */
     };
 
     struct ServerProtocol
@@ -34,7 +35,6 @@ namespace vuprs
         uint16_t initialize_port;
         uint16_t maximum_port;
         uint16_t accept_client_counts;
-
         vuprs::ServerProtocol protocol;
     };
 
@@ -62,11 +62,11 @@ namespace vuprs
 
         /* --- Algorithms --- */
 
-        std::mutex mut_bf;                  /* mutex for beam former */
-        CollaborationBeamformer beamformer; /* System beam former, controlled by mut_bf */
+        std::mutex mut_bf;           /* mutex for beam former */
+        HybridBeamformer beamformer; /* System beam former, controlled by mut_bf */
 
         std::mutex mut_bf_config;
-        CollaborationBeamformerConfig bf_config; /* Set by client or default value, controlled by mut_bf_config */
+        HybridBeamformerConfig bf_config; /* Set by client or default value, controlled by mut_bf_config */
 
         std::mutex mut_scan_config;
         ScanningConfig scan_config; /* Set by client or default value, controlled by mut_scan_config */

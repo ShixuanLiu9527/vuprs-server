@@ -10,7 +10,7 @@
 #include <Eigen/Dense>
 #include <atomic>
 #include <mutex>
-#include "logger/log_manager.h"
+#include "logger/check.h"
 #include "3rdparty/fftw3/api/fftw3.h"
 
 #define PI 3.14159265358979323846

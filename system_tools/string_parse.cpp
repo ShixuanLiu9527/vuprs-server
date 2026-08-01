@@ -1,5 +1,5 @@
 #include "system_tools/string_parse.h"
-#include "logger/log_manager.h"
+#include "logger/check.h"
 
 uint64_t vuprs::ParseHexFromString(const std::string &data_string, bool *status)
 {

@@ -1,14 +1,13 @@
 #include "algorithm/bf/fir.h"
-#include "logger/log_manager.h"
+#include "logger/check.h"
 
 vuprs::FIRCalculator::FIRCalculator()
 {
     this->fir_length = 0;
     this->freq_range_l = 0.0;
     this->freq_range_u = 1000000.0;
-    this->lastSignalPoints = 0;
+    this->last_signal_points = 0;
     this->config_done = false;
-
     this->thread_pool = std::make_unique<vuprs::ThreadPool>(std::thread::hardware_concurrency());
 }
 

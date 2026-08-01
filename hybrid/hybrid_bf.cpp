@@ -1,8 +1,8 @@
 #include "config.h"
-#include "collaboration_beamformer.h"
-#include "logger/log_manager.h"
+#include "hybrid/hybrid_bf.h"
+#include "logger/check.h"
 
-vuprs::CollaborationBeamformer::CollaborationBeamformer()
+vuprs::HybridBeamformer::HybridBeamformer()
 {
     this->config_done = false;
     this->system_run = false;
@@ -21,12 +21,12 @@ vuprs::CollaborationBeamformer::CollaborationBeamformer()
     this->BindBeamformer(std::make_unique<vuprs::Beamformer_DCRCB>()); /* default: DCRCB */
 }
 
-vuprs::CollaborationBeamformer::~CollaborationBeamformer()
+vuprs::HybridBeamformer::~HybridBeamformer()
 {
     this->stop();
 }
 
-void vuprs::CollaborationBeamformer::BindBeamformer(std::unique_ptr<vuprs::WidebandBeamformerTemplate> beamformer)
+void vuprs::HybridBeamformer::BindBeamformer(std::unique_ptr<vuprs::WidebandBeamformerTemplate> beamformer)
 {
     if (beamformer != nullptr)
     {
@@ -34,22 +34,22 @@ void vuprs::CollaborationBeamformer::BindBeamformer(std::unique_ptr<vuprs::Wideb
     }
 }
 
-bool vuprs::CollaborationBeamformer::ConfigDone() const
+bool vuprs::HybridBeamformer::ConfigDone() const
 {
     return this->config_done;
 }
 
-void vuprs::CollaborationBeamformer::ScanSwitch(bool enable)
+void vuprs::HybridBeamformer::ScanSwitch(bool enable)
 {
     this->scan_enable = enable;
 }
 
-bool vuprs::CollaborationBeamformer::ScanSwitch() const
+bool vuprs::HybridBeamformer::ScanSwitch() const
 {
     return this->scan_enable;
 }
 
-bool vuprs::CollaborationBeamformer::InitCollaborationBeamformer(const std::string &fpga_config_json, const std::string &bf_array_config_json, const std::string &fir_config_json)
+bool vuprs::HybridBeamformer::InitCollaborationBeamformer(const std::string &fpga_config_json, const std::string &bf_array_config_json, const std::string &fir_config_json)
 {
     bool operate_status = true;
     try
@@ -60,18 +60,18 @@ bool vuprs::CollaborationBeamformer::InitCollaborationBeamformer(const std::stri
     }
     catch (const std::exception &e)
     {
-        RUNTIME_CHECK(false, "collab_bf", " in [CollaborationBeamformer::InitCollaborationBeamformer] Error occurred in initialization.");
+        RUNTIME_CHECK(false, "hybrid_bf", " in [HybridBeamformer::InitCollaborationBeamformer] Error occurred in initialization.");
     }
 
     this->config_done = operate_status;
     return operate_status;
 }
 
-void vuprs::CollaborationBeamformer::ScanOptions(int points_in_hemisphere, double alt_min, double wave_velocity)
+void vuprs::HybridBeamformer::ScanOptions(int points_in_hemisphere, double alt_min, double wave_velocity)
 {
-    PARAM_CHECK(points_in_hemisphere > 0, "collab_bf", " in [CollaborationBeamformer::ScanOptions] points_in_hemisphere should be positive.");
-    PARAM_CHECK(alt_min >= 0 && alt_min <= 90, "collab_bf", " in [CollaborationBeamformer::ScanOptions] alt_min should be between 0 and 90.");
-    PARAM_CHECK(wave_velocity > 0, "collab_bf", " in [CollaborationBeamformer::ScanOptions] wave_velocity should be positive.");
+    PARAM_CHECK(points_in_hemisphere > 0, "hybrid_bf", " in [HybridBeamformer::ScanOptions] points_in_hemisphere should be positive.");
+    PARAM_CHECK(alt_min >= 0 && alt_min <= 90, "hybrid_bf", " in [HybridBeamformer::ScanOptions] alt_min should be between 0 and 90.");
+    PARAM_CHECK(wave_velocity > 0, "hybrid_bf", " in [HybridBeamformer::ScanOptions] wave_velocity should be positive.");
     if (points_in_hemisphere != this->scan_points_in_hemisphere || alt_min != this->scan_alt_min || wave_velocity != this->scan_wave_velocity)
     {
         {
@@ -89,7 +89,7 @@ void vuprs::CollaborationBeamformer::ScanOptions(int points_in_hemisphere, doubl
     }
 }
 
-bool vuprs::CollaborationBeamformer::ResetHardwareBeamformer()
+bool vuprs::HybridBeamformer::ResetHardwareBeamformer()
 {
     bool retval = true;
     /* FPGA reset */
@@ -101,9 +101,9 @@ bool vuprs::CollaborationBeamformer::ResetHardwareBeamformer()
     return retval;
 }
 
-bool vuprs::CollaborationBeamformer::StartBeamformerWithConfiguration(const CollaborationBeamformerConfig &config)
+bool vuprs::HybridBeamformer::StartBeamformerWithConfiguration(const HybridBeamformerConfig &config)
 {
-    PARAM_CHECK(this->ConfigDone(), "collab_bf", " in [CollaborationBeamformer::StartBeamformerWithConfiguration] Config not complete.");
+    PARAM_CHECK(this->ConfigDone(), "hybrid_bf", " in [HybridBeamformer::StartBeamformerWithConfiguration] Config not complete.");
     Eigen::Matrix<Eigen::dcomplex, -1, -1> fir_expected_frequency_response; /* Expected frequency response of FIR filter bank */
     std::vector<std::vector<double>> fir_coefficients;                      /* Coefficient of FIR filter bank */
     std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> _dma_descriptors;   /* SG descriptors for AXI DMA */
@@ -186,11 +186,11 @@ bool vuprs::CollaborationBeamformer::StartBeamformerWithConfiguration(const Coll
                                                              FIR_LENGTH);
     /* - FPGA config step 5 - Start ADC */
     retval &= vuprs::FPGA_API__ADC__StartADC(&this->controller, config.fs);
-    RUNTIME_CHECK(retval, "collab_bf", " in [CollaborationBeamformer::StartBeamformerWithConfiguration] Cannot start beam former with config");
+    RUNTIME_CHECK(retval, "hybrid_bf", " in [HybridBeamformer::StartBeamformerWithConfiguration] Cannot start beam former with config");
     return retval;
 }
 
-bool vuprs::CollaborationBeamformer::ReDirect(double alt, double az, double wave_velocity)
+bool vuprs::HybridBeamformer::ReDirect(double alt, double az, double wave_velocity)
 {
     std::vector<int> predelay_count;
     std::vector<double> predelay_time;
@@ -212,12 +212,12 @@ bool vuprs::CollaborationBeamformer::ReDirect(double alt, double az, double wave
                                               channel_name);
 }
 
-bool vuprs::CollaborationBeamformer::isRun() const
+bool vuprs::HybridBeamformer::isRun() const
 {
     return this->system_run;
 }
 
-bool vuprs::CollaborationBeamformer::run(const vuprs::CollaborationBeamformerConfig &config)
+bool vuprs::HybridBeamformer::run(const vuprs::HybridBeamformerConfig &config)
 {
     this->stop();
     this->StartBeamformerWithConfiguration(config);
@@ -236,7 +236,7 @@ bool vuprs::CollaborationBeamformer::run(const vuprs::CollaborationBeamformerCon
     return true;
 }
 
-void vuprs::CollaborationBeamformer::stop()
+void vuprs::HybridBeamformer::stop()
 {
     this->system_run = false;
     this->algorithm_cv.notify_all();
@@ -254,12 +254,12 @@ void vuprs::CollaborationBeamformer::stop()
 
 /* ------------------------------------------ Thread Control ----------------------------------------- */
 
-bool vuprs::CollaborationBeamformer::HasResult() const
+bool vuprs::HybridBeamformer::HasResult() const
 {
     return this->new_result_data_input;
 }
 
-bool vuprs::CollaborationBeamformer::ReadResult(std::vector<uint32_t> *result)
+bool vuprs::HybridBeamformer::ReadResult(std::vector<uint32_t> *result)
 {
     bool read_success = false;
     if (this->new_result_data_input)
@@ -278,12 +278,12 @@ bool vuprs::CollaborationBeamformer::ReadResult(std::vector<uint32_t> *result)
     return read_success;
 }
 
-bool vuprs::CollaborationBeamformer::HasArraySignal() const
+bool vuprs::HybridBeamformer::HasArraySignal() const
 {
     return this->new_array_signal_input;
 }
 
-bool vuprs::CollaborationBeamformer::ReadArraySignal(vuprs::SignalData *signalData)
+bool vuprs::HybridBeamformer::ReadArraySignal(vuprs::SignalData *signalData)
 {
     bool read_success = false;
     if (this->new_array_signal_input)
@@ -302,12 +302,12 @@ bool vuprs::CollaborationBeamformer::ReadArraySignal(vuprs::SignalData *signalDa
     return read_success;
 }
 
-bool vuprs::CollaborationBeamformer::HasScanPower() const
+bool vuprs::HybridBeamformer::HasScanPower() const
 {
     return this->new_scan_points_input;
 }
 
-bool vuprs::CollaborationBeamformer::ReadScanPower(std::vector<uint16_t> *scanPower, double *max_power_db, double *min_power_db)
+bool vuprs::HybridBeamformer::ReadScanPower(std::vector<uint16_t> *scanPower, double *max_power_db, double *min_power_db)
 {
     bool read_success = false;
     if (this->new_scan_points_input)
@@ -328,7 +328,7 @@ bool vuprs::CollaborationBeamformer::ReadScanPower(std::vector<uint16_t> *scanPo
     return read_success;
 }
 
-void vuprs::CollaborationBeamformer::THREAD__ScanPowerCalculation()
+void vuprs::HybridBeamformer::THREAD__ScanPowerCalculation()
 {
     vuprs::ScanResult scan_result;
     std::vector<double> alt, az, _scan_result;
@@ -398,7 +398,7 @@ void vuprs::CollaborationBeamformer::THREAD__ScanPowerCalculation()
     }
 }
 
-void vuprs::CollaborationBeamformer::THREAD__ListenDMAInterrupt()
+void vuprs::HybridBeamformer::THREAD__ListenDMAInterrupt()
 {
     uint32_t r_val;
     bool is_first_change = true;
@@ -426,7 +426,7 @@ void vuprs::CollaborationBeamformer::THREAD__ListenDMAInterrupt()
         }
         catch (const std::exception &e)
         {
-            std::cout << "Error in [CollaborationBeamformer::THREAD__ListenDMAInterrupt] Error: " << e.what() << std::endl;
+            std::cout << "Error in [HybridBeamformer::THREAD__ListenDMAInterrupt] Error: " << e.what() << std::endl;
         }
         if (!this->system_run)
             break; /* Jump out */
@@ -434,7 +434,7 @@ void vuprs::CollaborationBeamformer::THREAD__ListenDMAInterrupt()
     }
 }
 
-void vuprs::CollaborationBeamformer::THREAD__ReadResult()
+void vuprs::HybridBeamformer::THREAD__ReadResult()
 {
     vuprs::AXI_DMA_ScatterGatherDescriptor current_descriptor, previous_descriptor, next_descriptor;
     std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> _ref_descriptors;
@@ -509,17 +509,17 @@ void vuprs::CollaborationBeamformer::THREAD__ReadResult()
             }
             catch (const std::exception &e)
             {
-                std::cout << "Error in [CollaborationBeamformer::THREAD__ReadResult] " << e.what() << std::endl;
+                std::cout << "Error in [HybridBeamformer::THREAD__ReadResult] " << e.what() << std::endl;
             }
         }
         else
         {
-            std::cout << "Warning in [CollaborationBeamformer::THREAD__ReadResult] Cannot match current descriptor address to any in the reference list." << std::endl;
+            std::cout << "Warning in [HybridBeamformer::THREAD__ReadResult] Cannot match current descriptor address to any in the reference list." << std::endl;
         }
     }
 }
 
-void vuprs::CollaborationBeamformer::THREAD__ReadCircularBuffer()
+void vuprs::HybridBeamformer::THREAD__ReadCircularBuffer()
 {
     uint32_t r_val;
     vuprs::SignalData multi_channel_signal; /* signal data (from circular buffer) */
@@ -535,7 +535,7 @@ void vuprs::CollaborationBeamformer::THREAD__ReadCircularBuffer()
         }
         catch (const std::exception &e)
         {
-            std::cout << "Error in [CollaborationBeamformer::THREAD__ReadCircularBuffer] " << e.what() << std::endl;
+            std::cout << "Error in [HybridBeamformer::THREAD__ReadCircularBuffer] " << e.what() << std::endl;
         }
         if (r_val == 0x01)
         {
@@ -566,12 +566,12 @@ void vuprs::CollaborationBeamformer::THREAD__ReadCircularBuffer()
                 }
                 else
                 {
-                    RUNTIME_CHECK(false, "collab_bf", " in [CollaborationBeamformer::THREAD__ReadCircularBuffer] Cannot read circular buffer.");
+                    RUNTIME_CHECK(false, "hybrid_bf", " in [HybridBeamformer::THREAD__ReadCircularBuffer] Cannot read circular buffer.");
                 }
             }
             catch (const std::exception &e)
             {
-                std::cout << "Error in [CollaborationBeamformer::THREAD__ReadCircularBuffer]" << e.what() << std::endl;
+                std::cout << "Error in [HybridBeamformer::THREAD__ReadCircularBuffer]" << e.what() << std::endl;
             }
         }
         if (!this->system_run)
@@ -580,9 +580,9 @@ void vuprs::CollaborationBeamformer::THREAD__ReadCircularBuffer()
     }
 }
 
-void vuprs::CollaborationBeamformer::THREAD__AlgorithmCalculation()
+void vuprs::HybridBeamformer::THREAD__AlgorithmCalculation()
 {
-    bool has_interrupt, operation_status;
+    bool has_interrupt, operation - status;
     vuprs::SignalData signal;
     Eigen::Matrix<Eigen::dcomplex, -1, -1> fir_expected_frequency_response; /* Expected frequency response of FIR filter bank */
     std::vector<std::vector<double>> fir_coefficients;                      /* Coefficient of FIR filter bank, [channel][point] */
@@ -623,7 +623,7 @@ void vuprs::CollaborationBeamformer::THREAD__AlgorithmCalculation()
                 this->scan_cv.notify_all(); /* Notify scan thread to calculate (if waiting) */
             }
             /* - Check calculate enabled */
-            RUNTIME_CHECK(this->bf->CalculateEnable(), "collab_bf", " in [CollaborationBeamformer::THREAD__AlgorithmCalculation] Beam forming algorithm cannot calculate.");
+            RUNTIME_CHECK(this->bf->CalculateEnable(), "hybrid_bf", " in [HybridBeamformer::THREAD__AlgorithmCalculation] Beam forming algorithm cannot calculate.");
             /* Step 3: Calculate beamforming */
             this->bf->CalculateBeamforming();
             /* Step 4: Get FIR filter bank expected frequency response */
@@ -646,17 +646,17 @@ void vuprs::CollaborationBeamformer::THREAD__AlgorithmCalculation()
             debug_file_group = 0;
 #endif
         /* Issue coefficients to FIR */
-        operation_status = true;
+        operation - status = true;
         try
         {
-            operation_status &= vuprs::FPGA_API__FIR__SetCoefficients(&this->controller,
-                                                                      &fir_coefficients,
-                                                                      this->fir.MaxAbsoluteFIRCoefficient());
-            RUNTIME_CHECK(operation_status, "collab_bf", "FPGA operation failed.");
+            operation - status &= vuprs::FPGA_API__FIR__SetCoefficients(&this->controller,
+                                                                        &fir_coefficients,
+                                                                        this->fir.MaxAbsoluteFIRCoefficient());
+            RUNTIME_CHECK(operation - status, "hybrid_bf", "FPGA operation failed.");
         }
         catch (const std::exception &e)
         {
-            std::cout << "Error in [CollaborationBeamformer::THREAD__AlgorithmCalculation] " << e.what() << std::endl;
+            std::cout << "Error in [HybridBeamformer::THREAD__AlgorithmCalculation] " << e.what() << std::endl;
         }
     }
 }

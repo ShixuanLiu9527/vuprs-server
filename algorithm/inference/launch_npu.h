@@ -21,14 +21,56 @@ namespace vuprs
         RknnModel(RknnModel &&other) noexcept;
         RknnModel &operator=(RknnModel &&other) noexcept;
 
+        /**
+         * @brief Init inference model.
+         *
+         * @param model_path Model path.
+         */
         void InitModel(const std::string &model_path);
+
+        /**
+         * @brief Run inference.
+         */
         void run();
+
+        /**
+         * @brief Set data to one input tensor of the model.
+         *
+         * @param index Index of input tensor (0, 1, ...).
+         * @param buffer Pointer to the tensor data. The data must be arranged in
+         *               memory according to the specified `layout` (e.g., NCHW or NHWC).
+         *               The caller is responsible for ensuring the data layout matches
+         *               the tensor's expected format; otherwise inference results may
+         *               be incorrect or the API may fail.
+         * @param size Size of the tensor data in bytes. Must exactly match the
+         *             product of tensor dimensions, data type size, and channel count,
+         *             considering the layout.
+         * @param type Data type of each element (e.g., RKNN_TENSOR_UINT8, RKNN_TENSOR_FLOAT32).
+         *             The buffer's memory layout must also respect this type's alignment.
+         * @param layout Tensor layout (RKNN_TENSOR_NCHW or RKNN_TENSOR_NHWC). This
+         *               defines the order of dimensions in the buffer. For NCHW,
+         *               data is stored as [batch, channels, height, width] contiguous
+         *               per channel; for NHWC, it is [batch, height, width, channels].
+         *               Make sure the buffer is filled accordingly.
+         */
         void SetInput(uint32_t index,
                       void *buffer,
                       uint32_t size,
-                      _rknn_tensor_type type = _rknn_tensor_type::RKNN_TENSOR_UINT8,
-                      _rknn_tensor_format layout = _rknn_tensor_format::RKNN_TENSOR_NCHW);
+                      rknn_tensor_type type = rknn_tensor_type::RKNN_TENSOR_UINT8,
+                      rknn_tensor_format layout = rknn_tensor_format::RKNN_TENSOR_NCHW);
+
+        /**
+         * @brief Get output tensor of model.
+         *
+         * @param index Index of output tensor (0, 1, ...)
+         * @param buffer Pointer of the output data.
+         * @param size The size of output tensor (bytes).
+         */
         void GetOutput(uint32_t index, void *buffer, uint32_t size);
+
+        /**
+         * @brief Check if the model ready to inference.
+         */
         bool ModelReady() const { return this->ctx_ != 0; }
 
         uint32_t GetInputCount() const { return io_num_.n_input; }

@@ -5,7 +5,7 @@
 #include "system_tools/string_parse.h"
 #include "system_tools/aligned_buffer.h"
 #include "fpga/fpga_io_manager.h"
-#include "logger/log_manager.h"
+#include "logger/check.h"
 
 #define _IS_CODING_MODE false /* should be false before compilering */
 #if _IS_CODING_MODE

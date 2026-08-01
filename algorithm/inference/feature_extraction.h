@@ -6,20 +6,20 @@
 #include <Eigen/Dense>
 #include <vector>
 #include "algorithm/signal_processing/signal_processing.h"
-#include "logger/log_manager.h"
+#include "logger/check.h"
 
 namespace vuprs
 {
-    double f2mel(double f) { return 2595.0 * log10(1.0 + f / 700.0); }
+    inline double f2mel(double f) { return 2595.0 * log10(1.0 + f / 700.0); }
 
-    double mel2f(double mel) { return 700.0 * (pow(10.0, mel / 2595.0) - 1.0); }
+    inline double mel2f(double mel) { return 700.0 * (pow(10.0, mel / 2595.0) - 1.0); }
 
-    Eigen::Matrix<double, -1, 1> f2mel(const Eigen::Matrix<double, -1, 1> &f)
+    inline Eigen::Matrix<double, -1, 1> f2mel(const Eigen::Matrix<double, -1, 1> &f)
     {
         return 2595.0 * (f.array() / 700.0 + 1.0).log10();
     }
 
-    Eigen::Matrix<double, -1, 1> mel2f(const Eigen::Matrix<double, -1, 1> &mel)
+    inline Eigen::Matrix<double, -1, 1> mel2f(const Eigen::Matrix<double, -1, 1> &mel)
     {
         return (700.0 * ((mel.array() / 2595.0 * std::log(10.0)).exp() - 1.0)).matrix();
     }

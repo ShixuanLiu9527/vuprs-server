@@ -2,129 +2,113 @@
     "description": "VUPRS FPGA Configurations",
     "platform": "RK3568-XC7A100T",
     "author": "Shixuan Liu",
-    "bus":
-    {
-        "axi-lite": 
-        {
+    "bus": {
+        "axi-lite": {
             "fpga-base-address": "0x40000000",
             "bar-offset": "0x40000000"
         },
-        "axi-full":
-        {
+        "axi-full": {
             "fpga-base-address": "0x00000000"
         },
-        "axi-stream":
-        {
+        "axi-stream": {
             "width": "32"
         }
     },
-    "devices":
-    {
-        "axi_dma":
-        {
+    "devices": {
+        "axi_dma": {
             "control-bus": "axi-lite",
             "data-bus": "axi-stream",
             "fpga-address": "0x40000000",
             "bar-offset": "0x00000000",
             "control-device-file": "/dev/xdma0_user",
             "event-device-file": "/dev/xdma0_events_0",
-            "register-offset": 
-            {
-                "SG_CTL":             "0x2c",
-                "S2MM_DMACR":         "0x30",
-                "S2MM_DMASR":         "0x34",
-                "S2MM_CURDESC":       "0x38",
-                "S2MM_CURDESC_MSB":   "0x3c",
-                "S2MM_TAILDESC":      "0x40",
-                "S2MM_TAILDESC_MSB":  "0x44",
-                "S2MM_DA":            "0x48",
-                "S2MM_DA_MSB":        "0x4c",
-                "S2MM_LENGTH":        "0x58"
+            "register-offset": {
+                "SG_CTL": "0x2c",
+                "S2MM_DMACR": "0x30",
+                "S2MM_DMASR": "0x34",
+                "S2MM_CURDESC": "0x38",
+                "S2MM_CURDESC_MSB": "0x3c",
+                "S2MM_TAILDESC": "0x40",
+                "S2MM_TAILDESC_MSB": "0x44",
+                "S2MM_DA": "0x48",
+                "S2MM_DA_MSB": "0x4c",
+                "S2MM_LENGTH": "0x58"
             },
             "s2mm-length-register-width": "26"
         },
-        "adc_controller":
-        {
+        "adc_controller": {
             "control-bus": "axi-lite",
             "data-bus": "axi-stream",
             "fpga-address": "0x40010000",
             "bar-offset": "0x00010000",
             "control-device-file": "/dev/xdma0_user",
-            "register-offset": 
-            {
-                "ADC_SCI":  "0x00",
-                "ADC_SP":   "0x04",
-                "ADC_SF":   "0x08",
-                "ADC_STR":  "0x0c",
-                "ADC_NGF":  "0x10",
-                "ADC_ERR":  "0x14",
-                "ADC_RST":  "0x18",
-                "ADC_CS":   "0x1c"
+            "register-offset": {
+                "ADC_SCI": "0x00",
+                "ADC_SP": "0x04",
+                "ADC_SF": "0x08",
+                "ADC_STR": "0x0c",
+                "ADC_NGF": "0x10",
+                "ADC_ERR": "0x14",
+                "ADC_RST": "0x18",
+                "ADC_CS": "0x1c"
             },
             "max-sampling-frequency-hz": "120000",
             "voltage-range-radius-v": "10",
             "work-clock-frequency-hz": "50000000"
         },
-        "circular_buffer": 
-        {
+        "circular_buffer": {
             "control-bus": "axi-lite",
             "data-bus": "axi-stream",
             "fpga-address": "0x40020000",
             "bar-offset": "0x00020000",
             "control-device-file": "/dev/xdma0_user",
-            "register-offset": 
-            {
-                "CBUF_FREEZE":  "0x00",
-                "CBUF_RST":     "0x04",
-                "CBUF_RS":      "0x08",
-                "CBUF_CBP":     "0x0c"
+            "register-offset": {
+                "CBUF_FREEZE": "0x00",
+                "CBUF_RST": "0x04",
+                "CBUF_RS": "0x08",
+                "CBUF_CBP": "0x0c"
             },
             "signal-points": "512"
         },
-        "fir_bank": 
-        {
+        "fir_bank": {
             "control-bus": "axi-lite",
             "data-bus": "axi-stream",
             "fpga-address": "0x40030000",
             "bar-offset": "0x00030000",
             "control-device-file": "/dev/xdma0_user",
-            "register-offset": 
-            {
-                "FIR_RST":         "0x00",
-                "FIR_U_FIR_LEN":   "0x04",
-                "FIR_U_FIR_COEF":  "0x08",
-                "FIR_LEN":         "0x0c",
-                "FIR_COEF_SCALE":  "0x10",
-                "FIR_RSC":         "0x14",
-                "FIR_RS":          "0x18",
-                "FIR_MAX_LEN":     "0x1c"
+            "register-offset": {
+                "FIR_RST": "0x00",
+                "FIR_U_FIR_LEN": "0x04",
+                "FIR_U_FIR_COEF": "0x08",
+                "FIR_LEN": "0x0c",
+                "FIR_COEF_SCALE": "0x10",
+                "FIR_RSC": "0x14",
+                "FIR_RS": "0x18",
+                "FIR_MAX_LEN": "0x1c"
             }
         },
-        "pre_delay_unit": 
-        {
+        "pre_delay_unit": {
             "control-bus": "axi-lite",
             "data-bus": "axi-stream",
             "fpga-address": "0x40040000",
             "bar-offset": "0x00040000",
             "control-device-file": "/dev/xdma0_user",
-            "register-offset":
-            {
-                "PREDLY_CH1_CH2":    "0x00",
-                "PREDLY_CH3_CH4":    "0x04",
-                "PREDLY_CH5_CH6":    "0x08",
-                "PREDLY_CH7_CH8":    "0x0c",
-                "PREDLY_CH9_CH10":   "0x10",
-                "PREDLY_CH11_CH12":  "0x14",
-                "PREDLY_CH13_CH14":  "0x18",
-                "PREDLY_CH15_CH16":  "0x1c",
-                "PREDLY_FREEZE":     "0x20",
-                "PREDLY_RST":        "0x24",
-                "PREDLY_RS":         "0x28",
-                "PREDLY_MAX_DLY":    "0x2c"
+            "register-offset": {
+                "PREDLY_CH1_CH2": "0x00",
+                "PREDLY_CH3_CH4": "0x04",
+                "PREDLY_CH5_CH6": "0x08",
+                "PREDLY_CH7_CH8": "0x0c",
+                "PREDLY_CH9_CH10": "0x10",
+                "PREDLY_CH11_CH12": "0x14",
+                "PREDLY_CH13_CH14": "0x18",
+                "PREDLY_CH15_CH16": "0x1c",
+                "PREDLY_FREEZE": "0x20",
+                "PREDLY_RST": "0x24",
+                "PREDLY_RS": "0x28",
+                "PREDLY_MAX_DLY": "0x2c"
             }
         },
-        "ddr": 
-        {
+        "ddr": {
             "control-bus": "none",
             "data-bus": "axi-full",
             "fpga-address": "0x00000000",
@@ -132,8 +116,7 @@
             "c2h-device-file": "/dev/xdma0_c2h_0",
             "memory-capacity-kilobytes": "524288"
         },
-        "fir_bram":
-        {
+        "fir_bram": {
             "control-bus": "none",
             "data-bus": "axi-full",
             "fpga-address": "0x20010000",
@@ -141,8 +124,7 @@
             "c2h-device-file": "/dev/xdma0_c2h_0",
             "memory-capacity-kilobytes": "32"
         },
-        "sg_bram":
-        {
+        "sg_bram": {
             "control-bus": "none",
             "data-bus": "axi-full",
             "fpga-address": "0x20020000",
@@ -150,8 +132,7 @@
             "c2h-device-file": "/dev/xdma0_c2h_0",
             "memory-capacity-kilobytes": "16"
         },
-        "cbuf_bram":
-        {
+        "cbuf_bram": {
             "control-bus": "none",
             "data-bus": "axi-full",
             "fpga-address": "0x20030000",
@@ -160,20 +141,35 @@
             "memory-capacity-kilobytes": "32"
         }
     },
-    "xdma-driver": 
-    {
-        "device-files": 
-        {
+    "xdma-driver": {
+        "device-files": {
             "xdma-control": "/dev/xdma0_control",
             "xdma-user": "/dev/xdma0_user",
-            "xdma-h2c": ["/dev/xdma0_h2c_0", "/dev/xdma0_h2c_1"],
-            "xdma-c2h": ["/dev/xdma0_c2h_0", "/dev/xdma0_c2h_1"],
-            "xdma-events": 
-            [
-                "/dev/xdma0_events_0", "/dev/xdma0_events_1", "/dev/xdma0_events_2", "/dev/xdma0_events_3", 
-                "/dev/xdma0_events_4", "/dev/xdma0_events_5", "/dev/xdma0_events_6", "/dev/xdma0_events_7", 
-                "/dev/xdma0_events_8", "/dev/xdma0_events_9", "/dev/xdma0_events_10", "/dev/xdma0_events_11",
-                "/dev/xdma0_events_12", "/dev/xdma0_events_13", "/dev/xdma0_events_14", "/dev/xdma0_events_15"
+            "xdma-h2c": [
+                "/dev/xdma0_h2c_0",
+                "/dev/xdma0_h2c_1"
+            ],
+            "xdma-c2h": [
+                "/dev/xdma0_c2h_0",
+                "/dev/xdma0_c2h_1"
+            ],
+            "xdma-events": [
+                "/dev/xdma0_events_0",
+                "/dev/xdma0_events_1",
+                "/dev/xdma0_events_2",
+                "/dev/xdma0_events_3",
+                "/dev/xdma0_events_4",
+                "/dev/xdma0_events_5",
+                "/dev/xdma0_events_6",
+                "/dev/xdma0_events_7",
+                "/dev/xdma0_events_8",
+                "/dev/xdma0_events_9",
+                "/dev/xdma0_events_10",
+                "/dev/xdma0_events_11",
+                "/dev/xdma0_events_12",
+                "/dev/xdma0_events_13",
+                "/dev/xdma0_events_14",
+                "/dev/xdma0_events_15"
             ]
         },
         "max-transfer-size-bytes": "65536",

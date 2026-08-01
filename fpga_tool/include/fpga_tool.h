@@ -110,22 +110,19 @@ namespace tool
     {
         _FPGA_OPERATION operation;
         int isread; /* true: is read, false: is write */
-        bool transferSizeIfFilesize;
-        uint32_t offset;       /* (in dev/memo) offset */
-        uint32_t value;        /* (in dev) write value */
-        uint32_t transfersize; /* (in mem only) transfer size */
-        std::string file;      /* (in mem only) output & input file */
+        bool transfer_size_if_file_size;
+        uint32_t offset;        /* (in dev/memo) offset */
+        uint32_t value;         /* (in dev) write value */
+        uint32_t transfer_size; /* (in mem only) transfer size */
+        std::string file;       /* (in mem only) output & input file */
     };
 
     void _FPGA_TOOL_CommandParseResult_ToDefault(_FPGA_TOOL_CommandParseResult *result);
-
     void FPGA_TOOL_PrintHelp();
     void FPGA_TOOL_PrintErrorInfo();
-
     void FPGA_TOOL_PrintValue(uint32_t offset, uint32_t val);
     void FPGA_TOOL_PrintDeviceRegisters(const std::vector<std::string> &name, const std::vector<uint32_t> &offset, const std::vector<uint32_t> &val);
-
-    void FPGA_TOOL_ParseCommand(const std::vector<std::string> &args, const std::vector<std::string> &argsLower, _FPGA_TOOL_CommandParseResult *result);
+    void FPGA_TOOL_ParseCommand(const std::vector<std::string> &args, const std::vector<std::string> &args_lower, _FPGA_TOOL_CommandParseResult *result);
     void FPGA_TOOL_RestoreCommand(std::vector<std::string> *args);
 }
 

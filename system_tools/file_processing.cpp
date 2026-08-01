@@ -1,6 +1,6 @@
 #include <iomanip>
 #include "system_tools/file_processing.h"
-#include "logger/log_manager.h"
+#include "logger/check.h"
 
 static std::string EnsureTrailingSlash(const std::string &path)
 {

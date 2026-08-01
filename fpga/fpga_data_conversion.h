@@ -76,23 +76,15 @@ constexpr uint16_t ADC_FRAME_TAILER__L = (uint16_t)(ADC_FRAME_TAILER & 0xFFFF);
 #define ADC_CHANNEL_NAME__B_7 "CH-B-7"
 #define ADC_CHANNEL_NAME__B_8 "CH-B-8"
 
-#define IS_ADC_CHANNEL_NAME(VAL)     \
-    (VAL == ADC_CHANNEL_NAME__A_1 || \
-     VAL == ADC_CHANNEL_NAME__A_2 || \
-     VAL == ADC_CHANNEL_NAME__A_3 || \
-     VAL == ADC_CHANNEL_NAME__A_4 || \
-     VAL == ADC_CHANNEL_NAME__A_5 || \
-     VAL == ADC_CHANNEL_NAME__A_6 || \
-     VAL == ADC_CHANNEL_NAME__A_7 || \
-     VAL == ADC_CHANNEL_NAME__A_8 || \
-     VAL == ADC_CHANNEL_NAME__B_1 || \
-     VAL == ADC_CHANNEL_NAME__B_2 || \
-     VAL == ADC_CHANNEL_NAME__B_3 || \
-     VAL == ADC_CHANNEL_NAME__B_4 || \
-     VAL == ADC_CHANNEL_NAME__B_5 || \
-     VAL == ADC_CHANNEL_NAME__B_6 || \
-     VAL == ADC_CHANNEL_NAME__B_7 || \
-     VAL == ADC_CHANNEL_NAME__B_8)
+#define IS_ADC_CHANNEL_NAME(VAL)                                     \
+    (VAL == ADC_CHANNEL_NAME__A_1 || VAL == ADC_CHANNEL_NAME__A_2 || \
+     VAL == ADC_CHANNEL_NAME__A_3 || VAL == ADC_CHANNEL_NAME__A_4 || \
+     VAL == ADC_CHANNEL_NAME__A_5 || VAL == ADC_CHANNEL_NAME__A_6 || \
+     VAL == ADC_CHANNEL_NAME__A_7 || VAL == ADC_CHANNEL_NAME__A_8 || \
+     VAL == ADC_CHANNEL_NAME__B_1 || VAL == ADC_CHANNEL_NAME__B_2 || \
+     VAL == ADC_CHANNEL_NAME__B_3 || VAL == ADC_CHANNEL_NAME__B_4 || \
+     VAL == ADC_CHANNEL_NAME__B_5 || VAL == ADC_CHANNEL_NAME__B_6 || \
+     VAL == ADC_CHANNEL_NAME__B_7 || VAL == ADC_CHANNEL_NAME__B_8)
 
 namespace vuprs
 {
@@ -108,13 +100,12 @@ namespace vuprs
         std::unordered_map<std::string, uint8_t> CHANNEL_NAME__TO__CHANNEL_INDEX;
 
     public:
-        SignalData();
-
         std::vector<std::vector<std::complex<double>>> _channel_data;
         std::vector<std::string> _channel_name;
-
         double fs = 0.0, sampling_time = 0.0;
         int signal_points = 0; /* signal data point number for one channel */
+
+        SignalData();
 
         /**
          * @brief Indicate whether this channel is included.

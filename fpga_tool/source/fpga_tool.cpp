@@ -1,5 +1,5 @@
 #include "fpga_tool/include/fpga_tool.h"
-#include "logger/log_manager.h"
+#include "logger/check.h"
 
 void tool::_FPGA_TOOL_CommandParseResult_ToDefault(_FPGA_TOOL_CommandParseResult *result)
 {
@@ -7,8 +7,8 @@ void tool::_FPGA_TOOL_CommandParseResult_ToDefault(_FPGA_TOOL_CommandParseResult
     result->isread = -1;
     result->offset = 0;
     result->value = 0;
-    result->transfersize = 0;
-    result->transferSizeIfFilesize = false;
+    result->transfer_size = 0;
+    result->transfer_size_if_file_size = false;
     result->file = "";
 }
 
@@ -83,57 +83,51 @@ void tool::FPGA_TOOL_PrintValue(uint32_t offset, uint32_t val)
 void tool::FPGA_TOOL_PrintDeviceRegisters(const std::vector<std::string> &name, const std::vector<uint32_t> &offset, const std::vector<uint32_t> &val)
 {
     int len = name.size();
-
     PARAM_CHECK(len > 0, "fpga_tool", " No registers to display.");
-
     printf(" | ------------------------ List Registers ----------------------------- |\n");
-
-    size_t maxNameLength = 0;
+    size_t max_name_length = 0;
     for (int i = 0; i < len; i++)
     {
-        if (name[i].length() > maxNameLength)
+        if (name[i].length() > max_name_length)
         {
-            maxNameLength = name[i].length();
+            max_name_length = name[i].length();
         }
     }
-
-    int maxOffsetHexLength = 0;
+    int max_offset_hex_length = 0;
     for (int i = 0; i < len; i++)
     {
         uint32_t temp = offset[i];
-        int hexLength = 0;
+        int hex_length = 0;
         if (temp == 0)
         {
-            hexLength = 1;
+            hex_length = 1;
         }
         else
         {
             while (temp > 0)
             {
                 temp >>= 4;
-                hexLength++;
+                hex_length++;
             }
         }
-        if (hexLength > maxOffsetHexLength)
+        if (hex_length > max_offset_hex_length)
         {
-            maxOffsetHexLength = hexLength;
+            max_offset_hex_length = hex_length;
         }
     }
-
-    if (maxOffsetHexLength < 2)
-        maxOffsetHexLength = 2;
-    if (maxOffsetHexLength % 2 != 0)
-        maxOffsetHexLength++;
-
+    if (max_offset_hex_length < 2)
+        max_offset_hex_length = 2;
+    if (max_offset_hex_length % 2 != 0)
+        max_offset_hex_length++;
     for (int i = 0; i < len; i++)
     {
         printf("   ");
         printf("(0x");
         uint32_t temp = offset[i];
-        int hexLength = 0;
+        int hex_length = 0;
         if (temp == 0)
         {
-            hexLength = 1;
+            hex_length = 1;
         }
         else
         {
@@ -141,36 +135,30 @@ void tool::FPGA_TOOL_PrintDeviceRegisters(const std::vector<std::string> &name, 
             while (t > 0)
             {
                 t >>= 4;
-                hexLength++;
+                hex_length++;
             }
         }
-
-        for (int j = hexLength; j < maxOffsetHexLength; j++)
+        for (int j = hex_length; j < max_offset_hex_length; j++)
         {
             printf("0");
         }
-
         printf("%X)", offset[i]);
         printf(" ");
         printf("%s", name[i].c_str());
-
-        int spacesAfterName = maxNameLength - name[i].length();
+        int spaces_after_name = max_name_length - name[i].length();
         printf(":");
-
-        for (int j = 0; j < spacesAfterName + 2; j++)
+        for (int j = 0; j < spaces_after_name + 2; j++)
         {
             printf(" ");
         }
-
         printf("\033[33m0x%08X\033[0m\n", val[i]);
     }
-
     printf(" | --------------------------------------------------------------------- |\n");
 }
 
-void tool::FPGA_TOOL_ParseCommand(const std::vector<std::string> &args, const std::vector<std::string> &argsLower, _FPGA_TOOL_CommandParseResult *result)
+void tool::FPGA_TOOL_ParseCommand(const std::vector<std::string> &args, const std::vector<std::string> &args_lower, _FPGA_TOOL_CommandParseResult *result)
 {
-    bool offset_parseStatus = false, value_parseStatus = false, transfersize_parseStatus = true;
+    bool offset_parse_status = false, value_parse_status = false, transfer_size_parse_status = true;
 
     tool::_FPGA_TOOL_CommandParseResult_ToDefault(result);
 
@@ -206,9 +194,9 @@ void tool::FPGA_TOOL_ParseCommand(const std::vector<std::string> &args, const st
             result->operation = _FPGA_OPERATION::DEVICE_REGISTER_OPERATION__PDLY;
 
         result->isread = true;
-        result->offset = vuprs::ParseNumberFromString(args[6], &offset_parseStatus);
+        result->offset = vuprs::ParseNumberFromString(args[6], &offset_parse_status);
 
-        if (!offset_parseStatus)
+        if (!offset_parse_status)
             result->operation = _FPGA_OPERATION::OPERATION_ERR;
     }
     else if (args.size() == 9)
@@ -225,10 +213,10 @@ void tool::FPGA_TOOL_ParseCommand(const std::vector<std::string> &args, const st
             result->operation = _FPGA_OPERATION::DEVICE_REGISTER_OPERATION__PDLY;
 
         result->isread = false;
-        result->offset = vuprs::ParseNumberFromString(args[6], &offset_parseStatus);
-        result->value = vuprs::ParseNumberFromString(args[8], &value_parseStatus);
+        result->offset = vuprs::ParseNumberFromString(args[6], &offset_parse_status);
+        result->value = vuprs::ParseNumberFromString(args[8], &value_parse_status);
 
-        if (!offset_parseStatus || !value_parseStatus)
+        if (!offset_parse_status || !value_parse_status)
             result->operation = _FPGA_OPERATION::OPERATION_ERR;
     }
     else if (args.size() == 11)
@@ -249,23 +237,23 @@ void tool::FPGA_TOOL_ParseCommand(const std::vector<std::string> &args, const st
         else
             result->operation = _FPGA_OPERATION::OPERATION_ERR;
 
-        result->offset = vuprs::ParseNumberFromString(args[6], &offset_parseStatus);
+        result->offset = vuprs::ParseNumberFromString(args[6], &offset_parse_status);
 
         if (IS_FILE_SIZE(args[8]))
         {
-            result->transfersize = 0;
-            result->transferSizeIfFilesize = true;
-            transfersize_parseStatus = true;
+            result->transfer_size = 0;
+            result->transfer_size_if_file_size = true;
+            transfer_size_parse_status = true;
         }
         else
         {
-            result->transfersize = vuprs::ParseNumberFromString(args[8], &transfersize_parseStatus);
-            result->transferSizeIfFilesize = false;
+            result->transfer_size = vuprs::ParseNumberFromString(args[8], &transfer_size_parse_status);
+            result->transfer_size_if_file_size = false;
         }
 
-        result->file = argsLower[10];
+        result->file = args_lower[10];
 
-        if (!offset_parseStatus || !transfersize_parseStatus)
+        if (!offset_parse_status || !transfer_size_parse_status)
             result->operation = _FPGA_OPERATION::OPERATION_ERR;
     }
 }

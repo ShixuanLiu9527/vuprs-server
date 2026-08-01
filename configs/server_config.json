@@ -8,24 +8,26 @@
         "certain-commands": {
             "ack": {
                 "cmd": "ACK",
-                "included_params": [],
-                "operation_status": {
+                "included-params": [],
+                "operation-status": {
                     "success": "DONE",
                     "failure": "FAILED"
                 }
             },
             "change_beamformer": {
                 "cmd": "CHANGE_BEAMFORMER",
-                "included_params": ["beamformer"],
-                "operation_status": {
+                "included-params": [
+                    "beamformer"
+                ],
+                "operation-status": {
                     "success": "DONE",
                     "failure": "FAILED"
                 }
             },
             "get_direction": {
                 "cmd": "GET_DIRECTION",
-                "included_params": [],
-                "operation_status": {
+                "included-params": [],
+                "operation-status": {
                     "success": "DONE",
                     "failure": "FAILED"
                 }

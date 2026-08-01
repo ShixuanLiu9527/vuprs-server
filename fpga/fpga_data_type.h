@@ -6,7 +6,7 @@
 #include <vector>
 #include <stdexcept>
 #include <iostream>
-#include "logger/log_manager.h"
+#include "logger/check.h"
 
 /**
  * @note ADC data format: Q15

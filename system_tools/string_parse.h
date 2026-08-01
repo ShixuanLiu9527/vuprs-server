@@ -10,7 +10,7 @@
 #include <sstream>
 #include <iomanip>
 #include "3rdparty/nlohmann/json.hpp"
-#include "logger/log_manager.h"
+#include "logger/check.h"
 
 namespace vuprs
 {

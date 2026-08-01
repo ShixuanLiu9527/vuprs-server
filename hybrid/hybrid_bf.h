@@ -1,5 +1,5 @@
-#ifndef COLLABORATION_BEAMFORMER_H
-#define COLLABORATION_BEAMFORMER_H
+#ifndef HYBRID_BEAMFORMGING__H
+#define HYBRID_BEAMFORMGING__H
 
 #include <mutex>
 #include <queue>
@@ -8,7 +8,7 @@
 #include <condition_variable>
 #include "algorithm/bf/beam_former.h"
 #include "algorithm/bf/fir.h"
-#include "collab_bf/collaboration_configs.h"
+#include "hybrid/hybrid_bf_config.h"
 #include "fpga/fpga_api.h"
 
 namespace vuprs
@@ -26,29 +26,26 @@ namespace vuprs
      *
      * @note Usage:
      * @note --- ---
-     * @note Step 1: Create CollaborationBeamformer obj.
+     * @note Step 1: Create HybridBeamformer obj.
      * @note Step 2: Call InitCollaborationBeamformer() to initialize FPGA controller and algorithm.
      * @note Step 3: Call BindBeamformer() to bind beam forming algorithm (optional, if not called, default algorithm DCRCB will be used).
      * @note Step 4: Call RUN() to start beam former.
      * @note Step 5: Call ReadResultFromQueue() to read result from queue.
      * @note Step 6: Call STOP() to stop & reset beam former.
      */
-    class CollaborationBeamformer
+    class HybridBeamformer
     {
     private:
         bool config_done;
-
-        std::vector<std::thread> threads; /* Beam former threads */
-
-        vuprs::FPGAController controller; /* FPGA controller */
-
+        std::vector<std::thread> threads;                                    /* Beam former threads */
+        vuprs::FPGAController controller;                                    /* FPGA controller */
         std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> dma_descriptors; /* SG descriptors for AXI DMA */
         vuprs::AXI_DMA_SGDescriptor_Config sg_descriptor_config;             /* SG descriptor config */
 
         /**
          * @brief Start beam former (hardware & algorithm).
          */
-        bool StartBeamformerWithConfiguration(const vuprs::CollaborationBeamformerConfig &config);
+        bool StartBeamformerWithConfiguration(const vuprs::HybridBeamformerConfig &config);
 
         /**
          * @brief Reset FPGA.
@@ -58,62 +55,47 @@ namespace vuprs
         bool ResetHardwareBeamformer();
 
         /* Thread parameters */
-
         std::mutex mut; /* Global mutex lock */
 
         /* Scan */
-
-        std::mutex mut_scan_opt;                 /* Scan mutex lock */
-        std::vector<double> scan_alt, scan_az;   /* controlled by mut_scan_opt */
-        int scan_points_in_hemisphere;           /* controlled by mut_scan_opt */
-        double scan_wave_velocity, scan_alt_min; /* controlled by mut_scan_opt */
-
+        std::mutex mut_scan_opt;                         /* Scan mutex lock */
+        std::vector<double> scan_alt, scan_az;           /* controlled by mut_scan_opt */
+        int scan_points_in_hemisphere;                   /* controlled by mut_scan_opt */
+        double scan_wave_velocity, scan_alt_min;         /* controlled by mut_scan_opt */
         std::atomic<bool> new_scan_points_input{false};  /* scan points changed flag */
         std::mutex mut_scan_result;                      /* Scan result mutex lock */
         std::condition_variable scan_cv;                 /* Scan condition var, controlled by mut_scan */
         std::deque<vuprs::ScanResult> scan_result_queue; /* Scan result, controlled by mut_scan_result */
 
         /* Circular buffer interrupt */
-
-        std::mutex mut_alg;                   /* Algorithm mutex lock */
-        std::condition_variable algorithm_cv; /* Algorithm interrupt condition var, [controlled by mut_alg] */
-
-        std::deque<vuprs::SignalData> array_signal_queue; /* Array signal queue, [controlled by mut_alg] */
-
+        std::mutex mut_alg;                                      /* Algorithm mutex lock */
+        std::condition_variable algorithm_cv;                    /* Algorithm interrupt condition var, [controlled by mut_alg] */
+        std::deque<vuprs::SignalData> array_signal_queue;        /* Array signal queue, [controlled by mut_alg] */
         std::atomic<bool> new_array_signal_input{false};         /* new array signal input flag */
         std::mutex mut_output_arraySignal;                       /* Output array signal mutex lock */
         std::deque<vuprs::SignalData> output_array_signal_queue; /* Output array signal queue, controlled by mut_output_arraySignal */
-
-        vuprs::FIRCalculator fir;                              /* FIR algorithm, [controlled by mut_alg] (can be only used in THREAD__AlgorithmCalculation) */
-        std::unique_ptr<vuprs::WidebandBeamformerTemplate> bf; /* Beam forming algorithm, [controlled by mut_alg] (can be only used in THREAD__AlgorithmCalculation) */
-        double hardware_fs;                                    /* Hardware sampling frequency, calculate by SCI register, [controlled by mut_alg] */
+        vuprs::FIRCalculator fir;                                /* FIR algorithm, [controlled by mut_alg] (can be only used in THREAD__AlgorithmCalculation) */
+        std::unique_ptr<vuprs::WidebandBeamformerTemplate> bf;   /* Beam forming algorithm, [controlled by mut_alg] (can be only used in THREAD__AlgorithmCalculation) */
+        double hardware_fs;                                      /* Hardware sampling frequency, calculate by SCI register, [controlled by mut_alg] */
 
         /* DMA Interrupt */
-
         std::atomic<uint32_t> dma_current_desc{0xFFFFFFFF}; /* current descriptor address, initialized to an invalid value */
-
-        std::mutex mut_dma;                       /* DMA Interrupt mutex lock */
-        std::condition_variable dma_interrupt_cv; /* DMA Interrupt condition var, [controlled by mut_dma] */
-
-        std::atomic<bool> new_result_data_input{false}; /* assign to outside */
-        std::deque<std::vector<uint32_t>> result_queue; /* Result queue, [controlled by mut_dma] */
+        std::mutex mut_dma;                                 /* DMA Interrupt mutex lock */
+        std::condition_variable dma_interrupt_cv;           /* DMA Interrupt condition var, [controlled by mut_dma] */
+        std::atomic<bool> new_result_data_input{false};     /* assign to outside */
+        std::deque<std::vector<uint32_t>> result_queue;     /* Result queue, [controlled by mut_dma] */
 
         /* Atomics */
-
-        std::atomic<bool> system_run{false}; /* system run enable */
-
-        std::atomic<bool> circular_buffer_irq{false}; /* Circular buffer interrupt flag */
-        std::atomic<bool> dma_descriptor_irq{false};  /* DMA Interrupt flag */
-
-        std::atomic<int> interrupt_wait_time_us{0};       /* = descriptor_update_cycle_us / 10 */
-        std::atomic<int> circular_buffer_wait_time_us{0}; /* = descriptor_update_cycle_us / 5 */
-
+        std::atomic<bool> system_run{false};                  /* system run enable */
+        std::atomic<bool> circular_buffer_irq{false};         /* Circular buffer interrupt flag */
+        std::atomic<bool> dma_descriptor_irq{false};          /* DMA Interrupt flag */
+        std::atomic<int> interrupt_wait_time_us{0};           /* = descriptor_update_cycle_us / 10 */
+        std::atomic<int> circular_buffer_wait_time_us{0};     /* = descriptor_update_cycle_us / 5 */
         std::atomic<uint32_t> circular_buffer_queue_size_max; /* MAX size of circular buffer queue */
         std::atomic<uint32_t> result_queue_size_max;          /* MAX size of result queue */
-
-        std::atomic<bool> scan_enable{false};              /* Scan enable flag */
-        std::atomic<bool> scan_options_changed{false};     /* Scan options changed flag */
-        std::atomic<bool> scan_options_initialized{false}; /* Scan options initialized flag */
+        std::atomic<bool> scan_enable{false};                 /* Scan enable flag */
+        std::atomic<bool> scan_options_changed{false};        /* Scan options changed flag */
+        std::atomic<bool> scan_options_initialized{false};    /* Scan options initialized flag */
 
         /* Threads */
 
@@ -154,8 +136,8 @@ namespace vuprs
         void THREAD__ScanPowerCalculation();
 
     public:
-        CollaborationBeamformer();
-        ~CollaborationBeamformer();
+        HybridBeamformer();
+        ~HybridBeamformer();
 
         /* ------ Part 1: Initialization ------ */
 
@@ -202,12 +184,12 @@ namespace vuprs
          *
          * @note Tread safety.
          *
-         * @param config CollaborationBeamformerConfig struct.
+         * @param config HybridBeamformerConfig struct.
          *
          * @retval true: success.
          * @retval false: failed.
          */
-        bool run(const CollaborationBeamformerConfig &config);
+        bool run(const HybridBeamformerConfig &config);
 
         /**
          * @brief Stop & reset beam former.

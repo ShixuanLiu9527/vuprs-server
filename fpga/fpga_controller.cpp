@@ -1,5 +1,5 @@
 #include "fpga/fpga_controller.h"
-#include "logger/log_manager.h"
+#include "logger/check.h"
 
 vuprs::FPGAController::FPGAController()
 {
@@ -36,7 +36,6 @@ vuprs::FPGAController::~FPGAController()
 bool vuprs::FPGAController::ConfigFPGAFromJson(const std::string &json_filename)
 {
     std::ifstream f;
-
     /* open config json file */
     f.open(json_filename);
     RUNTIME_CHECK(f.is_open(), "fpga", " in [FPGAController::ConfigFPGAFromJson] Cannot open file: " + json_filename);
@@ -197,7 +196,7 @@ bool vuprs::FPGAController::BindIOManager()
     return bind_status;
 }
 
-bool vuprs::FPGAController::ConfigDown() const
+bool vuprs::FPGAController::ConfigDone() const
 {
     return this->config_done;
 }

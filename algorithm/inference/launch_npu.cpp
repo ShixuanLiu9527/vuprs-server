@@ -1,4 +1,4 @@
-#include "logger/log_manager.h"
+#include "logger/check.h"
 #include "system_tools/file_processing.h"
 #include "algorithm/inference/launch_npu.h"
 
@@ -102,8 +102,8 @@ void vuprs::RknnModel::InitTensorAttrs()
 void vuprs::RknnModel::SetInput(uint32_t index,
                                 void *buffer,
                                 uint32_t size,
-                                _rknn_tensor_type type = _rknn_tensor_type::RKNN_TENSOR_UINT8,
-                                _rknn_tensor_format layout = _rknn_tensor_format::RKNN_TENSOR_NCHW)
+                                rknn_tensor_type type,
+                                rknn_tensor_format layout)
 {
     RUNTIME_CHECK(index < this->io_num_.n_input, "inference", "Invalid input index.");
     rknn_input input;

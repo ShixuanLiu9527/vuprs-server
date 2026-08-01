@@ -1,8 +1,8 @@
 #include "config.h"
-#include "collab_bf/collaboration_configs.h"
-#include "logger/log_manager.h"
+#include "hybrid/hybrid_bf_config.h"
+#include "logger/check.h"
 
-void vuprs::CollaborationBeamformerConfig::SetDefault()
+void vuprs::HybridBeamformerConfig::SetDefault()
 {
     this->fs = 10000.0;                               /* sampling frequency (unit: Hz) */
     this->bf_target__alt = 90.0;                      /* altitude (unit: degree) beam former pointing target */
@@ -18,7 +18,7 @@ void vuprs::CollaborationBeamformerConfig::SetDefault()
     this->queue__result_queue_size_max = 10;          /* [internal param] depth of result data queue */
 }
 
-void vuprs::CollaborationBeamformerConfigMask::Reset()
+void vuprs::HybridBeamformerConfigMask::Reset()
 {
     this->m_fs = false;
     this->m_bf_target__alt = false;
@@ -34,10 +34,10 @@ void vuprs::CollaborationBeamformerConfigMask::Reset()
     this->m_queue__result_queue_size_max = false;
 }
 
-bool vuprs::CheckCollaborationBeamformerConfigValid(vuprs::FPGAController *controller, const vuprs::CollaborationBeamformerConfig &config)
+bool vuprs::CheckCollaborationBeamformerConfigValid(vuprs::FPGAController *controller, const vuprs::HybridBeamformerConfig &config)
 {
     bool retval = true;
-    PARAM_CHECK(controller->ConfigDown(), "collab_bf", " in [CheckCollaborationBeamformerConfigValid] FPGA config not complete.");
+    PARAM_CHECK(controller->ConfigDone(), "hybrid_bf", " in [CheckCollaborationBeamformerConfigValid] FPGA config not complete.");
     retval &= (config.fs > 0 && config.fs < controller->dev__adc_controller.MaxSamplingFrequency());
     retval &= (config.bf_freq__lower < config.fs / 2.0);
     retval &= (config.bf_freq__upper < config.fs / 2.0);

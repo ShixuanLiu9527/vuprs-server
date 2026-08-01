@@ -1,6 +1,6 @@
 #include "config.h"
 #include "fpga/fpga_api.h"
-#include "logger/log_manager.h"
+#include "logger/check.h"
 
 /* ----------------------------------------------------------------------------- */
 /* ----------------------------- ADC Controller -------------------------------- */
@@ -8,7 +8,7 @@
 
 bool vuprs::FPGA_API__ADC__StartADC(vuprs::FPGAController *controller, double fs)
 {
-    PARAM_CHECK(controller->ConfigDown(), "fpga", " in [vuprs::FPGA_API__ADC__StartADC] FPGA Controller not configured in advance.");
+    PARAM_CHECK(controller->ConfigDone(), "fpga", "FPGA Controller not configured in advance.");
 
     uint32_t r_val, w_val;
     bool operate_status = true;
@@ -30,7 +30,7 @@ bool vuprs::FPGA_API__ADC__StartADC(vuprs::FPGAController *controller, double fs
 
 bool vuprs::FPGA_API__ADC__ResetADC(vuprs::FPGAController *controller)
 {
-    PARAM_CHECK(controller->ConfigDown(), "fpga", " in [vuprs::FPGA_API__ADC__ResetADC] FPGA Controller not configured in advance.");
+    PARAM_CHECK(controller->ConfigDone(), "fpga", "FPGA Controller not configured in advance.");
 
     bool operate_status = true;
     /* STEP 1: Reset ADC */
@@ -47,8 +47,8 @@ bool vuprs::FPGA_API__ADC__ResetADC(vuprs::FPGAController *controller)
 bool vuprs::FPGA_API__CBUF__ReadCircularBuffer(vuprs::FPGAController *controller,
                                                vuprs::SignalData *signal)
 {
-    PARAM_CHECK(controller->ConfigDown(), "fpga", " in [vuprs::FPGA_API__CBUF__ReadCircularBuffer] FPGA Controller not configured in advance.");
-    RUNTIME_CHECK(controller->dev__circular_buffer.Refreshed(), "fpga", " in [vuprs::FPGA_API__CBUF__ReadCircularBuffer] Circular buffer not refreshed.");
+    PARAM_CHECK(controller->ConfigDone(), "fpga", "FPGA Controller not configured in advance.");
+    RUNTIME_CHECK(controller->dev__circular_buffer.Refreshed(), "fpga", "Circular buffer not refreshed.");
 
     uint32_t r_val, w_val, CBF;
     bool operate_status = true;
@@ -77,7 +77,7 @@ bool vuprs::FPGA_API__CBUF__ReadCircularBuffer(vuprs::FPGAController *controller
 
 bool vuprs::FPGA_API__CBUF__ResetCircularBuffer(vuprs::FPGAController *controller)
 {
-    PARAM_CHECK(controller->ConfigDown(), "fpga", " in [vuprs::FPGA_API__CBUF__ResetCircularBuffer] FPGA Controller not configured in advance.");
+    PARAM_CHECK(controller->ConfigDone(), "fpga", " in [vuprs::FPGA_API__CBUF__ResetCircularBuffer] FPGA Controller not configured in advance.");
     return controller->dev__circular_buffer.WriteSingleRegister(vuprs::Circular_Buffer__Registers::CBUF_RST, 0);
 }
 
@@ -89,7 +89,7 @@ bool vuprs::FPGA_API__PDLY__SetPredelay(vuprs::FPGAController *controller,
                                         const std::vector<int> &channel_predelay,
                                         const std::vector<std::string> &channel_name)
 {
-    PARAM_CHECK(controller->ConfigDown(), "fpga", " in [vuprs::FPGA_API__PDLY__SetPredelay] FPGA Controller not configured in advance.");
+    PARAM_CHECK(controller->ConfigDone(), "fpga", " in [vuprs::FPGA_API__PDLY__SetPredelay] FPGA Controller not configured in advance.");
     PARAM_CHECK(channel_name.size() == channel_predelay.size(), "fpga", " in [vuprs::FPGA_API__PDLY__SetPredelay] Channel name list & channel predelay list not the same size.");
     PARAM_CHECK(channel_predelay.size() == ADC_CHANNEL_NUMBER, "fpga", " in [vuprs::FPGA_API__PDLY__SetPredelay] Invalid channel predelay size.");
 
@@ -121,7 +121,7 @@ bool vuprs::FPGA_API__PDLY__SetPredelay(vuprs::FPGAController *controller,
 
 bool vuprs::FPGA_API__PDLY__ResetPredelay(vuprs::FPGAController *controller)
 {
-    PARAM_CHECK(controller->ConfigDown(), "fpga", " in [vuprs::FPGA_API__PDLY__ResetPredelay] FPGA Controller not configured in advance.");
+    PARAM_CHECK(controller->ConfigDone(), "fpga", " in [vuprs::FPGA_API__PDLY__ResetPredelay] FPGA Controller not configured in advance.");
     return controller->dev__predelay_unit.WriteSingleRegister(vuprs::PreDelay_Unit__Registers::PREDLY_RST, 0);
 }
 
@@ -133,7 +133,7 @@ bool vuprs::FPGA_API__FIR__SetCoefficients(vuprs::FPGAController *controller,
                                            std::vector<std::vector<double>> *coefficients,
                                            double max_absolute_coefficient)
 {
-    PARAM_CHECK(controller->ConfigDown(), "fpga", " in [vuprs::FPGA_API__FIR__SetCoefficients] FPGA Controller not configured in advance.");
+    PARAM_CHECK(controller->ConfigDone(), "fpga", " in [vuprs::FPGA_API__FIR__SetCoefficients] FPGA Controller not configured in advance.");
     PARAM_CHECK(!coefficients->empty(), "fpga", " in [vuprs::FPGA_API__FIR__SetCoefficients] Coefficients empty.");
 #if DEBUG
     static int debug_file_group = 0;
@@ -184,9 +184,9 @@ bool vuprs::FPGA_API__FIR__SetCoefficients(vuprs::FPGAController *controller,
     /* Write coefficients to BRAM */
     operate_status &= controller->mem__fir_bram.WriteMemory(&buffer, 0, total_coefficients_count * sizeof(uint32_t));
     /* Write scale to FIR */
-    double firScaleInDouble = controller->dev__adc_controller.VoltageRangeRadius() * max_absolute_coefficient;
-    uint32_t firScaleToWrite = vuprs::Q16__DOUBLE_TO_UINT32(firScaleInDouble);
-    operate_status &= controller->dev__fir_filter_bank.WriteSingleRegister(vuprs::FIR_Filter_Bank__Registers::FIR_COEF_SCALE, firScaleToWrite);
+    double fir_scale_in_double = controller->dev__adc_controller.VoltageRangeRadius() * max_absolute_coefficient;
+    uint32_t fir_scale_to_write = vuprs::Q16__DOUBLE_TO_UINT32(fir_scale_in_double);
+    operate_status &= controller->dev__fir_filter_bank.WriteSingleRegister(vuprs::FIR_Filter_Bank__Registers::FIR_COEF_SCALE, fir_scale_to_write);
     /* Trigger coefficient update */
     operate_status &= controller->dev__fir_filter_bank.WriteSingleRegister(vuprs::FIR_Filter_Bank__Registers::FIR_U_FIR_COEF, 0);
     return operate_status;
@@ -197,7 +197,7 @@ bool vuprs::FPGA_API__FIR__SetLengthAndCoefficients(vuprs::FPGAController *contr
                                                     double max_absolute_coefficient,
                                                     uint32_t len)
 {
-    PARAM_CHECK(controller->ConfigDown(), "fpga", " in [vuprs::FPGA_API__FIR__SetLengthAndCoefficients] FPGA Controller not configured in advance.");
+    PARAM_CHECK(controller->ConfigDone(), "fpga", " in [vuprs::FPGA_API__FIR__SetLengthAndCoefficients] FPGA Controller not configured in advance.");
     PARAM_CHECK(!coefficients->empty(), "fpga", " in [vuprs::FPGA_API__FIR__SetLengthAndCoefficients] Coefficients empty.");
     uint64_t banks = coefficients->size();
     int check_coefficients_count = -1;
@@ -238,9 +238,9 @@ bool vuprs::FPGA_API__FIR__SetLengthAndCoefficients(vuprs::FPGAController *contr
     /* Write length to FIR */
     operate_status &= controller->dev__fir_filter_bank.WriteSingleRegister(vuprs::FIR_Filter_Bank__Registers::FIR_LEN, len);
     /* Write scale to FIR */
-    double firScaleInDouble = controller->dev__adc_controller.VoltageRangeRadius() * max_absolute_coefficient;
-    uint32_t firScaleToWrite = vuprs::Q16__DOUBLE_TO_UINT32(firScaleInDouble);
-    operate_status &= controller->dev__fir_filter_bank.WriteSingleRegister(vuprs::FIR_Filter_Bank__Registers::FIR_COEF_SCALE, firScaleToWrite);
+    double fir_scale_in_double = controller->dev__adc_controller.VoltageRangeRadius() * max_absolute_coefficient;
+    uint32_t fir_scale_to_write = vuprs::Q16__DOUBLE_TO_UINT32(fir_scale_in_double);
+    operate_status &= controller->dev__fir_filter_bank.WriteSingleRegister(vuprs::FIR_Filter_Bank__Registers::FIR_COEF_SCALE, fir_scale_to_write);
     /* Trigger length update */
     operate_status &= controller->dev__fir_filter_bank.WriteSingleRegister(vuprs::FIR_Filter_Bank__Registers::FIR_U_FIR_LEN, 0);
     return operate_status;
@@ -248,7 +248,7 @@ bool vuprs::FPGA_API__FIR__SetLengthAndCoefficients(vuprs::FPGAController *contr
 
 bool vuprs::FPGA_API__FIR__ResetFIR(vuprs::FPGAController *controller)
 {
-    PARAM_CHECK(controller->ConfigDown(), "fpga", " in [vuprs::FPGA_API__FIR__ResetFIR] FPGA Controller not configured in advance.");
+    PARAM_CHECK(controller->ConfigDone(), "fpga", " in [vuprs::FPGA_API__FIR__ResetFIR] FPGA Controller not configured in advance.");
     bool operate_status = true;
     operate_status &= controller->dev__fir_filter_bank.WriteSingleRegister(vuprs::FIR_Filter_Bank__Registers::FIR_RST, 0);
     operate_status &= controller->dev__fir_filter_bank.WriteSingleRegisterBIT(vuprs::FIR_Filter_Bank__Registers::FIR_RSC, 0, false);
@@ -257,7 +257,7 @@ bool vuprs::FPGA_API__FIR__ResetFIR(vuprs::FPGAController *controller)
 
 bool vuprs::FPGA_API__FIR__RunningControl(vuprs::FPGAController *controller, bool run_enable)
 {
-    PARAM_CHECK(controller->ConfigDown(), "fpga", " in [vuprs::FPGA_API__FIR__RunningControl] FPGA Controller not configured in advance.");
+    PARAM_CHECK(controller->ConfigDone(), "fpga", " in [vuprs::FPGA_API__FIR__RunningControl] FPGA Controller not configured in advance.");
     bool operate_status = true;
     operate_status &= controller->dev__fir_filter_bank.WriteSingleRegisterBIT(vuprs::FIR_Filter_Bank__Registers::FIR_RSC, 0, run_enable);
     return operate_status;
@@ -272,7 +272,7 @@ bool vuprs::FPGA_API__DDR__ReadDDR(vuprs::FPGAController *controller,
                                    uint32_t ddr_offset,
                                    uint32_t transfer_size)
 {
-    PARAM_CHECK(controller->ConfigDown(), "fpga", " in [vuprs::FPGA_API__DDR__ReadDDR] FPGA Controller not configured in advance.");
+    PARAM_CHECK(controller->ConfigDone(), "fpga", " in [vuprs::FPGA_API__DDR__ReadDDR] FPGA Controller not configured in advance.");
     return controller->mem__ddr.ReadMemory(buffer, ddr_offset, transfer_size);
 }
 
@@ -285,7 +285,7 @@ bool vuprs::FPGA_API__DMA__StartScatterGatherDMA_S2MM(vuprs::FPGAController *con
                                                       bool is_cyclic_mode,
                                                       bool enable_ioc_interrupt)
 {
-    PARAM_CHECK(controller->ConfigDown(), "fpga", " in [vuprs::FPGA_API__DMA__StartScatterGatherDMA_S2MM] FPGA Controller not configured in advance.");
+    PARAM_CHECK(controller->ConfigDone(), "fpga", " in [vuprs::FPGA_API__DMA__StartScatterGatherDMA_S2MM] FPGA Controller not configured in advance.");
     uint32_t descriptorSize = descriptors.size();
     PARAM_CHECK(descriptorSize > 0, "fpga", " in [vuprs::FPGA_API__DMA__StartScatterGatherDMA_S2MM] Descriptor is empty.");
     PARAM_CHECK(!(is_cyclic_mode && descriptors[descriptorSize - 1].NXTDESC != descriptors[0].ALIGNMENT_0_CURRENT_ADDR), "fpga", " in [vuprs::FPGA_API__DMA__StartScatterGatherDMA_S2MM] Invalid cyclic DMA descriptor.");
@@ -339,7 +339,7 @@ bool vuprs::FPGA_API__DMA__StartScatterGatherDMA_S2MM(vuprs::FPGAController *con
 
 bool vuprs::FPGA_API__DMA__GetAndClearInterruptFlag(vuprs::FPGAController *controller, uint32_t *flag)
 {
-    PARAM_CHECK(controller->ConfigDown(), "fpga", " in [vuprs::FPGA_API__DMA__GetAndClearInterruptFlag] FPGA Controller not configured in advance.");
+    PARAM_CHECK(controller->ConfigDone(), "fpga", " in [vuprs::FPGA_API__DMA__GetAndClearInterruptFlag] FPGA Controller not configured in advance.");
     PARAM_CHECK(flag != nullptr, "fpga", " in [vuprs::FPGA_API__DMA__GetAndClearInterruptFlag] FLAG is NULL.");
 
     uint32_t r_val;
@@ -358,7 +358,7 @@ bool vuprs::FPGA_API__DMA__GetAndClearInterruptFlag(vuprs::FPGAController *contr
 
 bool vuprs::FPGA_API__DMA__ResetDMA(vuprs::FPGAController *controller)
 {
-    PARAM_CHECK(controller->ConfigDown(), "fpga", " in [vuprs::FPGA_API__DMA__ResetDMA] FPGA Controller not configured in advance.");
+    PARAM_CHECK(controller->ConfigDone(), "fpga", " in [vuprs::FPGA_API__DMA__ResetDMA] FPGA Controller not configured in advance.");
 
     bool operate_status = true;
     /* Reset */
@@ -376,7 +376,7 @@ bool vuprs::FPGA_API__DMA__GetCurrentDescriptor(vuprs::FPGAController *controlle
                                                 vuprs::AXI_DMA_ScatterGatherDescriptor *previous_descriptor,
                                                 vuprs::AXI_DMA_ScatterGatherDescriptor *next_descriptor)
 {
-    PARAM_CHECK(controller->ConfigDown(), "fpga", " in [vuprs::FPGA_API__DMA__GetCurrentDescriptor] FPGA Controller not configured in advance.");
+    PARAM_CHECK(controller->ConfigDone(), "fpga", " in [vuprs::FPGA_API__DMA__GetCurrentDescriptor] FPGA Controller not configured in advance.");
 
     bool operate_status = true, found = false;
     uint32_t r_val = INVALID_SG_DESCRIPTOR_POINTER + 1;
@@ -395,7 +395,7 @@ bool vuprs::FPGA_API__DMA__GetCurrentDescriptor(vuprs::FPGAController *controlle
 bool vuprs::FPGA_API__DMA__ReadCurrentDescriptor(vuprs::FPGAController *controller,
                                                  uint32_t *current_descriptor)
 {
-    PARAM_CHECK(controller->ConfigDown(), "fpga", " in [vuprs::FPGA_API__DMA__ReadCurrentDescriptor] FPGA Controller not configured in advance.");
+    PARAM_CHECK(controller->ConfigDone(), "fpga", " in [vuprs::FPGA_API__DMA__ReadCurrentDescriptor] FPGA Controller not configured in advance.");
     PARAM_CHECK(current_descriptor != nullptr, "fpga", " in [vuprs::FPGA_API__DMA__ReadCurrentDescriptor] CURRENT_DESCRIPTOR is NULL.");
     bool operate_status = true;
     uint32_t r_val;
@@ -407,7 +407,7 @@ bool vuprs::FPGA_API__DMA__ReadCurrentDescriptor(vuprs::FPGAController *controll
 bool vuprs::FPGA_API__DMA__SetTimeoutForInterrupt(vuprs::FPGAController *controller,
                                                   uint32_t timeout_ms)
 {
-    PARAM_CHECK(controller->ConfigDown(), "fpga", " in [vuprs::FPGA_API__DMA__SetTimeoutForInterrupt] FPGA Controller not configured in advance.");
+    PARAM_CHECK(controller->ConfigDone(), "fpga", " in [vuprs::FPGA_API__DMA__SetTimeoutForInterrupt] FPGA Controller not configured in advance.");
     controller->dev__axi_dma.SetInterruptTimeout(timeout_ms);
     return true;
 }

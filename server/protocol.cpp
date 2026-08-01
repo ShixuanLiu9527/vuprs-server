@@ -218,31 +218,31 @@ bool vuprs::PROTOCOL_ParseCommandFromMessage(const std::string &message, vuprs::
 	return false;
 }
 
-std::string vuprs::PROTOCOL_MakeServerOperationResponse(const vuprs::ServerCommandInformation &cmd, const std::string &info, bool operation_status)
+std::string vuprs::PROTOCOL_MakeServerOperationResponse(const vuprs::ServerCommandInformation &cmd, const std::string &info, bool operation - status)
 {
 	nlohmann::json response;
 	response["response_cmd"] = __ServerCommandToString(cmd.cmd);
-	response["operation_status"] = operation_status ? "done" : "failed";
+	response["operation-status"] = operation - status ? "done" : "failed";
 	response["info"] = info;
 	return response.dump();
 }
 
-std::string vuprs::PROTOCOL_MakeServerResultDataResponse(const std::string &info, bool operation_status)
+std::string vuprs::PROTOCOL_MakeServerResultDataResponse(const std::string &info, bool operation - status)
 {
 	nlohmann::json response;
 	response["response_cmd"] = SERVER_CMD__GET_NEW_DATA__STR;
-	response["operation_status"] = operation_status ? "done" : "failed";
+	response["operation-status"] = operation - status ? "done" : "failed";
 	response["info"] = info;
 	response["params"]["data_format"] = "uint32_t";
 	return response.dump();
 }
 
-std::string vuprs::PROTOCOL_MakeServerParameterResponse(const vuprs::CollaborationBeamformerConfig &config)
+std::string vuprs::PROTOCOL_MakeServerParameterResponse(const vuprs::HybridBeamformerConfig &config)
 {
 	/*
 		{
 			"response_cmd": "read_algorithm_parameters",
-			"operation_status": "done",
+			"operation-status": "done",
 			"params": {
 				"fs": "40000.0",
 				"wave_velocity": "346.0",
@@ -255,7 +255,7 @@ std::string vuprs::PROTOCOL_MakeServerParameterResponse(const vuprs::Collaborati
 	*/
 	nlohmann::json response;
 	response["response_cmd"] = SERVER_CMD__GET_ALG_PARAM__STR;
-	response["operation_status"] = "done";
+	response["operation-status"] = "done";
 	response["params"]["fs"] = std::to_string(config.fs);
 	response["params"]["wave_velocity"] = std::to_string(config.bf_wave_velocity);
 	response["params"]["lower_frequency"] = std::to_string(config.bf_freq__lower);
@@ -267,12 +267,12 @@ std::string vuprs::PROTOCOL_MakeServerParameterResponse(const vuprs::Collaborati
 
 std::string vuprs::PROTOCOL_MakeServerScanningResponse(const vuprs::ScanningConfig &scan_config,
 													   double min_scan_power_dB, double max_scan_power_dB,
-													   const std::string &info, bool operation_status)
+													   const std::string &info, bool operation - status)
 {
 	/*
 		{
 			"response_cmd": "power_scan",
-			"operation_status": "done",
+			"operation-status": "done",
 			"params": {
 				"points": "70",
 				"min_alt": "15.0",
@@ -284,7 +284,7 @@ std::string vuprs::PROTOCOL_MakeServerScanningResponse(const vuprs::ScanningConf
 	*/
 	nlohmann::json response;
 	response["response_cmd"] = SERVER_CMD__SCAN_FOR_POSITION_POWER__STR;
-	response["operation_status"] = operation_status ? "done" : "failed";
+	response["operation-status"] = operation - status ? "done" : "failed";
 	response["info"] = info;
 	response["params"]["points"] = std::to_string(scan_config.points_in_hemisphere);
 	response["params"]["min_alt"] = std::to_string(scan_config.alt_min);
