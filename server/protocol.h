@@ -80,7 +80,7 @@ namespace vuprs
      */
     std::string PROTOCOL_MakeServerOperationResponse(const ServerCommandInformation &cmd,
                                                      const std::string &info = "",
-                                                     bool operation - status = true);
+                                                     bool operation_status = true);
 
     /**
      * @brief Make server response message for current algorithm parameters.
@@ -93,9 +93,9 @@ namespace vuprs
                                                     double min_scan_power_dB,
                                                     double max_scan_power_dB,
                                                     const std::string &info = "",
-                                                    bool operation - status = true);
+                                                    bool operation_status = true);
 
-    std::string PROTOCOL_MakeServerResultDataResponse(const std::string &info = "", bool operation - status = true);
+    std::string PROTOCOL_MakeServerResultDataResponse(const std::string &info = "", bool operation_status = true);
 }
 
 #endif

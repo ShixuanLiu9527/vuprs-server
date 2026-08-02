@@ -265,9 +265,9 @@ uint32_t vuprs::FPGA_Device__CircularBuffer::SignalPoints() const
 bool vuprs::FPGA_Device__CircularBuffer::Refreshed()
 {
     uint32_t r_val;
-    bool operation - status;
-    operation - status = this->ReadSingleRegisterBIT(vuprs::Circular_Buffer__Registers::CBUF_RS, 1, &r_val);
-    RUNTIME_CHECK(operation - status, "fpga", " in [FPGA_Device__CircularBuffer::Refreshed] Cannot read circular buffer.");
+    bool operation_status;
+    operation_status = this->ReadSingleRegisterBIT(vuprs::Circular_Buffer__Registers::CBUF_RS, 1, &r_val);
+    RUNTIME_CHECK(operation_status, "fpga", " in [FPGA_Device__CircularBuffer::Refreshed] Cannot read circular buffer.");
     return r_val == 1;
 }
 

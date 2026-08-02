@@ -472,8 +472,8 @@ void vuprs::HybridBeamformer::THREAD__ReadResult()
         if (vuprs::MatchDescriptor(_ref_descriptors,
                                    this->dma_current_desc.load(),
                                    &current_descriptor,
-                                   &previous_descriptor,
-                                   &next_descriptor))
+                                   &next_descriptor,
+                                   &previous_descriptor))
         {
             try
             {
@@ -582,7 +582,7 @@ void vuprs::HybridBeamformer::THREAD__ReadCircularBuffer()
 
 void vuprs::HybridBeamformer::THREAD__AlgorithmCalculation()
 {
-    bool has_interrupt, operation - status;
+    bool has_interrupt, operation_status;
     vuprs::SignalData signal;
     Eigen::Matrix<Eigen::dcomplex, -1, -1> fir_expected_frequency_response; /* Expected frequency response of FIR filter bank */
     std::vector<std::vector<double>> fir_coefficients;                      /* Coefficient of FIR filter bank, [channel][point] */
@@ -646,13 +646,13 @@ void vuprs::HybridBeamformer::THREAD__AlgorithmCalculation()
             debug_file_group = 0;
 #endif
         /* Issue coefficients to FIR */
-        operation - status = true;
+        operation_status = true;
         try
         {
-            operation - status &= vuprs::FPGA_API__FIR__SetCoefficients(&this->controller,
-                                                                        &fir_coefficients,
-                                                                        this->fir.MaxAbsoluteFIRCoefficient());
-            RUNTIME_CHECK(operation - status, "hybrid_bf", "FPGA operation failed.");
+            operation_status &= vuprs::FPGA_API__FIR__SetCoefficients(&this->controller,
+                                                                      &fir_coefficients,
+                                                                      this->fir.MaxAbsoluteFIRCoefficient());
+            RUNTIME_CHECK(operation_status, "hybrid_bf", "FPGA operation failed.");
         }
         catch (const std::exception &e)
         {

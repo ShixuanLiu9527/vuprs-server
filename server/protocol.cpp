@@ -218,20 +218,20 @@ bool vuprs::PROTOCOL_ParseCommandFromMessage(const std::string &message, vuprs::
 	return false;
 }
 
-std::string vuprs::PROTOCOL_MakeServerOperationResponse(const vuprs::ServerCommandInformation &cmd, const std::string &info, bool operation - status)
+std::string vuprs::PROTOCOL_MakeServerOperationResponse(const vuprs::ServerCommandInformation &cmd, const std::string &info, bool operation_status)
 {
 	nlohmann::json response;
 	response["response_cmd"] = __ServerCommandToString(cmd.cmd);
-	response["operation-status"] = operation - status ? "done" : "failed";
+	response["operation-status"] = operation_status ? "done" : "failed";
 	response["info"] = info;
 	return response.dump();
 }
 
-std::string vuprs::PROTOCOL_MakeServerResultDataResponse(const std::string &info, bool operation - status)
+std::string vuprs::PROTOCOL_MakeServerResultDataResponse(const std::string &info, bool operation_status)
 {
 	nlohmann::json response;
 	response["response_cmd"] = SERVER_CMD__GET_NEW_DATA__STR;
-	response["operation-status"] = operation - status ? "done" : "failed";
+	response["operation-status"] = operation_status ? "done" : "failed";
 	response["info"] = info;
 	response["params"]["data_format"] = "uint32_t";
 	return response.dump();
@@ -267,7 +267,7 @@ std::string vuprs::PROTOCOL_MakeServerParameterResponse(const vuprs::HybridBeamf
 
 std::string vuprs::PROTOCOL_MakeServerScanningResponse(const vuprs::ScanningConfig &scan_config,
 													   double min_scan_power_dB, double max_scan_power_dB,
-													   const std::string &info, bool operation - status)
+													   const std::string &info, bool operation_status)
 {
 	/*
 		{
@@ -284,7 +284,7 @@ std::string vuprs::PROTOCOL_MakeServerScanningResponse(const vuprs::ScanningConf
 	*/
 	nlohmann::json response;
 	response["response_cmd"] = SERVER_CMD__SCAN_FOR_POSITION_POWER__STR;
-	response["operation-status"] = operation - status ? "done" : "failed";
+	response["operation-status"] = operation_status ? "done" : "failed";
 	response["info"] = info;
 	response["params"]["points"] = std::to_string(scan_config.points_in_hemisphere);
 	response["params"]["min_alt"] = std::to_string(scan_config.alt_min);

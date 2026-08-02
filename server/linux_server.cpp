@@ -409,7 +409,7 @@ void vuprs::LinuxServer::THREAD__Control()
     vuprs::ServerCommandInformation _cmd_info;
     vuprs::HybridBeamformerConfig config;
     vuprs::ScanningConfig scan_config;
-    bool operation - status = false;
+    bool operation_status = false;
     bool need_responseIn_this_thread = true;
     std::string header, tailer, response_message, error_info;
     {
@@ -436,7 +436,7 @@ void vuprs::LinuxServer::THREAD__Control()
             _cmd_info = this->cmd_info;
         }
         /* Change direction */
-        operation - status = true;         /* Assume operation is successful, if any error occurs, set it to false */
+        operation_status = true;           /* Assume operation is successful, if any error occurs, set it to false */
         this->server_need_response = true; /* Indicate that a response is needed in session */
         error_info = "";                   /* Clear error info, if any error occurs, assign error info to this variable, and it will be added to response message */
         try
@@ -570,7 +570,7 @@ void vuprs::LinuxServer::THREAD__Control()
         }
         catch (const std::exception &e)
         {
-            operation - status = false;
+            operation_status = false;
             error_info = e.what();
             std::cout << "Error in [LinuxServer::THREAD__Control] " << error_info << std::endl;
         }
@@ -579,7 +579,7 @@ void vuprs::LinuxServer::THREAD__Control()
         {
             try
             {
-                response_message = vuprs::PROTOCOL_MakeServerOperationResponse(_cmd_info, error_info, operation - status);
+                response_message = vuprs::PROTOCOL_MakeServerOperationResponse(_cmd_info, error_info, operation_status);
                 response_message = vuprs::AddFrameIfMissing(response_message, header, tailer);
             }
             catch (const std::exception &e)

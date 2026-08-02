@@ -17,7 +17,7 @@ namespace vuprs
         std::vector<vuprs::FFTWManagerComplex> fft_managers; /* FFT manager */
         std::unique_ptr<vuprs::ThreadPool> thread_pool;
         std::vector<std::vector<double>> fir_coefficient;
-        double max_abs_coefficient;
+        double max_abs_coefficient = 0.0;
 
     public:
         FIRCalculator();
