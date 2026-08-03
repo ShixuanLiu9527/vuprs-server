@@ -1,14 +1,16 @@
 #include <fstream>
 #include "logger/check.h"
+#include "logger/log_manager.h"
 #include "3rdparty/nlohmann/json.hpp"
 #include "fault_detect/fault_detector.h"
 #include "system_tools/string_parse.h"
 
-void vuprs::FaultDetector::LoadModel(const std::string &json, const vuprs::FaultDetectionConfig &config)
+bool vuprs::FaultDetector::InitDetector(const std::string &model_config_json,
+                                        const std::string &logger_dir)
 {
     std::ifstream f;
-    f.open(json);
-    RUNTIME_CHECK(f.is_open(), "bf", "Cannot open file: " + json);
+    f.open(model_config_json);
+    RUNTIME_CHECK(f.is_open(), "bf", "Cannot open file: " + model_config_json);
     nlohmann::json json_data;
     try
     {
@@ -16,7 +18,7 @@ void vuprs::FaultDetector::LoadModel(const std::string &json, const vuprs::Fault
     }
     catch (const std::exception &e)
     {
-        RUNTIME_CHECK(false, "bf", " Failed to load array data from: " + json);
+        RUNTIME_CHECK(false, "bf", " Failed to load array data from: " + model_config_json);
     }
     /* Read parameters from Json (frequency range is bound to certain model) */
     RUNTIME_CHECK(json_data.contains("frequency-range"), "fault_detect", "Missing key [frequency-range] in model config.");
@@ -24,11 +26,15 @@ void vuprs::FaultDetector::LoadModel(const std::string &json, const vuprs::Fault
     RUNTIME_CHECK(json_data["frequency-range"].contains("to"), "fault_detect", "Missing key [to] in model config.");
     RUNTIME_CHECK(json_data.contains("rknn-model"), "fault_detect", "Missing key [rknn-model] in model config.");
     RUNTIME_CHECK(json_data["rknn-model"].contains("path"), "fault_detect", "Missing key [path] in model config.");
+    RUNTIME_CHECK(json_data.contains("frame-time-ms"), "fault_detect", "Missing key [rknn-model] in model config.");
+    RUNTIME_CHECK(json_data["frame-time-ms"].contains("time-ms"), "fault_detect", "Missing key [path] in model config.");
     std::string s_f_l = json_data["frequency-range"]["from"];
     std::string s_f_h = json_data["frequency-range"]["to"];
+    std::string s_frame_time_ms = json_data["frame-time-ms"]["time-ms"];
     std::string model_path = json_data["rknn-model"]["path"];
     double f_l = vuprs::ParseDoubleFromString(s_f_l, nullptr);
     double f_h = vuprs::ParseDoubleFromString(s_f_h, nullptr);
+    double frame_time_ms = vuprs::ParseDoubleFromString(s_frame_time_ms, nullptr);
     /* Load RKNN model */
     this->model.InitModel(model_path);
     RUNTIME_CHECK(this->model.ModelReady(), "inference", "Model is empty.");
@@ -42,9 +48,13 @@ void vuprs::FaultDetector::LoadModel(const std::string &json, const vuprs::Fault
     /* Initialize extractor */
     this->extractor.SetParameters(mfcc_dim,
                                   mfcc_frame,
-                                  config.mfcc__frame_time_ms,
+                                  frame_time_ms,
                                   f_l,
                                   f_h);
+    this->inference_logger = vuprs::LogManager::getLogger("inference",
+                                                          "log.txt",
+                                                          logger_dir);
+    return true;
 }
 
 void vuprs::FaultDetector::InputSignal(const std::vector<double> &signal, double fs)

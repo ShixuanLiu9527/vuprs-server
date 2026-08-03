@@ -5,6 +5,7 @@
 #include <memory>
 #include <cstdlib>
 #include <cstring>
+#include "config.h"
 #include "spdlog/spdlog.h"
 #include "spdlog/sinks/rotating_file_sink.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
@@ -20,19 +21,21 @@ namespace vuprs
         static std::unordered_map<std::string, std::shared_ptr<spdlog::logger>> loggers_;
 
     public:
-        static std::shared_ptr<spdlog::logger> getLogger(const std::string &name, const std::string &filename = "");
+        static std::shared_ptr<spdlog::logger> getLogger(const std::string &name,
+                                                         const std::string &filename = "",
+                                                         const std::string &dir_name = "");
         static bool loggerExists(const std::string &name) { return loggers_.find(name) != loggers_.end(); }
         static void clearLoggers() { loggers_.clear(); }
     };
 
     enum LogLevel
     {
-        V_FATAL = 0,
-        V_ERROR,
-        V_WARN,
-        V_INFO,
-        V_DEBUG,
-        V_TRACE
+        _V_FATAL = 0,
+        _V_ERROR,
+        _V_WARN,
+        _V_INFO,
+        _V_DEBUG,
+        _V_TRACE
     };
 
     class LogStream
@@ -72,17 +75,17 @@ namespace vuprs
         {
             switch (lvl)
             {
-            case LogLevel::V_FATAL:
+            case LogLevel::_V_FATAL:
                 return spdlog::level::critical;
-            case LogLevel::V_ERROR:
+            case LogLevel::_V_ERROR:
                 return spdlog::level::err;
-            case LogLevel::V_WARN:
+            case LogLevel::_V_WARN:
                 return spdlog::level::warn;
-            case LogLevel::V_INFO:
+            case LogLevel::_V_INFO:
                 return spdlog::level::info;
-            case LogLevel::V_DEBUG:
+            case LogLevel::_V_DEBUG:
                 return spdlog::level::debug;
-            case LogLevel::V_TRACE:
+            case LogLevel::_V_TRACE:
                 return spdlog::level::trace;
             default:
                 return spdlog::level::info;
@@ -91,6 +94,28 @@ namespace vuprs
     };
 }
 
-#define LOG(level, logger) LogStream(logger, level)
+#define V_FATAL vuprs::LogLevel::_V_FATAL /* Log level: fatal */
+#define V_ERROR vuprs::LogLevel::_V_ERROR /* Log level: error */
+#define V_WARN vuprs::LogLevel::_V_WARN   /* Log level: warn */
+#define V_INFO vuprs::LogLevel::_V_INFO   /* Log level: info */
+#define V_DEBUG vuprs::LogLevel::_V_DEBUG /* Log level: debug */
+#define V_TRACE vuprs::LogLevel::_V_TRACE /* Log level: trace */
+#if DEBUG
+#define _LOG(logger, level) vuprs::LogStream(logger, level)
+#define _LOG_BY_NAME(logger, level) vuprs::LogStream(vuprs::LogManager::getLogger(logger), level)
+#else /* DEBUG = false: compile out V_DEBUG / V_TRACE level logs entirely */
+#define _LOG(logger, level)                 \
+    if ((level) > vuprs::LogLevel::_V_INFO) \
+    {                                       \
+    }                                       \
+    else                                    \
+        vuprs::LogStream(logger, level)
+#define _LOG_BY_NAME(logger, level)         \
+    if ((level) > vuprs::LogLevel::_V_INFO) \
+    {                                       \
+    }                                       \
+    else                                    \
+        vuprs::LogStream(vuprs::LogManager::getLogger(logger), level)
+#endif
 
 #endif

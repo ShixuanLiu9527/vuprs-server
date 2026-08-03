@@ -2,6 +2,8 @@
 #include "hybrid/hybrid_bf.h"
 #include "logger/check.h"
 
+#define HYBRID_LOG(level) _LOG(this->hybrid_logger, level)
+
 vuprs::HybridBeamformer::HybridBeamformer()
 {
     this->config_done = false;
@@ -49,7 +51,10 @@ bool vuprs::HybridBeamformer::ScanSwitch() const
     return this->scan_enable;
 }
 
-bool vuprs::HybridBeamformer::InitCollaborationBeamformer(const std::string &fpga_config_json, const std::string &bf_array_config_json, const std::string &fir_config_json)
+bool vuprs::HybridBeamformer::InitHybridBeamformer(const std::string &fpga_config_json,
+                                                   const std::string &bf_array_config_json,
+                                                   const std::string &fir_config_json,
+                                                   const std::string &log_dir)
 {
     bool operate_status = true;
     try
@@ -60,9 +65,12 @@ bool vuprs::HybridBeamformer::InitCollaborationBeamformer(const std::string &fpg
     }
     catch (const std::exception &e)
     {
-        RUNTIME_CHECK(false, "hybrid_bf", " in [HybridBeamformer::InitCollaborationBeamformer] Error occurred in initialization.");
+        RUNTIME_CHECK(false, "hybrid_bf", " in [HybridBeamformer::InitHybridBeamformer] Error occurred in initialization.");
     }
-
+    this->hybrid_logger = vuprs::LogManager::getLogger("hybrid",
+                                                       "log.txt",
+                                                       log_dir);
+    HYBRID_LOG(V_DEBUG) << "Successfully init logger: hybrid";
     this->config_done = operate_status;
     return operate_status;
 }
@@ -93,15 +101,17 @@ bool vuprs::HybridBeamformer::ResetHardwareBeamformer()
 {
     bool retval = true;
     /* FPGA reset */
+    HYBRID_LOG(V_DEBUG) << "Reset hardware beamformer [start].";
     retval &= vuprs::FPGA_API__ADC__ResetADC(&this->controller);             /* Reset ADC controller */
     retval &= vuprs::FPGA_API__CBUF__ResetCircularBuffer(&this->controller); /* Reset Circular Buffer */
     retval &= vuprs::FPGA_API__FIR__ResetFIR(&this->controller);             /* Reset FIR Filter Bank */
     retval &= vuprs::FPGA_API__DMA__ResetDMA(&this->controller);             /* Reset AXI DMA */
+    HYBRID_LOG(V_DEBUG) << "Reset hardware beamformer [done].";
     this->system_run = false;
     return retval;
 }
 
-bool vuprs::HybridBeamformer::StartBeamformerWithConfiguration(const HybridBeamformerConfig &config)
+bool vuprs::HybridBeamformer::StartBeamformerWithConfiguration(const vuprs::HybridBeamformerConfig &config)
 {
     PARAM_CHECK(this->ConfigDone(), "hybrid_bf", " in [HybridBeamformer::StartBeamformerWithConfiguration] Config not complete.");
     Eigen::Matrix<Eigen::dcomplex, -1, -1> fir_expected_frequency_response; /* Expected frequency response of FIR filter bank */
@@ -113,7 +123,13 @@ bool vuprs::HybridBeamformer::StartBeamformerWithConfiguration(const HybridBeamf
     int descriptor_update_cycle_us;
     uint32_t FIR_LENGTH;
     bool retval = true;
-
+    HYBRID_LOG(V_DEBUG) << "Start hybrid beamformer with parameters:";
+    HYBRID_LOG(V_DEBUG) << "Bandpass frequency range [" + std::to_string(config.bf_freq__lower) + ", " +
+                               std::to_string(config.bf_freq__upper) + "]";
+    HYBRID_LOG(V_DEBUG) << "Beamformer pointing position [Alt = " + std::to_string(config.bf_target__alt) + ", Az = " +
+                               std::to_string(config.bf_target__az) + "]";
+    HYBRID_LOG(V_DEBUG) << "DDR buffer size = " + std::to_string(config.dma__buffer_size) + " bytes.";
+    HYBRID_LOG(V_DEBUG) << "DDR buffer count = " + std::to_string(config.dma__buffer_count);
     /* Max queue size */
     this->circular_buffer_queue_size_max = config.queue__circular_buffer_queue_size_max;
     this->result_queue_size_max = config.queue__result_queue_size_max;
@@ -132,6 +148,8 @@ bool vuprs::HybridBeamformer::StartBeamformerWithConfiguration(const HybridBeamf
     /* Step 2: Initialize loop cycle */
     this->interrupt_wait_time_us = descriptor_update_cycle_us / 20;
     this->circular_buffer_wait_time_us = descriptor_update_cycle_us / 20;
+    HYBRID_LOG(V_DEBUG) << "DMA interrupt cycle time = " + std::to_string(this->interrupt_wait_time_us) + " us";
+    HYBRID_LOG(V_DEBUG) << "Circular buffer interrupt cycle time = " + std::to_string(this->circular_buffer_wait_time_us) + " us";
 #if DEBUG
     printf("DMA descriptor update cycle: %d us\n", descriptor_update_cycle_us);
     printf("DMA interrupt wait time: %d us\n", this->interrupt_wait_time_us.load());
@@ -139,11 +157,13 @@ bool vuprs::HybridBeamformer::StartBeamformerWithConfiguration(const HybridBeamf
 #endif
     /* Step 3: Get sampling frequency register (SCI) */
     uint32_t SCI = this->controller.dev__adc_controller.GetSCIValueForSamplingFrequency(config.fs);
+    HYBRID_LOG(V_DEBUG) << "Register [SCI] of [adc controller] has value: " + vuprs::Number2HexString(SCI);
     /* Step 4: Reset and initialize algorithm obj */
     {
         std::lock_guard<std::mutex> lock(this->mut_alg); /* LOCK */
         /* - Hardware sampling frequency */
         this->hardware_fs = this->controller.dev__adc_controller.SCI2FS(SCI);
+        HYBRID_LOG(V_DEBUG) << "Hardware fs = " + std::to_string(this->hardware_fs) + " Hz.";
         /* - Reset algorithm obj */
         this->bf->ResetCovarianceMatrices();
         /* - Set covariance matrix fitting parameters */

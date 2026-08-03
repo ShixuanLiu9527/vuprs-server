@@ -4,6 +4,7 @@
 #include "server/linux_session.h"
 #include "server/protocol.h"
 #include "system_tools/string_parse.h"
+#include "logger/log_manager.h"
 #include "hybrid/hybrid_bf.h"
 #include "fault_detect/fault_detector.h"
 
@@ -15,13 +16,23 @@
 
 namespace vuprs
 {
+    struct SystemLoggerConfig
+    {
+        std::string hybrid_logger_dir;
+        std::string server_logger_dir;
+        std::string inference_logger_dir;
+        SystemLoggerConfig() = default;
+        bool InitFromJson(const std::string &filename);
+    };
+
     struct SystemConfigFiles
     {
-        std::string fpga_config_json;            /* FPGA config JSON file */
-        std::string bf_array_config_json;        /* Beam forming config JSON file */
-        std::string fir_config_json;             /* FIR filter bank config JSON file */
-        std::string server_config_json;          /* Server config JSON file */
-        std::string inference_model_config_json; /* Inference model config json */
+        std::string server_config_json;          /* arg[2] - Server config JSON file */
+        std::string fpga_config_json;            /* arg[4] - FPGA config JSON file */
+        std::string bf_array_config_json;        /* arg[6] - Beam forming config JSON file */
+        std::string fir_config_json;             /* arg[8] - FIR filter bank config JSON file */
+        std::string inference_model_config_json; /* arg[10] - Inference model config json */
+        SystemLoggerConfig logger_configs;       /* arg[12] - Logger configs */
     };
 
     struct ServerProtocol
@@ -46,9 +57,9 @@ namespace vuprs
     class LinuxServer
     {
     private:
-        bool config_done; /* Indicate config done */
-
+        bool config_done;                 /* Indicate config done */
         std::vector<std::thread> threads; /* Server threads */
+        std::shared_ptr<spdlog::logger> server_logger;
 
         /* --- Server --- */
 

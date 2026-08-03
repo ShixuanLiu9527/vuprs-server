@@ -58,4 +58,44 @@
  * @}
  */
 
+#define VUPRS_CXX_STANDARD__11 11U
+#define VUPRS_CXX_STANDARD__14 14U
+#define VUPRS_CXX_STANDARD__17 17U
+#define VUPRS_CXX_STANDARD__20 20U
+#if defined(_MSC_VER) && !defined(__clang__)
+#ifndef _MSVC_LANG
+#define VUPRS_CXX_STANDARD VUPRS_CXX_STANDARD__11
+#elif _MSVC_LANG >= 202002L
+#define VUPRS_CXX_STANDARD VUPRS_CXX_STANDARD__20
+#elif _MSVC_LANG >= 201703L
+#define VUPRS_CXX_STANDARD VUPRS_CXX_STANDARD__17
+#elif _MSVC_LANG >= 201402L
+#define VUPRS_CXX_STANDARD VUPRS_CXX_STANDARD__14
+#elif _MSVC_LANG >= 201103L
+#define VUPRS_CXX_STANDARD VUPRS_CXX_STANDARD__11
+#else
+#error SOLVER requires at least C++11
+#endif
+#elif defined(__cplusplus)
+#if __cplusplus >= 202002L
+#define VUPRS_CXX_STANDARD VUPRS_CXX_STANDARD__20
+#elif __cplusplus >= 201703L
+#define VUPRS_CXX_STANDARD VUPRS_CXX_STANDARD__17
+#elif __cplusplus >= 201402L
+#define VUPRS_CXX_STANDARD VUPRS_CXX_STANDARD__14
+#elif __cplusplus >= 201103L
+#define VUPRS_CXX_STANDARD VUPRS_CXX_STANDARD__11
+#else
+#error SOLVER requires at least C++11
+#endif
+#else
+#define VUPRS_CXX_STANDARD VUPRS_CXX_STANDARD__11
+#warning SOLVER CXX standard is set to default: C++11
+#endif
+#if __has_include(<filesystem>)
+#define VUPRS_HAS_FILESYSTEM true
+#else
+#define VUPRS_HAS_FILESYSTEM false
+#endif
+
 #endif

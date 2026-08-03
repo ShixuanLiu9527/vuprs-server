@@ -6,6 +6,8 @@ FPGA_CONFIG="./configs/fpga_config.json"
 SERVER_CONFIG="./configs/server_config.json"
 ARRAY_CONFIG="./configs/array_config.json"
 FIR_CONFIG="./configs/fir_config.json"
+INFERENCE_CONFIG="./configs/rknn_config.json"
+LOGGER_CONFIG="./configs/logger_config.json"
 
 # --------------------------- Security Check --------------------------------
 
@@ -119,4 +121,6 @@ exec "${SERVER_NAME}" \
     --server-config "${SERVER_CONFIG}" \
     --fpga-config "${FPGA_CONFIG}" \
     --array-config "${ARRAY_CONFIG}" \
-    --fir-config "${FIR_CONFIG}"
+    --fir-config "${FIR_CONFIG}" \
+    --inference-config "${INFERENCE_CONFIG}" \
+    --logger-config "${LOGGER_CONFIG}"

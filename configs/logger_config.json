@@ -1,0 +1,5 @@
+{
+    "hybrid-logger-dir": "./logs/hybrid",
+    "server-logger-dir": "./logs/server",
+    "inference-logger-dir": "./logs/inference"
+}

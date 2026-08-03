@@ -10,6 +10,7 @@
 #include "algorithm/bf/fir.h"
 #include "hybrid/hybrid_bf_config.h"
 #include "fpga/fpga_api.h"
+#include "logger/log_manager.h"
 
 namespace vuprs
 {
@@ -36,6 +37,8 @@ namespace vuprs
     class HybridBeamformer
     {
     private:
+        std::shared_ptr<spdlog::logger> hybrid_logger;
+
         bool config_done;
         std::vector<std::thread> threads;                                    /* Beam former threads */
         vuprs::FPGAController controller;                                    /* FPGA controller */
@@ -147,10 +150,12 @@ namespace vuprs
          * @param fpga_config_json FPGA config JSON file.
          * @param bf_array_config_json Beam forming array config JSON file.
          * @param fir_config_json FIR filter config JSON file.
+         * @param log_dir Log directory.
          */
-        bool InitCollaborationBeamformer(const std::string &fpga_config_json,
-                                         const std::string &bf_array_config_json,
-                                         const std::string &fir_config_json);
+        bool InitHybridBeamformer(const std::string &fpga_config_json,
+                                  const std::string &bf_array_config_json,
+                                  const std::string &fir_config_json,
+                                  const std::string &log_dir);
 
         /**
          * @brief Bind beam forming algorithm.

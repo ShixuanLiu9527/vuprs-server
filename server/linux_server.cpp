@@ -1,6 +1,29 @@
 #include "server/linux_server.h"
 #include "logger/check.h"
 
+bool vuprs::SystemLoggerConfig::InitFromJson(const std::string &filename)
+{
+    std::ifstream f;
+    f.open(filename);
+    RUNTIME_CHECK(f.is_open(), "system", "Cannot open file: " + filename);
+    nlohmann::json json_data;
+    try
+    {
+        f >> json_data;
+    }
+    catch (const std::exception &e)
+    {
+        RUNTIME_CHECK(false, "bf", " in [BeamFormingArray::LoadArrayFromJson] Failed to load array data from: " + filename);
+    }
+    RUNTIME_CHECK(json_data.contains("hybrid-logger-dir"), "system", "Missing key: hybrid-logger-dir");
+    RUNTIME_CHECK(json_data.contains("server-logger-dir"), "system", "Missing key: server-logger-dir");
+    RUNTIME_CHECK(json_data.contains("inference-logger-dir"), "system", "Missing key: inference-logger-dir");
+    this->hybrid_logger_dir = json_data["hybrid-logger-dir"].get<std::string>();
+    this->server_logger_dir = json_data["server-logger-dir"].get<std::string>();
+    this->inference_logger_dir = json_data["inference-logger-dir"].get<std::string>();
+    return true;
+}
+
 /* --------------------------------------------------------------------------------------------------------------- */
 /* ----------------------------------------------- Linux Server -------------------------------------------------- */
 /* --------------------------------------------------------------------------------------------------------------- */
@@ -58,11 +81,19 @@ void vuprs::LinuxServer::InitSystemConfigFiles(const vuprs::SystemConfigFiles &c
         /* Config beam former */
         {
             std::lock_guard<std::mutex> lock(this->mut_bf); /* LOCK */
-            config_result &= this->beamformer.InitCollaborationBeamformer(
-                config.fpga_config_json,
-                config.bf_array_config_json,
-                config.fir_config_json);
+            config_result &= this->beamformer.InitHybridBeamformer(config.fpga_config_json,
+                                                                   config.bf_array_config_json,
+                                                                   config.fir_config_json,
+                                                                   config.logger_configs.hybrid_logger_dir);
         }
+        {
+            std::lock_guard<std::mutex> lock(this->mut_npu); /* LOCK */
+            config_result &= this->fault_detector.InitDetector(config.inference_model_config_json,
+                                                               config.logger_configs.inference_logger_dir);
+        }
+        this->server_logger = vuprs::LogManager::getLogger("server",
+                                                           "log.txt",
+                                                           config.logger_configs.server_logger_dir);
         RUNTIME_CHECK(config_result, "server", " in [LinuxServer::InitSystemConfigFiles] Config error.");
         this->config_done = true;
     }
