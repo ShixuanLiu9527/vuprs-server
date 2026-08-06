@@ -45,6 +45,7 @@ file(GLOB_RECURSE LOGGER_SRC "${CMAKE_CURRENT_SOURCE_DIR}/logger/*.cpp")
 file(GLOB_RECURSE ALGORITHM_SRC "${CMAKE_CURRENT_SOURCE_DIR}/algorithm/*.cpp")
 file(GLOB_RECURSE SERVER_SRC "${CMAKE_CURRENT_SOURCE_DIR}/server/*.cpp")
 file(GLOB_RECURSE HYBRID_BF_SRC "${CMAKE_CURRENT_SOURCE_DIR}/hybrid/*.cpp")
+file(GLOB_RECURSE FAULT_DETECT_SRC "${CMAKE_CURRENT_SOURCE_DIR}/fault_detect/*.cpp")
 
 add_executable(server main.cpp 
     ${FPGA_SRC} 
@@ -52,7 +53,8 @@ add_executable(server main.cpp
     ${LOGGER_SRC} 
     ${ALGORITHM_SRC} 
     ${SERVER_SRC} 
-    ${HYBRID_BF_SRC})
+    ${HYBRID_BF_SRC}
+    ${FAULT_DETECT_SRC})
 target_link_directories(server PRIVATE 
 ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/rknpu2/librknn_api/aarch64)
 target_link_libraries(server PRIVATE Threads::Threads m fftw3 rknnrt)

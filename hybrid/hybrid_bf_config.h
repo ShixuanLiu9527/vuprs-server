@@ -28,12 +28,12 @@ namespace vuprs
         bool m_queue__circular_buffer_queue_size_max; /* Mask of [queue__circular_buffer_queue_size_max] */
         bool m_queue__result_queue_size_max;          /* Mask of [queue__result_queue_size_max] */
 
-        HybridBeamformerConfigMask() { this->Reset(); }
+        HybridBeamformerConfigMask() { this->Reset(false); }
 
         /**
-         * @brief Reset all mask to false.
+         * @brief Reset all mask to val (false as default).
          */
-        void Reset();
+        void Reset(bool val = false);
     };
 
     class HybridBeamformerConfig
@@ -62,6 +62,8 @@ namespace vuprs
 
         HybridBeamformerConfig() { this->SetDefault(); }
 
+        bool FromJson(const std::string &json_filename);
+
         /**
          * @brief Merger config with another config.
          *
@@ -87,7 +89,7 @@ namespace vuprs
         /**
          * @brief Reset all fields to default value, and reset mask.
          */
-        void ResetMask() { this->mask.Reset(); }
+        void ResetMask(bool val = false) { this->mask.Reset(val); }
     };
 
     struct ScanningConfig

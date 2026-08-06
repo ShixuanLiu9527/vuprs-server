@@ -7,6 +7,7 @@ SERVER_CONFIG="./configs/server_config.json"
 ARRAY_CONFIG="./configs/array_config.json"
 FIR_CONFIG="./configs/fir_config.json"
 INFERENCE_CONFIG="./configs/rknn_config.json"
+HYBRID_DEFAULT_CONFIG="./configs/hybrid_default_config.json"
 LOGGER_CONFIG="./configs/logger_config.json"
 
 # --------------------------- Security Check --------------------------------
@@ -45,7 +46,7 @@ if [ ! -d "${FFTW_LIB_DIR}" ]; then
     exit 1
 fi
 
-for config_file in "${SERVER_CONFIG}" "${FPGA_CONFIG}" "${ARRAY_CONFIG}" "${FIR_CONFIG}"; do
+for config_file in "${SERVER_CONFIG}" "${FPGA_CONFIG}" "${ARRAY_CONFIG}" "${FIR_CONFIG}" "${INFERENCE_CONFIG}" "${HYBRID_DEFAULT_CONFIG}" "${LOGGER_CONFIG}"; do
     if [ ! -f "${config_file}" ]; then
         echo -e "${RED}Config file not found: ${config_file}${NC}"
         exit 1
@@ -123,4 +124,5 @@ exec "${SERVER_NAME}" \
     --array-config "${ARRAY_CONFIG}" \
     --fir-config "${FIR_CONFIG}" \
     --inference-config "${INFERENCE_CONFIG}" \
+    --hybrid-bf-default-config "${HYBRID_DEFAULT_CONFIG}" \
     --logger-config "${LOGGER_CONFIG}"

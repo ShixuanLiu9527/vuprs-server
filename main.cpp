@@ -4,29 +4,33 @@
 
 static void ParseArgs(const std::vector<std::string> &args, vuprs::SystemConfigFiles *configs)
 {
-    PARAM_CHECK(args.size() == 13, "vuprs-server", " Invalid command with arg size = " + std::to_string(args.size()));
+    PARAM_CHECK(args.size() == 15, "vuprs-server", " Invalid command with arg size = " + std::to_string(args.size()));
     PARAM_CHECK(args[1] == "--server-config" &&
                     args[3] == "--fpga-config" &&
                     args[5] == "--array-config" &&
                     args[7] == "--fir-config" &&
                     args[9] == "--inference-config" &&
-                    args[11] == "--logger-config",
+                    args[11] == "--hybrid-bf-default-config" &&
+                    args[13] == "--logger-config",
                 "vuprs-server", " Invalid command.");
     configs->server_config_json = args[2];
     configs->fpga_config_json = args[4];
     configs->bf_array_config_json = args[6];
     configs->fir_config_json = args[8];
     configs->inference_model_config_json = args[10];
-    configs->logger_configs.InitFromJson(args[12]);
+    configs->hybrid_default_config_json = args[12];
+    configs->logger_configs.InitFromJson(args[14]);
 }
 
 /**
- * @note Command (argc = 13): server --server-config {JSON}
- *                                   --fpga-config {JSON}
- *                                   --array-config {JSON}
- *                                   --fir-config {JSON}
- *                                   --inference-config {JSON}
- *                                   --logger-config {JSON}
+ * @note Command (argc = 15):
+ * server --server-config {JSON}
+ *        --fpga-config {JSON}
+ *        --array-config {JSON}
+ *        --fir-config {JSON}
+ *        --inference-config {JSON}
+ *        --hybrid-bf-default-config {JSON}
+ *        --logger-config {JSON}
  */
 int main(int argc, char *argv[])
 {

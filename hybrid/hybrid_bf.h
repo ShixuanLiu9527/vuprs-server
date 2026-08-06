@@ -10,10 +10,20 @@
 #include "algorithm/bf/fir.h"
 #include "hybrid/hybrid_bf_config.h"
 #include "fpga/fpga_api.h"
+#include "fault_detect/fault_detector.h"
 #include "logger/log_manager.h"
 
 namespace vuprs
 {
+    struct BeamformerResultMeta
+    {
+        std::vector<uint32_t> signal;           /* raw signal from DDR (Q16) */
+        std::vector<uint32_t> inference_result; /* inference result from NPU (Q31) */
+        int inference_result_identity;          /* inference result class identity */
+        bool inference_valid;
+        BeamformerResultMeta() : inference_valid(false), inference_result_identity(-1) {}
+    };
+
     /**
      * @brief ARM FPGA Collaboration Beamformer.
      *
@@ -60,6 +70,10 @@ namespace vuprs
         /* Thread parameters */
         std::mutex mut; /* Global mutex lock */
 
+        /* NPU */
+        std::mutex mut_npu;
+        FaultDetector fault_detector;
+
         /* Scan */
         std::mutex mut_scan_opt;                         /* Scan mutex lock */
         std::vector<double> scan_alt, scan_az;           /* controlled by mut_scan_opt */
@@ -86,7 +100,7 @@ namespace vuprs
         std::mutex mut_dma;                                 /* DMA Interrupt mutex lock */
         std::condition_variable dma_interrupt_cv;           /* DMA Interrupt condition var, [controlled by mut_dma] */
         std::atomic<bool> new_result_data_input{false};     /* assign to outside */
-        std::deque<std::vector<uint32_t>> result_queue;     /* Result queue, [controlled by mut_dma] */
+        std::deque<BeamformerResultMeta> result_queue;      /* Result queue, [controlled by mut_dma] */
 
         /* Atomics */
         std::atomic<bool> system_run{false};                  /* system run enable */
@@ -156,6 +170,9 @@ namespace vuprs
                                   const std::string &bf_array_config_json,
                                   const std::string &fir_config_json,
                                   const std::string &log_dir);
+
+        bool InitInference(const std::string &model_config_json,
+                           const std::string &inference_log_dir);
 
         /**
          * @brief Bind beam forming algorithm.
@@ -272,12 +289,12 @@ namespace vuprs
          *
          * @note Tread safety.
          *
-         * @param result pointer to vector to store the result.
+         * @param meta beamformer result.
          *
          * @retval true: success.
          * @retval false: failed.
          */
-        bool ReadResult(std::vector<uint32_t> *result);
+        bool ReadResult(BeamformerResultMeta *meta);
 
         /* - Part 3.2: Array signal data Input/Output - */
 

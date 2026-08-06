@@ -32,7 +32,8 @@ namespace vuprs
         std::string bf_array_config_json;        /* arg[6] - Beam forming config JSON file */
         std::string fir_config_json;             /* arg[8] - FIR filter bank config JSON file */
         std::string inference_model_config_json; /* arg[10] - Inference model config json */
-        SystemLoggerConfig logger_configs;       /* arg[12] - Logger configs */
+        std::string hybrid_default_config_json;  /* arg[12] - hybrid beamformer default config value config json */
+        SystemLoggerConfig logger_configs;       /* arg[14] - Logger configs */
     };
 
     struct ServerProtocol
@@ -81,9 +82,6 @@ namespace vuprs
 
         std::mutex mut_scan_config;
         ScanningConfig scan_config; /* Set by client or default value, controlled by mut_scan_config */
-
-        std::mutex mut_npu;
-        FaultDetector fault_detector;
 
         /* --- Thread data --- */
 

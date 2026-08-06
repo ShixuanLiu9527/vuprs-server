@@ -85,16 +85,17 @@ void vuprs::LinuxServer::InitSystemConfigFiles(const vuprs::SystemConfigFiles &c
                                                                    config.bf_array_config_json,
                                                                    config.fir_config_json,
                                                                    config.logger_configs.hybrid_logger_dir);
+            config_result &= this->beamformer.InitInference(config.inference_model_config_json,
+                                                            config.logger_configs.inference_logger_dir);
         }
         {
-            std::lock_guard<std::mutex> lock(this->mut_npu); /* LOCK */
-            config_result &= this->fault_detector.InitDetector(config.inference_model_config_json,
-                                                               config.logger_configs.inference_logger_dir);
+            std::lock_guard<std::mutex> lock(this->mut_bf_config); /* LOCK */
+            config_result &= this->bf_config.FromJson(config.hybrid_default_config_json);
         }
+        RUNTIME_CHECK(config_result, "server", "Config error.");
         this->server_logger = vuprs::LogManager::getLogger("server",
                                                            "log.txt",
                                                            config.logger_configs.server_logger_dir);
-        RUNTIME_CHECK(config_result, "server", " in [LinuxServer::InitSystemConfigFiles] Config error.");
         this->config_done = true;
     }
     catch (const std::exception &e)
@@ -290,7 +291,7 @@ void vuprs::LinuxServer::Stop()
 
 void vuprs::LinuxServer::THREAD__Send()
 {
-    std::vector<uint32_t> result_to_send;
+    vuprs::BeamformerResultMeta bf_result_meta;
     std::vector<uint16_t> scan_result_to_send;
     double max_scan_power_dB, min_scan_power_dB;
     bool queue_empty, status, send_ok;
@@ -338,8 +339,8 @@ void vuprs::LinuxServer::THREAD__Send()
                 {
                 case static_cast<uint32_t>(vuprs::ServerCommand::SERVER_CMD__GET_NEW_DATA):
                 {
-                    status = this->beamformer.ReadResult(&result_to_send);
-                    send_data_size = result_to_send.size() * sizeof(uint32_t);
+                    status = this->beamformer.ReadResult(&bf_result_meta);
+                    send_data_size = bf_result_meta.signal.size() * sizeof(uint32_t);
                     break;
                 }
                 case static_cast<uint32_t>(vuprs::ServerCommand::SERVER_CMD__SCAN_FOR_POSITION_POWER):
@@ -359,7 +360,9 @@ void vuprs::LinuxServer::THREAD__Send()
             {
             case static_cast<uint32_t>(vuprs::ServerCommand::SERVER_CMD__GET_NEW_DATA):
             {
-                send_string = vuprs::PROTOCOL_MakeServerResultDataResponse(info, status);
+                send_string = vuprs::PROTOCOL_MakeServerResultDataResponse(info,
+                                                                           bf_result_meta.inference_result_identity,
+                                                                           status);
                 break;
             }
             case static_cast<uint32_t>(vuprs::ServerCommand::SERVER_CMD__SCAN_FOR_POSITION_POWER):
@@ -387,7 +390,7 @@ void vuprs::LinuxServer::THREAD__Send()
                 {
                 case static_cast<uint32_t>(vuprs::ServerCommand::SERVER_CMD__GET_NEW_DATA):
                 {
-                    send_ok &= manager->SendBuffer<uint32_t>(result_to_send); /* Send data */
+                    send_ok &= manager->SendBuffer<uint32_t>(bf_result_meta.signal); /* Send data */
                     break;
                 }
                 case static_cast<uint32_t>(vuprs::ServerCommand::SERVER_CMD__SCAN_FOR_POSITION_POWER):

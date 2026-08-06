@@ -95,7 +95,9 @@ namespace vuprs
                                                     const std::string &info = "",
                                                     bool operation_status = true);
 
-    std::string PROTOCOL_MakeServerResultDataResponse(const std::string &info = "", bool operation_status = true);
+    std::string PROTOCOL_MakeServerResultDataResponse(const std::string &info = "",
+                                                      int inference_identity = -1,
+                                                      bool operation_status = true);
 }
 
 #endif

@@ -1,4 +1,5 @@
 #include <fstream>
+#include "config.h"
 #include "logger/check.h"
 #include "logger/log_manager.h"
 #include "3rdparty/nlohmann/json.hpp"
@@ -41,10 +42,25 @@ bool vuprs::FaultDetector::InitDetector(const std::string &model_config_json,
     /* Get and check input number and tensor size */
     std::vector<rknn_tensor_attr> inputs = this->model.GetInputAttrs();
     RUNTIME_CHECK(inputs.size() == 1, "inference", "Input number must be 1.");
-    /* NCWH layout (0-batch, 1-channel, 2-width, 3-height) */
+    /* NHWC layout (batch, height, width, channel) */
     RUNTIME_CHECK(inputs[0].n_dims == 4, "inference", "Not a 4D-input model.");
-    uint32_t mfcc_dim = inputs[0].dims[3];   /* MFCC image height (MFCC dims) */
-    uint32_t mfcc_frame = inputs[0].dims[2]; /* MFCC image width (frames) */
+    RUNTIME_CHECK(inputs[0].dims[0] == 1, "inference", "Input batch must be 1.");
+    RUNTIME_CHECK(inputs[0].dims[3] == 1, "inference", "Input channel must be 1.");
+#if DEBUG
+    printf("Input tensor layout: [%d, %d, %d, %d]\n", inputs[0].dims[0],
+           inputs[0].dims[1],
+           inputs[0].dims[2],
+           inputs[0].dims[3]);
+    std::vector<rknn_tensor_attr> outputs = this->model.GetOutputAttrs();
+    printf("Output tensor layout: [");
+    for (uint32_t i = 0; i < outputs[0].n_dims; i++)
+    {
+        printf("%d%s", outputs[0].dims[i], (i + 1 < outputs[0].n_dims) ? ", " : "");
+    }
+    printf("]\n");
+#endif
+    uint32_t mfcc_dim = inputs[0].dims[1];   /* H: MFCC dims per frame */
+    uint32_t mfcc_frame = inputs[0].dims[2]; /* W: frames */
     /* Initialize extractor */
     this->extractor.SetParameters(mfcc_dim,
                                   mfcc_frame,
@@ -64,6 +80,11 @@ void vuprs::FaultDetector::InputSignal(const std::vector<double> &signal, double
     this->extractor.InputSignal(_signal, fs);
 }
 
+bool vuprs::FaultDetector::ValidateInputSignalLength(uint32_t samples, double fs) const
+{
+    return samples >= this->extractor.FrameLengthSamples(fs);
+}
+
 void vuprs::FaultDetector::RunInference()
 {
     RUNTIME_CHECK(this->CheckReady(), "default_detect", "Model not ready.");
@@ -74,11 +95,11 @@ void vuprs::FaultDetector::RunInference()
                          tensor.data(),
                          tensor.size() * sizeof(uint8_t),
                          RKNN_TENSOR_UINT8,
-                         RKNN_TENSOR_NCHW);
+                         RKNN_TENSOR_NHWC);
     this->model.run();
 }
 
-void vuprs::FaultDetector::GetResult(std::vector<double> *res)
+void vuprs::FaultDetector::GetResult(Eigen::Matrix<double, -1, 1> *res, int *identity, bool use_softmax)
 {
     /* Retrieve output attributes */
     std::vector<rknn_tensor_attr> output_attrs = this->model.GetOutputAttrs();
@@ -90,45 +111,29 @@ void vuprs::FaultDetector::GetResult(std::vector<double> *res)
     {
         n_elements *= out_attr.dims[i];
     }
-    /* Allocate buffer and get output from NPU */
-    std::vector<uint8_t> output_buffer(out_attr.size);
-    this->model.GetOutput(0, output_buffer.data(), out_attr.size);
-    /* Convert raw output to double logits based on tensor type */
+    /* Allocate buffer and get output from NPU.
+     * Note: [RknnModel::GetOutput] requests float32 output (want_float = 1),
+     * so the NPU runtime dequantizes the tensor (FP32/INT8/INT16... all
+     * supported), and we always read floats here. */
+    std::vector<float> output_buffer(n_elements);
+    this->model.GetOutput(0, output_buffer.data(), n_elements * sizeof(float));
+    /* Convert output to double logits */
     Eigen::Matrix<double, -1, 1> logits(n_elements);
-    if (out_attr.type == RKNN_TENSOR_FLOAT32)
-    {
-        float *float_out = reinterpret_cast<float *>(output_buffer.data());
-        for (uint32_t i = 0; i < n_elements; i++)
-        {
-            logits(i) = static_cast<double>(float_out[i]);
-        }
-    }
-    else if (out_attr.type == RKNN_TENSOR_UINT8)
-    {
-        for (uint32_t i = 0; i < n_elements; i++)
-        {
-            logits(i) = static_cast<double>(output_buffer[i]);
-        }
-    }
-    else if (out_attr.type == RKNN_TENSOR_INT8)
-    {
-        int8_t *int8_out = reinterpret_cast<int8_t *>(output_buffer.data());
-        for (uint32_t i = 0; i < n_elements; i++)
-        {
-            logits(i) = static_cast<double>(int8_out[i]);
-        }
-    }
-    else
-    {
-        RUNTIME_CHECK(false, "default_detect",
-                      "Unsupported output tensor type: " + std::to_string(out_attr.type));
-    }
-    /* Apply softmax to obtain class probabilities */
-    Eigen::Matrix<double, -1, 1> probs = vuprs::softmax(logits);
-    /* Write result */
-    res->resize(n_elements);
     for (uint32_t i = 0; i < n_elements; i++)
     {
-        (*res)[i] = probs(i);
+        logits(i) = static_cast<double>(output_buffer[i]);
     }
+    /* Apply softmax to obtain class probabilities */
+    if (use_softmax)
+        *res = vuprs::softmax(logits);
+    else
+        *res = logits;
+    /* Class identity (argmax is invariant under softmax) */
+    if (identity != nullptr)
+    {
+        res->maxCoeff(identity);
+    }
+#if DEBUG
+    std::cout << "NPU Inference time comsuming: " << this->model.GetInferenceRuntime() << " us" << std::endl;
+#endif
 }

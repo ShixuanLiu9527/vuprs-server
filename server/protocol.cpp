@@ -50,7 +50,7 @@ bool vuprs::PROTOCOL_ParseCommandFromMessage(const std::string &message, vuprs::
 	if (message.empty())
 		return false;
 
-	cmd->config.ResetMask();
+	cmd->config.ResetMask(false);
 
 	try
 	{
@@ -227,13 +227,17 @@ std::string vuprs::PROTOCOL_MakeServerOperationResponse(const vuprs::ServerComma
 	return response.dump();
 }
 
-std::string vuprs::PROTOCOL_MakeServerResultDataResponse(const std::string &info, bool operation_status)
+std::string vuprs::PROTOCOL_MakeServerResultDataResponse(const std::string &info,
+														 int inference_identity,
+														 bool operation_status)
 {
 	nlohmann::json response;
 	response["response_cmd"] = SERVER_CMD__GET_NEW_DATA__STR;
 	response["operation-status"] = operation_status ? "done" : "failed";
 	response["info"] = info;
 	response["params"]["data_format"] = "uint32_t";
+	response["params"]["quantization"] = "q31";
+	response["params"]["inference_identity"] = std::to_string(inference_identity);
 	return response.dump();
 }
 
@@ -291,5 +295,6 @@ std::string vuprs::PROTOCOL_MakeServerScanningResponse(const vuprs::ScanningConf
 	response["params"]["max_power"] = std::to_string(max_scan_power_dB);
 	response["params"]["min_power"] = std::to_string(min_scan_power_dB);
 	response["params"]["data_format"] = "uint16_t";
+	response["params"]["quantization"] = "q15";
 	return response.dump();
 }

@@ -99,6 +99,16 @@ void vuprs::RknnModel::InitTensorAttrs()
     }
 }
 
+int64_t vuprs::RknnModel::GetInferenceRuntime() const
+{
+    rknn_perf_run info;
+    int ret = rknn_query(this->ctx_, RKNN_QUERY_PERF_RUN, &info, sizeof(rknn_perf_run));
+    RUNTIME_CHECK(ret == RKNN_SUCC,
+                  "inference",
+                  "Failed to query performance parameters");
+    return info.run_duration;
+}
+
 void vuprs::RknnModel::SetInput(uint32_t index,
                                 void *buffer,
                                 uint32_t size,
@@ -132,7 +142,7 @@ void vuprs::RknnModel::GetOutput(uint32_t index, void *buffer, uint32_t size)
     output.index = index;
     output.buf = buffer;
     output.size = size;
-    output.want_float = 0;
+    output.want_float = 1; /* request float32 output (NPU runtime dequantizes) */
     output.is_prealloc = 1;
     int ret = rknn_outputs_get(this->ctx_,
                                1,

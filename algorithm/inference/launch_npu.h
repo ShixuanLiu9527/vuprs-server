@@ -7,7 +7,7 @@
 namespace vuprs
 {
     /**
-     * @note Tensor layout NCHW
+     * @note Tensor layout must match the model (specified per-call in SetInput).
      */
     class RknnModel
     {
@@ -75,6 +75,7 @@ namespace vuprs
 
         uint32_t GetInputCount() const { return io_num_.n_input; }
         uint32_t GetOutputCount() const { return io_num_.n_output; }
+        int64_t GetInferenceRuntime() const;
         const std::vector<rknn_tensor_attr> &GetInputAttrs() const { return input_attrs_; }
         const std::vector<rknn_tensor_attr> &GetOutputAttrs() const { return output_attrs_; }
 

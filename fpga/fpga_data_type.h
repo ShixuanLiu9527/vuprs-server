@@ -88,6 +88,53 @@ namespace vuprs
         return static_cast<double>(static_cast<int32_t>(CODE)) / vuprs::Q31_FIXED_SCALE_32BIT;
     }
 
+    /**
+     * @brief Convert double to uint32_t (Q31).
+     *
+     * @note The input must be scaled in advance: coef <- coef / max(coef).
+     * @note Make sure data in range [FPGA_Q31_MIN, FPGA_Q31_MAX].
+     *
+     * @param input_scaled input data (double in range [FPGA_Q31_MIN, FPGA_Q31_MAX]).
+     * @param output output data (Q31 format).
+     *
+     * @throw std::runtime_error
+     */
+    void inline Q31__DOUBLE_TO_UINT32(const std::vector<double> &input_scaled, std::vector<uint32_t> *output)
+    {
+        uint64_t coefficient_size = input_scaled.size();
+        PARAM_CHECK(coefficient_size > 0, "fpga", " in " + std::string(__func__) + " Input FIR coefficient is empty.");
+        output->resize(coefficient_size);
+        for (uint64_t i = 0; i < coefficient_size; i++)
+        {
+            (*output)[i] = Q31__DOUBLE_TO_UINT32(input_scaled[i]);
+        }
+    }
+
+    /**
+     * @brief Convert double to uint32_t (Q31).
+     *
+     * @param input input data (double).
+     * @param output output data (Q31).
+     * @param max_abs max absolute value (= max(abs(input{i}))).
+     *
+     * @throw std::runtime_error
+     */
+    void inline Q31__DOUBLE_TO_UINT32(const std::vector<double> &input, std::vector<uint32_t> *output, double max_abs)
+    {
+        uint64_t coefficient_size = input.size();
+        PARAM_CHECK(coefficient_size > 0, "fpga", " in [Q31__DOUBLE_TO_UINT32] Input FIR coefficient is empty.");
+        output->resize(coefficient_size);
+        if (std::abs(max_abs - 0.0) < FPGA_TYPE_EPS)
+        {
+            memset(output->data(), 0, coefficient_size * sizeof(uint32_t));
+            return;
+        }
+        for (uint64_t i = 0; i < coefficient_size; i++)
+        {
+            (*output)[i] = Q31__DOUBLE_TO_UINT32(input[i] / max_abs);
+        }
+    }
+
     /* ------------------------------------ Q16 ----------------------------------- */
 
     /**
@@ -120,57 +167,10 @@ namespace vuprs
         return static_cast<double>(static_cast<int32_t>(CODE)) / vuprs::Q16_FIXED_SCALE_32BIT;
     }
 
-    /**
-     * @brief Convert FIR coefficient from double to Q31.
-     *
-     * @note The input must be scaled in advance: coef <- coef / max(coef).
-     * @note Make sure coefficients in range [FPGA_Q31_MIN, FPGA_Q31_MAX].
-     *
-     * @param input_scaled scaled FIR coefficients.
-     * @param output output Q31 coefficients (send to FPGA).
-     *
-     * @throw std::runtime_error
-     */
-    void inline ScaledFIRCoefficient_DOUBLE_TO_Q31_UINT32(const std::vector<double> &input_scaled, std::vector<uint32_t> *output)
-    {
-        uint64_t coefficient_size = input_scaled.size();
-        PARAM_CHECK(coefficient_size > 0, "fpga", " in " + std::string(__func__) + " Input FIR coefficient is empty.");
-        output->resize(coefficient_size);
-        for (uint64_t i = 0; i < coefficient_size; i++)
-        {
-            (*output)[i] = Q31__DOUBLE_TO_UINT32(input_scaled[i]);
-        }
-    }
-
-    /**
-     * @brief Convert FIR coefficient from double to Q31.
-     *
-     * @param input_scaled FIR coefficients (raw data, no need to scale).
-     * @param output output Q31 coefficients (send to FPGA).
-     * @param max_abs_coef max absolute coefficient (= max(abs(coef{i}))).
-     *
-     * @throw std::runtime_error
-     */
-    void inline FIRCoefficient_DOUBLE_TO_Q31_UINT32(const std::vector<double> &input, std::vector<uint32_t> *output, double max_abs_coef)
-    {
-        uint64_t coefficient_size = input.size();
-        PARAM_CHECK(coefficient_size > 0, "fpga", " in [FIRCoefficient_DOUBLE_TO_Q31_UINT32] Input FIR coefficient is empty.");
-        output->resize(coefficient_size);
-        if (std::abs(max_abs_coef - 0.0) < FPGA_TYPE_EPS)
-        {
-            memset(output->data(), 0, coefficient_size * sizeof(uint32_t));
-            return;
-        }
-        for (uint64_t i = 0; i < coefficient_size; i++)
-        {
-            (*output)[i] = Q31__DOUBLE_TO_UINT32(input[i] / max_abs_coef);
-        }
-    }
-
-    void inline FIRResult_Q16_TO_DOUBLE(const std::vector<uint32_t> &input, std::vector<double> *output)
+    void inline Q16__UINT32_TO_DOUBLE(const std::vector<uint32_t> &input, std::vector<double> *output)
     {
         uint64_t _size = input.size();
-        PARAM_CHECK(_size > 0, "fpga", " in [FIRResult_Q16_TO_DOUBLE] Input FIR result is empty.");
+        PARAM_CHECK(_size > 0, "fpga", " in [Q16__UINT32_TO_DOUBLE] Input FIR result is empty.");
         output->resize(_size);
         for (uint64_t i = 0; i < _size; i++)
         {

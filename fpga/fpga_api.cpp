@@ -164,7 +164,7 @@ bool vuprs::FPGA_API__FIR__SetCoefficients(vuprs::FPGAController *controller,
     /* Convert double to Q31 uint32_t */
     for (uint64_t i = 0; i < banks; i++)
     {
-        vuprs::FIRCoefficient_DOUBLE_TO_Q31_UINT32((*coefficients)[i], &one_bank_coefficients, max_absolute_coefficient);
+        vuprs::Q31__DOUBLE_TO_UINT32((*coefficients)[i], &one_bank_coefficients, max_absolute_coefficient);
         total_coefficients_count += one_bank_coefficients.size();
         coefficients_to_write.insert(coefficients_to_write.end(), one_bank_coefficients.begin(), one_bank_coefficients.end());
     }
@@ -227,7 +227,7 @@ bool vuprs::FPGA_API__FIR__SetLengthAndCoefficients(vuprs::FPGAController *contr
     /* Convert double to Q31 uint32_t */
     for (uint64_t i = 0; i < banks; i++)
     {
-        vuprs::FIRCoefficient_DOUBLE_TO_Q31_UINT32((*coefficients)[i], &one_bank_coefficients, max_absolute_coefficient);
+        vuprs::Q31__DOUBLE_TO_UINT32((*coefficients)[i], &one_bank_coefficients, max_absolute_coefficient);
         total_coefficients_count += one_bank_coefficients.size();
         coefficients_to_write.insert(coefficients_to_write.end(), one_bank_coefficients.begin(), one_bank_coefficients.end());
     }

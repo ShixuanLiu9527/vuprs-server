@@ -1,0 +1,57 @@
+{
+    "fs": {
+        "value": "10000.0",
+        "unit": "Hz",
+        "description": "sampling frequency"
+    },
+    "bf_target__alt": {
+        "value": "90.0",
+        "unit": "deg",
+        "description": "beam former pointing target - altitude"
+    },
+    "bf_target__az": {
+        "value": "0.0",
+        "unit": "deg",
+        "description": "beam former pointing target - azimuth"
+    },
+    "bf_wave_velocity": {
+        "value": "346.0",
+        "unit": "m/s",
+        "description": "wave velocity, e.g. 346.0 for speed of sound in air"
+    },
+    "bf_freq__lower": {
+        "value": "500.0",
+        "unit": "Hz",
+        "description": "lower boundary of beam former work frequency"
+    },
+    "bf_freq__upper": {
+        "value": "3000.0",
+        "unit": "Hz",
+        "description": "upper boundary of beam former work frequency"
+    },
+    "bf_cov_snapshots_window_size": {
+        "value": "200",
+        "description": "snapshots window size to fit covariance matrix"
+    },
+    "bf_cov_freq_average_index": {
+        "value": "0.8",
+        "description": "frequency average index to fit covariance matrix"
+    },
+    "dma__buffer_size": {
+        "value": "32768",
+        "unit": "bytes",
+        "description": "AXI DMA descriptor buffer size, the sampling points of the frame can be calculated as [dma__buffer_size] / 4"
+    },
+    "dma__buffer_count": {
+        "value": "20",
+        "description": "AXI DMA descriptor buffer count"
+    },
+    "queue__circular_buffer_queue_size_max": {
+        "value": "10",
+        "description": "MAX size of circular buffer data queue"
+    },
+    "queue__result_queue_size_max": {
+        "value": "10",
+        "description": "MAX size of result data queue"
+    }
+}

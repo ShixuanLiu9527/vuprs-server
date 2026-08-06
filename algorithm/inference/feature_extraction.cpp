@@ -179,12 +179,18 @@ void vuprs::SignalExtractor::InputFrameSignal(const Eigen::Matrix<double, -1, 1>
     this->total_frames_processed++;
 }
 
+uint32_t vuprs::SignalExtractor::FrameLengthSamples(double fs) const
+{
+    uint32_t N_half_frame = static_cast<uint32_t>(std::floor(0.5 * this->frame_time_ms * fs / 1000.0));
+    return 2 * N_half_frame;
+}
+
 void vuprs::SignalExtractor::InputSignal(const Eigen::Matrix<double, -1, 1> &signal, double fs)
 {
     PARAM_CHECK(fs > 0.0, "inference", "fs must greater than 0.");
     uint32_t N_total = signal.rows();
-    uint32_t N_half_frame = static_cast<uint32_t>(std::floor(0.5 * this->frame_time_ms * fs / 1000.0));
-    uint32_t N_frame = 2 * N_half_frame;
+    uint32_t N_frame = this->FrameLengthSamples(fs);
+    uint32_t N_half_frame = N_frame / 2;
     RUNTIME_CHECK(N_total >= N_frame, "inference", "No enough points for extract.");
     /* Slice the signal into frames (overlap) */
     if (!this->signal_average_set)
@@ -196,7 +202,7 @@ void vuprs::SignalExtractor::InputSignal(const Eigen::Matrix<double, -1, 1> &sig
     {
         this->signal_average = 0.6 * this->signal_average + 0.4 * signal.mean();
     }
-    uint32_t frame_number = N_total / N_half_frame;
+    uint32_t frame_number = (N_total >= N_frame) ? ((N_total - N_frame) / N_half_frame + 1) : 0;
     for (uint32_t i = 0; i < frame_number; ++i)
     {
         Eigen::Matrix<double, -1, 1> segment_signal = signal.segment(i * N_half_frame, N_frame);
@@ -224,6 +230,7 @@ void vuprs::SignalExtractor::GetExtractTensor(Eigen::Matrix<uint8_t, -1, -1> *te
         uint32_t r_start = this->pool_size + this->circular_ptr - this->frames;
         auto tensor_d_l = this->extract_tensor_pool.middleCols(0, this->circular_ptr);
         auto tensor_d_r = this->extract_tensor_pool.middleCols(r_start, this->frames - this->circular_ptr);
+        tensor_d.resize(tensor_d_l.rows(), tensor_d_l.cols() + tensor_d_r.cols());
         tensor_d << tensor_d_l, tensor_d_r;
     }
     /* Quantization */

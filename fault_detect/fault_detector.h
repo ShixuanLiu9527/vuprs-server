@@ -31,11 +31,23 @@ namespace vuprs
 
         void InputSignal(const std::vector<double> &signal, double fs);
 
+        /**
+         * @brief Check whether a signal block contains enough samples to form
+         *        at least one inference frame at the given sampling frequency.
+         *
+         * @param samples Number of samples in one signal block (e.g. DMA buffer).
+         * @param fs Sampling frequency in Hz.
+         *
+         * @retval true: enough samples.
+         * @retval false: too short, inference can never start.
+         */
+        bool ValidateInputSignalLength(uint32_t samples, double fs) const;
+
         bool CheckReady() const { return this->extractor.Flushed() && this->model.ModelReady(); }
 
         void RunInference();
 
-        void GetResult(std::vector<double> *res);
+        void GetResult(Eigen::Matrix<double, -1, 1> *res, int *identity, bool use_softmax);
     };
 }
 

@@ -75,6 +75,12 @@ bool vuprs::HybridBeamformer::InitHybridBeamformer(const std::string &fpga_confi
     return operate_status;
 }
 
+bool vuprs::HybridBeamformer::InitInference(const std::string &model_config_json,
+                                            const std::string &inference_log_dir)
+{
+    return this->fault_detector.InitDetector(model_config_json, inference_log_dir);
+}
+
 void vuprs::HybridBeamformer::ScanOptions(int points_in_hemisphere, double alt_min, double wave_velocity)
 {
     PARAM_CHECK(points_in_hemisphere > 0, "hybrid_bf", " in [HybridBeamformer::ScanOptions] points_in_hemisphere should be positive.");
@@ -185,6 +191,16 @@ bool vuprs::HybridBeamformer::StartBeamformerWithConfiguration(const vuprs::Hybr
         this->fir.GetZeroFIRBankCoefficient(&fir_coefficients, this->bf->ElementCount());
         FIR_LENGTH = this->fir.FIRLength();
     }
+    /* Step 4.5: Check whether one DMA buffer can provide at least one inference frame */
+    {
+        uint32_t samples_per_buffer = config.dma__buffer_size / sizeof(uint32_t);
+        if (!this->fault_detector.ValidateInputSignalLength(samples_per_buffer, this->hardware_fs))
+        {
+            HYBRID_LOG(V_WARN) << "DMA buffer (" << config.dma__buffer_size << " bytes = "
+                               << samples_per_buffer << " samples) is shorter than one inference frame at fs = "
+                               << this->hardware_fs << " Hz. Fault inference will never start.";
+        }
+    }
     /* Step 5: System reset FPGA */
     retval &= this->ResetHardwareBeamformer();
     /* Step 6: Config FPGA */
@@ -279,7 +295,7 @@ bool vuprs::HybridBeamformer::HasResult() const
     return this->new_result_data_input;
 }
 
-bool vuprs::HybridBeamformer::ReadResult(std::vector<uint32_t> *result)
+bool vuprs::HybridBeamformer::ReadResult(BeamformerResultMeta *meta)
 {
     bool read_success = false;
     if (this->new_result_data_input)
@@ -288,7 +304,7 @@ bool vuprs::HybridBeamformer::ReadResult(std::vector<uint32_t> *result)
             std::lock_guard<std::mutex> lock(this->mut_dma); /* LOCK */
             if (!this->result_queue.empty())
             {
-                *result = this->result_queue.front();
+                *meta = this->result_queue.front();
                 this->result_queue.pop_front();
                 read_success = true;
             }
@@ -459,15 +475,21 @@ void vuprs::HybridBeamformer::THREAD__ReadResult()
     vuprs::AXI_DMA_ScatterGatherDescriptor current_descriptor, previous_descriptor, next_descriptor;
     std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> _ref_descriptors;
     vuprs::AlignedBufferDMA buffer;
-    std::vector<uint32_t> result;
-    bool has_interrupt;
-#if DEBUG
     std::vector<double> result_d;
+    Eigen::Matrix<double, -1, 1> inference_res;
+    std::vector<double> std_inference_res;
+    bool has_interrupt;
+    double _hardware_fs;
+#if DEBUG
     int debug_file_group = 0;
 #endif
     {
         std::lock_guard<std::mutex> lock(this->mut); /* LOCK */
         _ref_descriptors = this->dma_descriptors;
+    }
+    {
+        std::lock_guard<std::mutex> lock(this->mut_alg); /* LOCK */
+        _hardware_fs = this->hardware_fs;
     }
     while (this->system_run)
     {
@@ -502,13 +524,33 @@ void vuprs::HybridBeamformer::THREAD__ReadResult()
                                               &buffer,
                                               previous_descriptor.BUFFER_ADDRESS,
                                               previous_descriptor.ALIGNMENT_2_BUFFER_SIZE);
+                vuprs::BeamformerResultMeta result_meta;
                 /* Convert buffer to vector */
-                result = buffer.to_vector<uint32_t>();
+                result_meta.signal = buffer.to_vector<uint32_t>();
+                /* Convert to double */
+                vuprs::Q16__UINT32_TO_DOUBLE(result_meta.signal, &result_d);
+                /* Inference */
+                {
+                    std::lock_guard<std::mutex> lock(this->mut_npu); /* LOCK */
+                    this->fault_detector.InputSignal(result_d, _hardware_fs);
+                    if (this->fault_detector.CheckReady())
+                    {
+                        this->fault_detector.RunInference();
+                        this->fault_detector.GetResult(&inference_res,
+                                                       &result_meta.inference_result_identity,
+                                                       false);
+                        /* Convert to uint32_t Q31 inference result */
+                        vuprs::eigenVector2stdVector(inference_res, &std_inference_res);
+                        vuprs::Q31__DOUBLE_TO_UINT32(std_inference_res,
+                                                     &result_meta.inference_result,
+                                                     inference_res.array().abs().maxCoeff());
+                        result_meta.inference_valid = true;
+                    }
+                }
 #if DEBUG
                 buffer.to_file(std::string(DEBUG_FILES_ROOT_DIR) + "/" +
                                std::string(DEBUG_FILES_DIR) + "-" + std::to_string(debug_file_group) + "/" +
                                std::string(FIR_RESULT_BIN_DEBUG_FILENAME));
-                vuprs::FIRResult_Q16_TO_DOUBLE(result, &result_d); /* Convert to double */
                 vuprs::SaveToCSV(result_d, std::string(DEBUG_FILES_ROOT_DIR) + "/" +
                                                std::string(DEBUG_FILES_DIR) + "-" + std::to_string(debug_file_group) + "/" +
                                                std::string(FIR_RESULT_DEBUG_FILENAME));
@@ -519,7 +561,7 @@ void vuprs::HybridBeamformer::THREAD__ReadResult()
                 /* Push data to queue */
                 {
                     std::lock_guard<std::mutex> lock(this->mut_dma); /* LOCK */
-                    this->result_queue.push_back(result);
+                    this->result_queue.push_back(result_meta);
                     if (this->result_queue.size() > this->result_queue_size_max)
                     {
                         this->result_queue.pop_front(); /* Pop the oldest data to avoid overflow */

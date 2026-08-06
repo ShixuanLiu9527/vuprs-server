@@ -193,6 +193,16 @@ namespace vuprs
         void InputSignal(const Eigen::Matrix<double, -1, 1> &signal, double fs);
 
         /**
+         * @brief Get number of samples of one frame at the given sampling
+         *        frequency (same formula used by [InputSignal]).
+         *
+         * @param fs Sampling frequency in Hz.
+         *
+         * @retval sample count per frame (0 if not configured).
+         */
+        uint32_t FrameLengthSamples(double fs) const;
+
+        /**
          * @brief Flushed flag.
          *
          * @retval true: flushed.
