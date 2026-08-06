@@ -92,7 +92,7 @@ namespace vuprs
 
         std::mutex mut_response;
         std::atomic<bool> server_response_irq;
-        std::atomic<bool> server_need_response; /* false = no need to send response */
+        std::atomic<bool> session_need_response; /* false = no need to send response */
         std::condition_variable server_response_cv;
         std::string server_response_message;
 

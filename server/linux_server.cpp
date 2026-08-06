@@ -35,7 +35,7 @@ vuprs::LinuxServer::LinuxServer()
     this->server_response_irq = false;
     this->sending_irq = false; /* true: should send */
     this->control_irq = false;
-    this->server_need_response = false; /* false = no need to send response */
+    this->session_need_response = false; /* false = no need to send response */
 }
 
 vuprs::LinuxServer::~LinuxServer()
@@ -225,7 +225,7 @@ void vuprs::LinuxServer::ConnectCallback(bool connect, const std::string &messag
 
 void vuprs::LinuxServer::Run()
 {
-    bool bf_config_done;
+    bool bf_config_done, config_valid = false;
     {
         std::lock_guard<std::mutex> lock(this->mut_bf); /* LOCK */
         bf_config_done = this->beamformer.ConfigDone();
@@ -247,9 +247,20 @@ void vuprs::LinuxServer::Run()
             std::lock_guard<std::mutex> lock(this->mut_bf_config); /* LOCK */
             config = this->bf_config;
         }
+        std::string check_info;
+        {
+            std::lock_guard<std::mutex> lock(this->mut_bf); /* LOCK */
+            config_valid = this->beamformer.CheckConfigValid(config, &check_info);
+        }
+        if (config_valid)
         {
             std::lock_guard<std::mutex> lock(this->mut_bf); /* LOCK */
             this->beamformer.run(config);
+        }
+        else
+        {
+            this->Stop();
+            RUNTIME_CHECK(false, "server", " in [LinuxServer::Run] Invalid beamformer parameters: " + check_info + ", server killed.");
         }
     }
     else
@@ -453,153 +464,179 @@ void vuprs::LinuxServer::THREAD__Control()
     }
     while (this->server_running)
     {
+        /* Sleep until wake up by session */
         {
             std::unique_lock<std::mutex> lock(this->mut_control); /* LOCK */
             this->control_cv.wait(lock, [this]
                                   { return !this->server_running || this->control_irq; });
         }
+        /* Check wake up flags */
         if (!this->server_running)
             break;
         if (!this->control_irq)
             continue;
         else
             this->control_irq = false;
-        /* Get command & config information */
+        /* Get command & config information from global */
         {
             std::lock_guard<std::mutex> lock(this->mut_cmd); /* LOCK */
             _cmd_info = this->cmd_info;
         }
-        /* Change direction */
-        operation_status = true;           /* Assume operation is successful, if any error occurs, set it to false */
-        this->server_need_response = true; /* Indicate that a response is needed in session */
-        error_info = "";                   /* Clear error info, if any error occurs, assign error info to this variable, and it will be added to response message */
+        /* Handle the message */
+        operation_status = true;            /* Assume operation is successful, if any error occurs, set it to false */
+        this->session_need_response = true; /* Indicate that a response is needed in session */
+        error_info = "";                    /* Clear error info, if any error occurs, assign error info to this variable, and it will be added to response message */
         try
         {
+            /* Check config valid */
             {
                 std::lock_guard<std::mutex> lock(this->mut_bf_config); /* LOCK */
                 config = this->bf_config;
             }
-            switch (_cmd_info.cmd)
-            {
-            case vuprs::ServerCommand::SERVER_CMD__ACK:
-            {
-                /* Do nothing, just response with ack */
-                break;
-            }
-            case vuprs::ServerCommand::SERVER_CMD__RESET: /* use this.config */
+            config += _cmd_info.config; /* merge config with mask */
+            bool check_valid = false;
+            std::string check_info;
             {
                 std::lock_guard<std::mutex> lock(this->mut_bf); /* LOCK */
-                this->beamformer.stop();
-                this->beamformer.run(config);
-                break;
+                check_valid = this->beamformer.CheckConfigValid(config, &check_info);
             }
-            case vuprs::ServerCommand::SERVER_CMD__CHANGE_BEAMFORMER:
+            if (check_valid)
             {
-                if (_cmd_info.beamformer_name == "dcrcb")
-                {
-                    std::lock_guard<std::mutex> lock(this->mut_bf); /* LOCK */
-                    this->beamformer.BindBeamformer(std::make_unique<vuprs::Beamformer_DCRCB>());
-                    this->beamformer.stop();
-                    this->beamformer.run(config);
-                }
-                else if (_cmd_info.beamformer_name == "cbf")
-                {
-                    std::lock_guard<std::mutex> lock(this->mut_bf); /* LOCK */
-                    this->beamformer.BindBeamformer(std::make_unique<vuprs::Beamformer_CBF>());
-                    this->beamformer.stop();
-                    this->beamformer.run(config);
-                }
-                else if (_cmd_info.beamformer_name == "mvdr")
-                {
-                    std::lock_guard<std::mutex> lock(this->mut_bf); /* LOCK */
-                    this->beamformer.BindBeamformer(std::make_unique<vuprs::Beamformer_MVDR>());
-                    this->beamformer.stop();
-                    this->beamformer.run(config);
-                }
-                else
-                {
-                    PARAM_CHECK(false, "server", " in [LinuxServer::THREAD__Control] Invalid beamformer name: " + _cmd_info.beamformer_name);
-                }
-                break;
-            }
-            case vuprs::ServerCommand::SERVER_CMD__REDIRECT: /* use this.config */
-            {
+                /* Save config to server global */
                 {
                     std::lock_guard<std::mutex> lock(this->mut_bf_config); /* LOCK */
-                    this->bf_config += _cmd_info.config;                   /* Merge config */
-                    config = this->bf_config;
+                    this->bf_config = config;
                 }
-                std::lock_guard<std::mutex> lock(this->mut_bf); /* LOCK */
-                this->beamformer.ReDirect(config.bf_target__alt, config.bf_target__az, config.bf_wave_velocity);
-                break;
-            }
-            case vuprs::ServerCommand::SERVER_CMD__START: /* use this.config */
-            {
-                std::lock_guard<std::mutex> lock(this->mut_bf); /* LOCK */
-                this->beamformer.run(config);
-                break;
-            }
-            case vuprs::ServerCommand::SERVER_CMD__STOP:
-            {
-                std::lock_guard<std::mutex> lock(this->mut_bf); /* LOCK */
-                this->beamformer.stop();
-                break;
-            }
-            case vuprs::ServerCommand::SERVER_CMD__SCAN_FOR_POSITION_POWER:
-            {
-                this->server_need_response = false; /* No need to response */
-                this->sending_format = static_cast<uint32_t>(vuprs::ServerCommand::SERVER_CMD__SCAN_FOR_POSITION_POWER);
+                switch (_cmd_info.cmd)
                 {
-                    std::lock_guard<std::mutex> lock(this->mut_scan_config); /* LOCK */
-                    this->scan_config = _cmd_info.scan_config;
+                case vuprs::ServerCommand::SERVER_CMD__ACK:
+                {
+                    /* Do nothing, just response with ack */
+                    break;
                 }
+                case vuprs::ServerCommand::SERVER_CMD__RESET:
                 {
                     std::lock_guard<std::mutex> lock(this->mut_bf); /* LOCK */
-                    this->beamformer.ScanOptions(
-                        _cmd_info.scan_config.points_in_hemisphere,
-                        _cmd_info.scan_config.alt_min,
-                        config.bf_wave_velocity);
-                    if (!this->beamformer.ScanSwitch())
+                    this->beamformer.stop();
+                    this->beamformer.run(config);
+                    break;
+                }
+                case vuprs::ServerCommand::SERVER_CMD__CHANGE_BEAMFORMER:
+                {
+                    if (_cmd_info.beamformer_name == "dcrcb")
                     {
-                        this->beamformer.ScanSwitch(true); /* Enable scanning */
+                        std::lock_guard<std::mutex> lock(this->mut_bf); /* LOCK */
+                        this->beamformer.BindBeamformer(std::make_unique<vuprs::Beamformer_DCRCB>());
+                        this->beamformer.stop();
+                        this->beamformer.run(config);
                     }
+                    else if (_cmd_info.beamformer_name == "cbf")
+                    {
+                        std::lock_guard<std::mutex> lock(this->mut_bf); /* LOCK */
+                        this->beamformer.BindBeamformer(std::make_unique<vuprs::Beamformer_CBF>());
+                        this->beamformer.stop();
+                        this->beamformer.run(config);
+                    }
+                    else if (_cmd_info.beamformer_name == "mvdr")
+                    {
+                        std::lock_guard<std::mutex> lock(this->mut_bf); /* LOCK */
+                        this->beamformer.BindBeamformer(std::make_unique<vuprs::Beamformer_MVDR>());
+                        this->beamformer.stop();
+                        this->beamformer.run(config);
+                    }
+                    else
+                    {
+                        PARAM_CHECK(false, "server", " in [LinuxServer::THREAD__Control] Invalid beamformer name: " + _cmd_info.beamformer_name);
+                    }
+                    break;
                 }
-                this->sending_irq = true;
-                this->sending_cv.notify_all();
-                break;
-            }
-            case vuprs::ServerCommand::SERVER_CMD__GET_NEW_DATA:
-            {
-                this->server_need_response = false; /* No need to response */
-                this->sending_format = static_cast<uint32_t>(vuprs::ServerCommand::SERVER_CMD__GET_NEW_DATA);
-                this->sending_irq = true;
-                this->sending_cv.notify_all();
-                break;
-            }
-            case vuprs::ServerCommand::SERVER_CMD__GET_ALG_PARAM:
-            {
-                this->server_need_response = false; /* Need to response */
-                this->sending_format = static_cast<uint32_t>(vuprs::ServerCommand::SERVER_CMD__GET_ALG_PARAM);
-                this->sending_irq = true;
-                this->sending_cv.notify_all();
-                break;
-            }
-            case vuprs::ServerCommand::SERVER_CMD__CHANGE_ALG_PARAM:
-            {
+                case vuprs::ServerCommand::SERVER_CMD__REDIRECT:
                 {
-                    std::lock_guard<std::mutex> lock(this->mut_bf_config); /* LOCK */
-                    this->bf_config += _cmd_info.config;                   /* Merge config */
-                    config = this->bf_config;
+                    std::lock_guard<std::mutex> lock(this->mut_bf); /* LOCK */
+                    this->beamformer.ReDirect(config.bf_target__alt,
+                                              config.bf_target__az,
+                                              config.bf_wave_velocity);
+                    break;
                 }
-                std::lock_guard<std::mutex> lock(this->mut_bf); /* LOCK */
-                this->beamformer.stop();
-                this->beamformer.run(config);
-                break;
+                case vuprs::ServerCommand::SERVER_CMD__START:
+                {
+                    std::lock_guard<std::mutex> lock(this->mut_bf); /* LOCK */
+                    this->beamformer.run(config);
+                    break;
+                }
+                case vuprs::ServerCommand::SERVER_CMD__STOP:
+                {
+                    std::lock_guard<std::mutex> lock(this->mut_bf); /* LOCK */
+                    this->beamformer.stop();
+                    break;
+                }
+                case vuprs::ServerCommand::SERVER_CMD__SCAN_FOR_POSITION_POWER:
+                {
+                    /* Validate scan options first (ScanOptions throws on invalid parameters,
+                       and session_need_response is still true so the error reaches the client) */
+                    {
+                        std::lock_guard<std::mutex> lock(this->mut_bf); /* LOCK */
+                        this->beamformer.ScanOptions(_cmd_info.scan_config.points_in_hemisphere,
+                                                     _cmd_info.scan_config.alt_min,
+                                                     config.bf_wave_velocity);
+                    }
+                    /* No need to response in session (data will be send in THREAD__Send) */
+                    this->session_need_response = false;
+                    this->sending_format = static_cast<uint32_t>(vuprs::ServerCommand::SERVER_CMD__SCAN_FOR_POSITION_POWER);
+                    /* Update scan config to server global */
+                    {
+                        std::lock_guard<std::mutex> lock(this->mut_scan_config); /* LOCK */
+                        this->scan_config = _cmd_info.scan_config;
+                    }
+                    /* Enable scanning */
+                    {
+                        std::lock_guard<std::mutex> lock(this->mut_bf); /* LOCK */
+                        if (!this->beamformer.ScanSwitch())
+                            this->beamformer.ScanSwitch(true); /* Enable scanning */
+                    }
+                    /* Wake up THREAD__Send */
+                    this->sending_irq = true;
+                    this->sending_cv.notify_all();
+                    break;
+                }
+                case vuprs::ServerCommand::SERVER_CMD__GET_NEW_DATA:
+                {
+                    /* No need to response in session, will send in THREAD__Send */
+                    this->session_need_response = false;
+                    this->sending_format = static_cast<uint32_t>(vuprs::ServerCommand::SERVER_CMD__GET_NEW_DATA);
+                    /* Wake up THREAD__Send */
+                    this->sending_irq = true;
+                    this->sending_cv.notify_all();
+                    break;
+                }
+                case vuprs::ServerCommand::SERVER_CMD__GET_ALG_PARAM:
+                {
+                    /* No need to response in session, will send in THREAD__Send */
+                    this->session_need_response = false;
+                    this->sending_format = static_cast<uint32_t>(vuprs::ServerCommand::SERVER_CMD__GET_ALG_PARAM);
+                    /* Wake up THREAD__Send */
+                    this->sending_irq = true;
+                    this->sending_cv.notify_all();
+                    break;
+                }
+                case vuprs::ServerCommand::SERVER_CMD__CHANGE_ALG_PARAM:
+                {
+                    std::lock_guard<std::mutex> lock(this->mut_bf); /* LOCK */
+                    this->beamformer.stop();
+                    this->beamformer.run(config);
+                    break;
+                }
+                default:
+                {
+                    break;
+                }
+                }
             }
-            default:
+            else
             {
-                break;
-            }
+                _cmd_info.cmd = vuprs::ServerCommand::SERVER_CMD__INVALID;
+                error_info = "invalid parameters: " + check_info;
+                operation_status = false;
             }
         }
         catch (const std::exception &e)
@@ -609,7 +646,7 @@ void vuprs::LinuxServer::THREAD__Control()
             std::cout << "Error in [LinuxServer::THREAD__Control] " << error_info << std::endl;
         }
         /* Make server response in session callback (if needed) */
-        if (this->server_need_response)
+        if (this->session_need_response)
         {
             try
             {
@@ -620,11 +657,8 @@ void vuprs::LinuxServer::THREAD__Control()
             {
                 std::cout << "Error occurred while making server response: " << e.what() << std::endl;
             }
-
-            {
-                std::lock_guard<std::mutex> lock(this->mut_response);
-                this->server_response_message = response_message;
-            }
+            std::lock_guard<std::mutex> lock(this->mut_response); /* LOCK */
+            this->server_response_message = response_message;
         }
         /* Wake up session and Send Response (session must be awake) */
         this->server_response_irq = true;
@@ -680,28 +714,31 @@ void vuprs::LinuxServer::SessionCallback(std::weak_ptr<vuprs::SocketIOManager> m
     /* --------------------------------------------------------------- */
     /* ---------- Normal: Response by the certain thread ------------- */
     /* --------------------------------------------------------------- */
-    /* Load command information */
+    /* Load command information to server global */
     {
         std::lock_guard<std::mutex> lock(this->mut_cmd); /* LOCK */
         this->cmd_info = _cmd_info;
     }
+    /* Wake up thread: control to handle this cmd */
     this->control_irq = true;
     this->control_cv.notify_all();
-    /* Wait for wake up */
+    /* Wait for wake up by thread: control */
     {
         std::unique_lock<std::mutex> lock(this->mut_response);
         this->server_response_cv.wait(lock, [this]
                                       { return !this->server_running || this->server_response_irq.load(); });
     }
+    /* Check wake up flag */
     if (!this->server_running)
         return;
     if (this->server_response_irq)
         this->server_response_irq = false;
     else
         return;
-    /* Get response message */
-    if (this->server_need_response)
+    /* Make [lite] response in session */
+    if (this->session_need_response)
     {
+        /* Get response message */
         {
             std::lock_guard<std::mutex> lock(this->mut_response);
             send_string = this->server_response_message;

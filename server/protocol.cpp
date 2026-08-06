@@ -49,9 +49,7 @@ bool vuprs::PROTOCOL_ParseCommandFromMessage(const std::string &message, vuprs::
 		return false;
 	if (message.empty())
 		return false;
-
-	cmd->config.ResetMask(false);
-
+	cmd->config.ResetMask(false); /* mask to false */
 	try
 	{
 		nlohmann::json root = nlohmann::json::parse(message);
@@ -99,8 +97,8 @@ bool vuprs::PROTOCOL_ParseCommandFromMessage(const std::string &message, vuprs::
 			vuprs::__JsonStringParseFLOAT<double>(&az, params, "az", true);
 			cmd->cmd = vuprs::ServerCommand::SERVER_CMD__REDIRECT;
 			cmd->config.bf_target__alt = alt;
-			cmd->config.bf_target__az = az;
 			cmd->config.mask.m_bf_target__alt = true;
+			cmd->config.bf_target__az = az;
 			cmd->config.mask.m_bf_target__az = true;
 			return true;
 		}

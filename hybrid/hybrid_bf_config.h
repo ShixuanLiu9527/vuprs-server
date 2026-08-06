@@ -108,9 +108,6 @@ namespace vuprs
         double min_power_db;               /* minimum power in dB for scan result */
         double max_power_db;               /* maximum power in dB for scan result */
     };
-
-    bool CheckCollaborationBeamformerConfigValid(vuprs::FPGAController *controller,
-                                                 const vuprs::HybridBeamformerConfig &config);
 }
 
 #endif

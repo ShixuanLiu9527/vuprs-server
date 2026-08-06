@@ -103,6 +103,49 @@ void vuprs::HybridBeamformer::ScanOptions(int points_in_hemisphere, double alt_m
     }
 }
 
+bool vuprs::HybridBeamformer::CheckConfigValid(const vuprs::HybridBeamformerConfig &config, std::string *info) const
+{
+    bool retval = true;
+#define _CHECK_AND_RETURN(STR)    \
+    if (!retval)                  \
+    {                             \
+        *info = std::string(STR); \
+        return false;             \
+    }
+    /* FPGA hardware must be initialized first */
+    retval &= this->controller.ConfigDone();
+    _CHECK_AND_RETURN("config not complete")
+    /* Sampling frequency must be within the range supported by the ADC controller */
+    retval &= (config.fs > 1e-2 && config.fs <= this->controller.dev__adc_controller.MaxSamplingFrequency());
+    _CHECK_AND_RETURN("fs out of range (must be 1e-2 < fs <= max_fs)")
+    /* Bandpass frequency range must be positive and below the Nyquist frequency */
+    retval &= (config.bf_freq__lower > 0 && config.bf_freq__lower < config.fs / 2.0);
+    retval &= (config.bf_freq__upper > 0 && config.bf_freq__upper < config.fs / 2.0);
+    retval &= (config.bf_freq__lower < config.bf_freq__upper);
+    _CHECK_AND_RETURN("bf_freq out of range (must be 0 < lower < upper < fs/2)")
+    /* Pointing direction must be within the physical hemisphere */
+    retval &= (config.bf_target__alt >= -90.0 && config.bf_target__alt <= 90.0);
+    retval &= (config.bf_target__az >= -180.0 && config.bf_target__az <= 180.0);
+    retval &= (config.bf_wave_velocity > 0);
+    _CHECK_AND_RETURN("bf_target out of range (alt in [-90,90], az in [-180,180], wave_velocity > 0)")
+    /* Covariance matrix fitting parameters */
+    retval &= (config.bf_cov_snapshots_window_size > 0);
+    retval &= (config.bf_cov_freq_average_index >= 0.0 && config.bf_cov_freq_average_index < 1.0);
+    _CHECK_AND_RETURN("bf_cov out of range (window_size > 0, freq_average_index in [0,1))")
+    /* DMA buffers: non-zero size, aligned, and the total size must fit in DDR (use uint64 to avoid overflow) */
+    retval &= (config.dma__buffer_size > 0 && config.dma__buffer_size % DMA_BUFFER_ALIGNMENT_1_WORD == 0);
+    retval &= (config.dma__buffer_count > 0);
+    retval &= (static_cast<uint64_t>(config.dma__buffer_size) * static_cast<uint64_t>(config.dma__buffer_count) <=
+               static_cast<uint64_t>(this->controller.mem__ddr.MaxSizeBytes()));
+    _CHECK_AND_RETURN("dma buffer size/count invalid or total exceeds DDR capacity")
+    /* Data queues */
+    retval &= (config.queue__circular_buffer_queue_size_max > 0);
+    retval &= (config.queue__result_queue_size_max > 0);
+    _CHECK_AND_RETURN("queue size must be > 0")
+    return retval;
+#undef _CHECK_AND_RETURN
+}
+
 bool vuprs::HybridBeamformer::ResetHardwareBeamformer()
 {
     bool retval = true;

@@ -348,6 +348,11 @@ namespace vuprs
                            double *max_power_db,
                            double *min_power_db);
 
+        /**
+         * @brief Check config valid.
+         */
+        bool CheckConfigValid(const vuprs::HybridBeamformerConfig &config, std::string *info) const;
+
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };
 }

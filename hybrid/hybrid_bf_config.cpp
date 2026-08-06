@@ -113,17 +113,3 @@ void vuprs::HybridBeamformerConfigMask::Reset(bool val)
     this->m_queue__circular_buffer_queue_size_max = val;
     this->m_queue__result_queue_size_max = val;
 }
-
-bool vuprs::CheckCollaborationBeamformerConfigValid(vuprs::FPGAController *controller, const vuprs::HybridBeamformerConfig &config)
-{
-    bool retval = true;
-    PARAM_CHECK(controller->ConfigDone(), "hybrid_bf", " in [CheckCollaborationBeamformerConfigValid] FPGA config not complete.");
-    retval &= (config.fs > 0 && config.fs < controller->dev__adc_controller.MaxSamplingFrequency());
-    retval &= (config.bf_freq__lower < config.fs / 2.0);
-    retval &= (config.bf_freq__upper < config.fs / 2.0);
-    retval &= (config.bf_freq__lower < config.bf_freq__upper);
-    retval &= (config.bf_cov_freq_average_index < 1.0);
-    retval &= (config.dma__buffer_size % DMA_BUFFER_ALIGNMENT_1_WORD == 0);
-    retval &= ((config.dma__buffer_size * config.dma__buffer_count) < controller->mem__ddr.MaxSizeBytes());
-    return retval;
-}
