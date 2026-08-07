@@ -247,15 +247,14 @@ namespace vuprs
      * @note Total points = 2 * n + 1 (n points in upper hemisphere, n points in lower hemisphere, and 1 point at the pole), but only points in upper hemisphere are returned.
      *
      * @param n_in_half number of scan points in each hemisphere (the point count in the half sphere).
+     * @param alt_min minimum altitude for generated scan points (units: degrees).
      * @param alt output vector of altitudes (units: degrees).
      * @param az output vector of azimuths (units: degrees).
-     * @param alt_min minimum altitude for generated scan points (units: degrees).
-
      */
     void FibonacciGrid(int n_in_half,
+                       double alt_min,
                        std::vector<double> *alt,
-                       std::vector<double> *az,
-                       double alt_min);
+                       std::vector<double> *az);
 
     double ConditionNumber(const Eigen::Matrix<Eigen::dcomplex, -1, -1> &R);
 }

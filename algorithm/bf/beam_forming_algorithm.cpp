@@ -265,7 +265,6 @@ void vuprs::CholeskyDecomposition(const Eigen::Matrix<Eigen::dcomplex, -1, -1> &
 void vuprs::Get_FIR_EXPMatrix(int L_fir, int N_points, Eigen::Matrix<Eigen::dcomplex, -1, -1> *exp_matrix, bool use_positive_freq)
 {
     int output_size;
-
     if (use_positive_freq)
         output_size = N_points / 2 + 1;
     else
@@ -279,10 +278,12 @@ void vuprs::Get_FIR_EXPMatrix(int L_fir, int N_points, Eigen::Matrix<Eigen::dcom
     *exp_matrix = exp_matrix->array().exp().matrix();                           /* E(k,l) = exp(-j * 2 * pi * k * l / N) */
 }
 
-void vuprs::FibonacciGrid(int n_in_half, std::vector<double> *alt, std::vector<double> *az, double alt_min = 15.0)
+void vuprs::FibonacciGrid(int n_in_half,
+                          double alt_min,
+                          std::vector<double> *alt,
+                          std::vector<double> *az)
 {
     RUNTIME_CHECK(alt && az, "bf", "Output pointers cannot be null");
-
     double phi = (std::sqrt(5.0) - 1.0) / 2.0; /* Golden ratio */
     double xn, yn, zn, _alt, _az;
     int N = 2 * n_in_half + 1, n;

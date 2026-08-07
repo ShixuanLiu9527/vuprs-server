@@ -15,9 +15,9 @@ vuprs::HybridBeamformer::HybridBeamformer()
         this->scan_alt_min = DEFAULT_SCANNING_ALTITUDE_MIN;
         this->scan_wave_velocity = DEFAULT_WAVE_VELOCITY;
         vuprs::FibonacciGrid(this->scan_points_in_hemisphere,
+                             this->scan_alt_min,
                              &this->scan_alt,
-                             &this->scan_az,
-                             this->scan_alt_min);
+                             &this->scan_az);
     }
     this->scan_options_initialized = false;
     this->BindBeamformer(std::make_unique<vuprs::Beamformer_DCRCB>()); /* default: DCRCB */
@@ -111,9 +111,9 @@ bool vuprs::HybridBeamformer::ScanOptions(const ScanningConfig &config, double w
             this->scan_points_in_hemisphere = config.points_in_hemisphere;
             this->scan_alt_min = config.alt_min;
             vuprs::FibonacciGrid(this->scan_points_in_hemisphere,
+                                 this->scan_alt_min,
                                  &this->scan_alt,
-                                 &this->scan_az,
-                                 this->scan_alt_min);
+                                 &this->scan_az);
             this->scan_wave_velocity = wave_velocity;
         }
         this->scan_options_changed = true;
