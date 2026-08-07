@@ -11,7 +11,7 @@ namespace vuprs
     {
     private:
         std::unique_ptr<ThreadPool> thread_pool;
-        int covariance_snap_window_size;
+        double covariance_snap_window_size;
         double adjacent_freq_average_index;
         double adjacent_freq_average_index_1;
         double exp_weighed_moving_average_index;
@@ -144,7 +144,7 @@ namespace vuprs
         /**
          * @brief Set covariance matrix fitting parameters.
          */
-        void SetCovarianceMatrixFittingParam(int snaps_window_size = 100, double adjacent_freq_average_index = 0.8);
+        void SetCovarianceMatrixFittingParam(double snaps_window_size = 100.0, double adjacent_freq_average_index = 0.8);
 
         /**
          * @brief Reset covariance matrices.

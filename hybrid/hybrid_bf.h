@@ -179,7 +179,7 @@ namespace vuprs
          *
          * @param beamformer beam forming algorithm (must be created by user, and bind to this class).
          */
-        void BindBeamformer(std::unique_ptr<vuprs::WidebandBeamformerTemplate> beamformer = nullptr);
+        bool BindBeamformer(std::unique_ptr<vuprs::WidebandBeamformerTemplate> beamformer = nullptr);
 
         /**
          * @brief Indicate config done.
@@ -214,11 +214,16 @@ namespace vuprs
         bool run(const HybridBeamformerConfig &config);
 
         /**
+         * @brief Check config valid.
+         */
+        bool CheckConfigValid(const vuprs::HybridBeamformerConfig &config, std::string *info) const;
+
+        /**
          * @brief Stop & reset beam former.
          *
          * @note Tread safety.
          */
-        void stop();
+        bool stop();
 
         /* ------ Part 2: Control (for algorithms) ------ */
 
@@ -264,11 +269,15 @@ namespace vuprs
          *
          * @note Tread safety.
          *
-         * @param points_in_hemisphere scanning points in half of the scanning area (altitude: 0-90 degree, azimuth: -180-180 degree).
-         * @param alt_min minimum altitude (unit: degree) of scanning area.
-         * @param wave_velocity wave velocity (m/s). e.g. 346.0 for speed of sound in air.
+         * @param config scanning config.
+         * @param wave_velocity wave velocity.
          */
-        void ScanOptions(int points_in_hemisphere, double alt_min, double wave_velocity);
+        bool ScanOptions(const ScanningConfig &config, double wave_velocity);
+
+        /**
+         * @brief Check config valid.
+         */
+        bool CheckScanningConfigValid(const ScanningConfig &config, std::string *info) const;
 
         /* ------ Part 3: Data Input/Output ------ */
 
@@ -347,11 +356,6 @@ namespace vuprs
         bool ReadScanPower(std::vector<uint16_t> *scanPower,
                            double *max_power_db,
                            double *min_power_db);
-
-        /**
-         * @brief Check config valid.
-         */
-        bool CheckConfigValid(const vuprs::HybridBeamformerConfig &config, std::string *info) const;
 
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };

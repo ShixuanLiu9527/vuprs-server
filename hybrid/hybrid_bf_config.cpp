@@ -10,7 +10,7 @@ void vuprs::HybridBeamformerConfig::SetDefault()
     this->bf_wave_velocity = 346.0;                   /* wave velocity of sound */
     this->bf_freq__lower = 500.0;                     /* lower boundary of beam former work frequency (unit: Hz) */
     this->bf_freq__upper = 3000.0;                    /* upper boundary of beam former work frequency (unit: Hz) */
-    this->bf_cov_snapshots_window_size = 200;         /* Snapshots window size (to fit covariance matrix) >= 200 */
+    this->bf_cov_snapshots_window_size = 200.0;       /* Snapshots window size (to fit covariance matrix) >= 200 */
     this->bf_cov_freq_average_index = 0.8;            /* frequency average index (to fit covariance matrix) */
     this->dma__buffer_size = 32768;                   /* [internal param] AXI DMA descriptor buffer size */
     this->dma__buffer_count = 20;                     /* [internal param] AXI DMA descriptor buffer count */
@@ -53,7 +53,7 @@ bool vuprs::HybridBeamformerConfig::FromJson(const std::string &json_filename)
     if (json_data.contains("bf_wave_velocity"))
     {
         vuprs::__JsonStringParseFLOAT<double>(&this->bf_wave_velocity, json_data["bf_wave_velocity"], "value", true);
-        this->mask.m_bf_waveVelocity = true;
+        this->mask.m_bf_wave_velocity = true;
     }
     if (json_data.contains("bf_freq__lower"))
     {
@@ -67,7 +67,7 @@ bool vuprs::HybridBeamformerConfig::FromJson(const std::string &json_filename)
     }
     if (json_data.contains("bf_cov_snapshots_window_size"))
     {
-        vuprs::__JsonStringParseINT<int>(&this->bf_cov_snapshots_window_size, json_data["bf_cov_snapshots_window_size"], "value", true);
+        vuprs::__JsonStringParseFLOAT<double>(&this->bf_cov_snapshots_window_size, json_data["bf_cov_snapshots_window_size"], "value", true);
         this->mask.m_bf_cov_snapshots_window_size = true;
     }
     if (json_data.contains("bf_cov_freq_average_index"))
@@ -103,7 +103,7 @@ void vuprs::HybridBeamformerConfigMask::Reset(bool val)
     this->m_fs = val;
     this->m_bf_target__alt = val;
     this->m_bf_target__az = val;
-    this->m_bf_waveVelocity = val;
+    this->m_bf_wave_velocity = val;
     this->m_bf_freq__lower = val;
     this->m_bf_freq__upper = val;
     this->m_bf_cov_snapshots_window_size = val;
@@ -112,4 +112,10 @@ void vuprs::HybridBeamformerConfigMask::Reset(bool val)
     this->m_dma__bufferCount = val;
     this->m_queue__circular_buffer_queue_size_max = val;
     this->m_queue__result_queue_size_max = val;
+}
+
+void vuprs::ScanningConfigMask::Reset(bool val)
+{
+    this->m_alt_min = val;
+    this->m_points_in_hemisphere = val;
 }

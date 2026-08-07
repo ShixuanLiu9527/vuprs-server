@@ -18,7 +18,7 @@ namespace vuprs
         bool m_fs;                                    /* Mask of [fs] */
         bool m_bf_target__alt;                        /* Mask of [bf_target__alt] */
         bool m_bf_target__az;                         /* Mask of [bf_target__az] */
-        bool m_bf_waveVelocity;                       /* Mask of [bf_wave_velocity] */
+        bool m_bf_wave_velocity;                      /* Mask of [bf_wave_velocity] */
         bool m_bf_freq__lower;                        /* Mask of [bf_freq__lower] */
         bool m_bf_freq__upper;                        /* Mask of [bf_freq_upper] */
         bool m_bf_cov_snapshots_window_size;          /* Mask of [bf_cov_snapshots_window_size] */
@@ -52,7 +52,7 @@ namespace vuprs
         double bf_wave_velocity;                        /* wave velocity (m/s). e.g. 346.0 for speed of sound in air */
         double bf_freq__lower;                          /* lower boundary of beam former work frequency (unit: Hz), the valid range is [10, 120000] Hz */
         double bf_freq__upper;                          /* upper boundary of beam former work frequency (unit: Hz), the valid range is [10, 120000] Hz */
-        int bf_cov_snapshots_window_size;               /* Snapshots window size (to fit covariance matrix) */
+        double bf_cov_snapshots_window_size;            /* Snapshots window size (to fit covariance matrix) */
         double bf_cov_freq_average_index;               /* frequency average index (to fit covariance matrix) */
         uint32_t dma__buffer_size;                      /* [internal param] AXI DMA descriptor buffer size in bytes */
         uint32_t dma__buffer_count;                     /* [internal param] AXI DMA descriptor buffer count */
@@ -75,7 +75,7 @@ namespace vuprs
             this->fs = other.mask.m_fs ? other.fs : this->fs;
             this->bf_target__alt = other.mask.m_bf_target__alt ? other.bf_target__alt : this->bf_target__alt;
             this->bf_target__az = other.mask.m_bf_target__az ? other.bf_target__az : this->bf_target__az;
-            this->bf_wave_velocity = other.mask.m_bf_waveVelocity ? other.bf_wave_velocity : this->bf_wave_velocity;
+            this->bf_wave_velocity = other.mask.m_bf_wave_velocity ? other.bf_wave_velocity : this->bf_wave_velocity;
             this->bf_freq__lower = other.mask.m_bf_freq__lower ? other.bf_freq__lower : this->bf_freq__lower;
             this->bf_freq__upper = other.mask.m_bf_freq__upper ? other.bf_freq__upper : this->bf_freq__upper;
             this->bf_cov_snapshots_window_size = other.mask.m_bf_cov_snapshots_window_size ? other.bf_cov_snapshots_window_size : this->bf_cov_snapshots_window_size;
@@ -92,14 +92,27 @@ namespace vuprs
         void ResetMask(bool val = false) { this->mask.Reset(val); }
     };
 
+    struct ScanningConfigMask
+    {
+        bool m_points_in_hemisphere;
+        bool m_alt_min;
+        ScanningConfigMask() { this->Reset(false); }
+        void Reset(bool val = false);
+    };
+
     struct ScanningConfig
     {
         int points_in_hemisphere;
         double alt_min;
-        bool need_regenerate_position_points;
+        ScanningConfigMask mask;
         ScanningConfig() : points_in_hemisphere(DEFAULT_SCANNING_POINTS_IN_HALF),
-                           alt_min(DEFAULT_SCANNING_ALTITUDE_MIN),
-                           need_regenerate_position_points(true) {}
+                           alt_min(DEFAULT_SCANNING_ALTITUDE_MIN) {}
+        void operator+=(const ScanningConfig &other)
+        {
+            this->points_in_hemisphere = other.mask.m_points_in_hemisphere ? other.points_in_hemisphere : this->points_in_hemisphere;
+            this->alt_min = other.mask.m_alt_min ? other.alt_min : this->alt_min;
+        }
+        void ResetMask(bool val = false) { this->mask.Reset(val); }
     };
 
     struct ScanResult

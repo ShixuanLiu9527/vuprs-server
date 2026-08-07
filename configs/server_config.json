@@ -4,34 +4,6 @@
     "accept-client-counts": "1",
     "protocol": {
         "command-header": "[HEADER]",
-        "command-tailer": "[TAILER]",
-        "certain-commands": {
-            "ack": {
-                "cmd": "ACK",
-                "included-params": [],
-                "operation-status": {
-                    "success": "DONE",
-                    "failure": "FAILED"
-                }
-            },
-            "change_beamformer": {
-                "cmd": "CHANGE_BEAMFORMER",
-                "included-params": [
-                    "beamformer"
-                ],
-                "operation-status": {
-                    "success": "DONE",
-                    "failure": "FAILED"
-                }
-            },
-            "get_direction": {
-                "cmd": "GET_DIRECTION",
-                "included-params": [],
-                "operation-status": {
-                    "success": "DONE",
-                    "failure": "FAILED"
-                }
-            }
-        }
+        "command-tailer": "[TAILER]"
     }
 }

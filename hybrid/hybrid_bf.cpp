@@ -28,12 +28,13 @@ vuprs::HybridBeamformer::~HybridBeamformer()
     this->stop();
 }
 
-void vuprs::HybridBeamformer::BindBeamformer(std::unique_ptr<vuprs::WidebandBeamformerTemplate> beamformer)
+bool vuprs::HybridBeamformer::BindBeamformer(std::unique_ptr<vuprs::WidebandBeamformerTemplate> beamformer)
 {
     if (beamformer != nullptr)
     {
         this->bf = std::move(beamformer);
     }
+    return beamformer != nullptr;
 }
 
 bool vuprs::HybridBeamformer::ConfigDone() const
@@ -81,18 +82,34 @@ bool vuprs::HybridBeamformer::InitInference(const std::string &model_config_json
     return this->fault_detector.InitDetector(model_config_json, inference_log_dir);
 }
 
-void vuprs::HybridBeamformer::ScanOptions(int points_in_hemisphere, double alt_min, double wave_velocity)
+bool vuprs::HybridBeamformer::CheckScanningConfigValid(const ScanningConfig &config, std::string *info) const
 {
-    PARAM_CHECK(points_in_hemisphere > 0, "hybrid_bf", " in [HybridBeamformer::ScanOptions] points_in_hemisphere should be positive.");
-    PARAM_CHECK(alt_min >= 0 && alt_min <= 90, "hybrid_bf", " in [HybridBeamformer::ScanOptions] alt_min should be between 0 and 90.");
-    PARAM_CHECK(wave_velocity > 0, "hybrid_bf", " in [HybridBeamformer::ScanOptions] wave_velocity should be positive.");
-    if (points_in_hemisphere != this->scan_points_in_hemisphere || alt_min != this->scan_alt_min || wave_velocity != this->scan_wave_velocity)
+    bool retval = true;
+#define _CHECK_AND_RETURN(STR)        \
+    if (!retval)                      \
+    {                                 \
+        if (info != nullptr)          \
+            *info = std::string(STR); \
+        return false;                 \
+    }
+    retval &= config.points_in_hemisphere > 0;
+    _CHECK_AND_RETURN("points_in_hemisphere must greater than 0")
+    retval &= config.alt_min >= 0.0 && config.alt_min <= 90.0;
+    _CHECK_AND_RETURN("alt_min must be in range [0.0, 90.0] deg")
+    return retval;
+}
+
+bool vuprs::HybridBeamformer::ScanOptions(const ScanningConfig &config, double wave_velocity)
+{
+    PARAM_CHECK(this->CheckScanningConfigValid(config, nullptr), "hybrid", "Invalid scan options.");
+    if (config.points_in_hemisphere != this->scan_points_in_hemisphere ||
+        config.alt_min != this->scan_alt_min ||
+        wave_velocity != this->scan_wave_velocity)
     {
         {
             std::lock_guard<std::mutex> lock(this->mut_scan_opt); /* LOCK */
-
-            this->scan_points_in_hemisphere = points_in_hemisphere;
-            this->scan_alt_min = alt_min;
+            this->scan_points_in_hemisphere = config.points_in_hemisphere;
+            this->scan_alt_min = config.alt_min;
             vuprs::FibonacciGrid(this->scan_points_in_hemisphere,
                                  &this->scan_alt,
                                  &this->scan_az,
@@ -101,16 +118,18 @@ void vuprs::HybridBeamformer::ScanOptions(int points_in_hemisphere, double alt_m
         }
         this->scan_options_changed = true;
     }
+    return true;
 }
 
 bool vuprs::HybridBeamformer::CheckConfigValid(const vuprs::HybridBeamformerConfig &config, std::string *info) const
 {
     bool retval = true;
-#define _CHECK_AND_RETURN(STR)    \
-    if (!retval)                  \
-    {                             \
-        *info = std::string(STR); \
-        return false;             \
+#define _CHECK_AND_RETURN(STR)        \
+    if (!retval)                      \
+    {                                 \
+        if (info != nullptr)          \
+            *info = std::string(STR); \
+        return false;                 \
     }
     /* FPGA hardware must be initialized first */
     retval &= this->controller.ConfigDone();
@@ -129,7 +148,7 @@ bool vuprs::HybridBeamformer::CheckConfigValid(const vuprs::HybridBeamformerConf
     retval &= (config.bf_wave_velocity > 0);
     _CHECK_AND_RETURN("bf_target out of range (alt in [-90,90], az in [-180,180], wave_velocity > 0)")
     /* Covariance matrix fitting parameters */
-    retval &= (config.bf_cov_snapshots_window_size > 0);
+    retval &= (config.bf_cov_snapshots_window_size > 0.0);
     retval &= (config.bf_cov_freq_average_index >= 0.0 && config.bf_cov_freq_average_index < 1.0);
     _CHECK_AND_RETURN("bf_cov out of range (window_size > 0, freq_average_index in [0,1))")
     /* DMA buffers: non-zero size, aligned, and the total size must fit in DDR (use uint64 to avoid overflow) */
@@ -237,6 +256,7 @@ bool vuprs::HybridBeamformer::StartBeamformerWithConfiguration(const vuprs::Hybr
     /* Step 4.5: Check whether one DMA buffer can provide at least one inference frame */
     {
         uint32_t samples_per_buffer = config.dma__buffer_size / sizeof(uint32_t);
+        std::lock_guard<std::mutex> lock(this->mut_npu); /* LOCK */
         if (!this->fault_detector.ValidateInputSignalLength(samples_per_buffer, this->hardware_fs))
         {
             HYBRID_LOG(V_WARN) << "DMA buffer (" << config.dma__buffer_size << " bytes = "
@@ -315,7 +335,7 @@ bool vuprs::HybridBeamformer::run(const vuprs::HybridBeamformerConfig &config)
     return true;
 }
 
-void vuprs::HybridBeamformer::stop()
+bool vuprs::HybridBeamformer::stop()
 {
     this->system_run = false;
     this->algorithm_cv.notify_all();
@@ -328,7 +348,7 @@ void vuprs::HybridBeamformer::stop()
             f.join();
         }
     }
-    this->ResetHardwareBeamformer();
+    return this->ResetHardwareBeamformer();
 }
 
 /* ------------------------------------------ Thread Control ----------------------------------------- */

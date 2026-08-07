@@ -16,9 +16,13 @@
 #define SERVER_CMD__CHANGE_ALG_PARAM__STR "change_algorithm_parameters"
 #define SERVER_CMD__STOP__STR "stop"
 #define SERVER_CMD__START__STR "start"
-#define SERVER_CMD__GET_NEW_DATA__STR "get_data"
-#define SERVER_CMD__SCAN_FOR_POSITION_POWER__STR "power_scan"
+#define SERVER_CMD__ENABLE_SCAN__STR "enable_scan"
+#define SERVER_CMD__DISABLE_SCAN__STR "disable_scan"
+#define SERVER_CMD__GET_SCAN_DATA__STR "get_scan"
+#define SERVER_CMD__GET_NEW_DATA__STR "get_bf"
 #define SERVER_CMD__GET_ALG_PARAM__STR "read_algorithm_parameters"
+
+#define IS_VALID_BEAMFORMER_SELECTION(VAL) ((VAL) == "dcrcb" || (VAL) == "cbf" || (VAL) == "mvdr")
 
 namespace vuprs
 {
@@ -27,17 +31,19 @@ namespace vuprs
      */
     enum class ServerCommand
     {
-        SERVER_CMD__INVALID = 0,             /* Invalid command */
-        SERVER_CMD__ACK,                     /* Acknowledge command, which is used to indicate that the server has received the command and is processing it, and the client can wait for response. */
-        SERVER_CMD__RESET,                   /* Reset beam former (STEP 1: Stop, STEP 2: Clear) */
-        SERVER_CMD__REDIRECT,                /* Redirect beam former */
-        SERVER_CMD__CHANGE_BEAMFORMER,       /* Change beam former */
-        SERVER_CMD__CHANGE_ALG_PARAM,        /* Change algorithm parameters (STEP 1: Stop, STEP 2: Start with new parameters) */
-        SERVER_CMD__STOP,                    /* Stop beam former */
-        SERVER_CMD__START,                   /* Start beam former */
-        SERVER_CMD__GET_NEW_DATA,            /* Get newest data from server (Send DMA buffer to host) */
-        SERVER_CMD__SCAN_FOR_POSITION_POWER, /* Scan for position power */
-        SERVER_CMD__GET_ALG_PARAM            /* Get current algorithm parameters */
+        SERVER_CMD__INVALID = 0,       /* Invalid command */
+        SERVER_CMD__ACK,               /* Acknowledge command, which is used to indicate that the server has received the command and is processing it, and the client can wait for response. */
+        SERVER_CMD__RESET,             /* Reset beam former (STEP 1: Stop, STEP 2: Clear) */
+        SERVER_CMD__REDIRECT,          /* Redirect beam former */
+        SERVER_CMD__CHANGE_BEAMFORMER, /* Change beam former */
+        SERVER_CMD__CHANGE_ALG_PARAM,  /* Change algorithm parameters (STEP 1: Stop, STEP 2: Start with new parameters) */
+        SERVER_CMD__STOP,              /* Stop beam former */
+        SERVER_CMD__START,             /* Start beam former */
+        SERVER_CMD__ENABLE_SCAN,       /* Enable space energy scan */
+        SERVER_CMD__DISABLE_SCAN,      /* Disable space energy scan */
+        SERVER_CMD__GET_SCAN_DATA,     /* Get space energy scan result */
+        SERVER_CMD__GET_BF_DATA,       /* Get newest data from server (Send DMA buffer to host) */
+        SERVER_CMD__GET_ALG_PARAM      /* Get current algorithm parameters */
     };
 
     /**
@@ -46,9 +52,9 @@ namespace vuprs
     struct ServerCommandInformation
     {
         vuprs::HybridBeamformerConfig config; /* config info */
-        vuprs::ScanningConfig scan_config;    /* scanning config info, which is used when cmd is SERVER_CMD__SCAN_FOR_POSITION_POWER */
-        vuprs::ServerCommand cmd;
-        std::string beamformer_name; /* beam former name (for SERVER_CMD__CHANGE_BEAMFORMER) */
+        vuprs::ScanningConfig scan_config;    /* scanning config info, which is used when cmd is SERVER_CMD__ENABLE_SCAN */
+        vuprs::ServerCommand cmd;             /* Command enum */
+        std::string beamformer_name;          /* beam former name (for SERVER_CMD__CHANGE_BEAMFORMER) */
         ServerCommandInformation() : cmd(vuprs::ServerCommand::SERVER_CMD__INVALID), beamformer_name("") {}
     };
 
@@ -78,24 +84,16 @@ namespace vuprs
      *
      * @retval Server response message.
      */
-    std::string PROTOCOL_MakeServerOperationResponse(const ServerCommandInformation &cmd,
-                                                     const std::string &info = "",
-                                                     bool operation_status = true);
-
-    /**
-     * @brief Make server response message for current algorithm parameters.
-     *
-     * @param config Current algorithm parameters.
-     */
-    std::string PROTOCOL_MakeServerParameterResponse(const vuprs::HybridBeamformerConfig &config);
-
-    std::string PROTOCOL_MakeServerScanningResponse(const vuprs::ScanningConfig &scan_config,
-                                                    double min_scan_power_dB,
-                                                    double max_scan_power_dB,
-                                                    const std::string &info = "",
-                                                    bool operation_status = true);
-
-    std::string PROTOCOL_MakeServerResultDataResponse(const std::string &info = "",
+    std::string PROTOCOL_server_response__normal(const ServerCommandInformation &cmd,
+                                                 const std::string &info = "",
+                                                 bool operation_status = true);
+    std::string PROTOCOL_server_response__algo_params(const vuprs::HybridBeamformerConfig &config);
+    std::string PROTOCOL_server_response__get_scan_data(const vuprs::ScanningConfig &scan_config,
+                                                        double min_scan_power_dB,
+                                                        double max_scan_power_dB,
+                                                        const std::string &info = "",
+                                                        bool operation_status = true);
+    std::string PROTOCOL_server_response__get_bf_data(const std::string &info = "",
                                                       int inference_identity = -1,
                                                       bool operation_status = true);
 }

@@ -10,9 +10,9 @@
 
 #define DEFAULT_SENDING_DATA_QUEUE_LENGTH 10U
 
-#define IS_BINARY_DATA_SENDING_CMD(VAL)                                                \
-    ((VAL) == static_cast<uint32_t>(vuprs::ServerCommand::SERVER_CMD__GET_NEW_DATA) || \
-     (VAL) == static_cast<uint32_t>(vuprs::ServerCommand::SERVER_CMD__SCAN_FOR_POSITION_POWER))
+#define IS_BINARY_DATA_SENDING_CMD(VAL)                                               \
+    ((VAL) == static_cast<uint32_t>(vuprs::ServerCommand::SERVER_CMD__GET_BF_DATA) || \
+     (VAL) == static_cast<uint32_t>(vuprs::ServerCommand::SERVER_CMD__GET_SCAN_DATA))
 
 namespace vuprs
 {
@@ -118,7 +118,7 @@ namespace vuprs
         /**
          * @brief Send thread, which will block in sending_cv and wait for sending_irq, then send data to client.
          *
-         * @note Fork 1: send result data (when this->sending_format is SERVER_CMD__GET_NEW_DATA, send data in this->result_queue).
+         * @note Fork 1: send result data (when this->sending_format is SERVER_CMD__GET_BF_DATA, send data in this->result_queue).
          * @note Fork 2: send current algorithm parameters (when this->sending_format is SERVER_CMD__GET_ALG_PARAM, send current algorithm parameters).
          */
         void THREAD__Send();

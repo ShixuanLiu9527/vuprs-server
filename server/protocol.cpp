@@ -5,41 +5,31 @@ static std::string __ServerCommandToString(vuprs::ServerCommand cmd)
 	switch (cmd)
 	{
 	case vuprs::ServerCommand::SERVER_CMD__RESET:
-	{
 		return SERVER_CMD__RESET__STR;
-	}
 	case vuprs::ServerCommand::SERVER_CMD__REDIRECT:
-	{
 		return SERVER_CMD__REDIRECT__STR;
-	}
 	case vuprs::ServerCommand::SERVER_CMD__CHANGE_BEAMFORMER:
-	{
 		return SERVER_CMD__CHANGE_BEAMFORMER__STR;
-	}
 	case vuprs::ServerCommand::SERVER_CMD__CHANGE_ALG_PARAM:
-	{
 		return SERVER_CMD__CHANGE_ALG_PARAM__STR;
-	}
 	case vuprs::ServerCommand::SERVER_CMD__STOP:
-	{
 		return SERVER_CMD__STOP__STR;
-	}
 	case vuprs::ServerCommand::SERVER_CMD__START:
-	{
 		return SERVER_CMD__START__STR;
-	}
-	case vuprs::ServerCommand::SERVER_CMD__GET_NEW_DATA:
-	{
+	case vuprs::ServerCommand::SERVER_CMD__GET_BF_DATA:
 		return SERVER_CMD__GET_NEW_DATA__STR;
-	}
+	case vuprs::ServerCommand::SERVER_CMD__ENABLE_SCAN:
+		return SERVER_CMD__ENABLE_SCAN__STR;
+	case vuprs::ServerCommand::SERVER_CMD__DISABLE_SCAN:
+		return SERVER_CMD__DISABLE_SCAN__STR;
+	case vuprs::ServerCommand::SERVER_CMD__GET_SCAN_DATA:
+		return SERVER_CMD__GET_SCAN_DATA__STR;
+	case vuprs::ServerCommand::SERVER_CMD__GET_ALG_PARAM:
+		return SERVER_CMD__GET_ALG_PARAM__STR;
 	case vuprs::ServerCommand::SERVER_CMD__ACK:
-	{
 		return SERVER_CMD__ACK__STR;
-	}
 	default:
-	{
 		return SERVER_CMD__INVALID__STR;
-	}
 	}
 }
 
@@ -49,16 +39,14 @@ bool vuprs::PROTOCOL_ParseCommandFromMessage(const std::string &message, vuprs::
 		return false;
 	if (message.empty())
 		return false;
-	cmd->config.ResetMask(false); /* mask to false */
+	cmd->config.ResetMask(false);	   /* mask to false */
+	cmd->scan_config.ResetMask(false); /* mask to false */
 	try
 	{
 		nlohmann::json root = nlohmann::json::parse(message);
-
 		if (!root.contains("cmd") || !root["cmd"].is_string())
 			return false;
-
 		std::string command = root["cmd"].get<std::string>();
-
 		if (command == SERVER_CMD__RESET__STR)
 		{
 			cmd->cmd = vuprs::ServerCommand::SERVER_CMD__RESET;
@@ -75,11 +63,9 @@ bool vuprs::PROTOCOL_ParseCommandFromMessage(const std::string &message, vuprs::
 				return false;
 			if (!root["params"].contains("beamformer") || !root["params"]["beamformer"].is_string())
 				return false;
-
 			const std::string beamformer_name = root["params"]["beamformer"].get<std::string>();
-			if (beamformer_name != "mvdr" && beamformer_name != "cbf" && beamformer_name != "dcrcb")
+			if (!IS_VALID_BEAMFORMER_SELECTION(beamformer_name))
 				return false;
-
 			cmd->cmd = vuprs::ServerCommand::SERVER_CMD__CHANGE_BEAMFORMER;
 			cmd->beamformer_name = beamformer_name;
 			return true;
@@ -90,8 +76,7 @@ bool vuprs::PROTOCOL_ParseCommandFromMessage(const std::string &message, vuprs::
 				return false;
 			if (!root["params"].contains("alt") || !root["params"].contains("az"))
 				return false;
-			double alt = 0.0;
-			double az = 0.0;
+			double alt = 0.0, az = 0.0;
 			auto params = root["params"];
 			vuprs::__JsonStringParseFLOAT<double>(&alt, params, "alt", true);
 			vuprs::__JsonStringParseFLOAT<double>(&az, params, "az", true);
@@ -102,7 +87,7 @@ bool vuprs::PROTOCOL_ParseCommandFromMessage(const std::string &message, vuprs::
 			cmd->config.mask.m_bf_target__az = true;
 			return true;
 		}
-		else if (command == SERVER_CMD__SCAN_FOR_POSITION_POWER__STR)
+		else if (command == SERVER_CMD__ENABLE_SCAN__STR)
 		{
 			if (!root.contains("params") || !root["params"].is_object())
 				return false;
@@ -115,75 +100,42 @@ bool vuprs::PROTOCOL_ParseCommandFromMessage(const std::string &message, vuprs::
 			auto params = root["params"];
 			vuprs::__JsonStringParseINT<int>(&points_in_hemisphere, params, "points", true);
 			vuprs::__JsonStringParseFLOAT<double>(&alt_min, params, "alt_min", true);
-			if (alt_min < 0.0 || alt_min > 90.0)
+			if (alt_min < 0.0 || alt_min > 90.0 || points_in_hemisphere <= 0)
 				return false;
-			if (points_in_hemisphere <= 0)
-				return false;
-			cmd->cmd = vuprs::ServerCommand::SERVER_CMD__SCAN_FOR_POSITION_POWER;
+			cmd->cmd = vuprs::ServerCommand::SERVER_CMD__ENABLE_SCAN;
 			cmd->scan_config.points_in_hemisphere = points_in_hemisphere;
+			cmd->scan_config.mask.m_points_in_hemisphere = true;
 			cmd->scan_config.alt_min = alt_min;
+			cmd->scan_config.mask.m_alt_min = true;
 			return true;
 		}
 		else if (command == SERVER_CMD__CHANGE_ALG_PARAM__STR)
 		{
-			/*
-				[HEADER]
-				{
-					"cmd": "change_algorithm_parameters",
-					"params": {
-						"fs": "40000.0",
-						"wave_velocity": "346.0",
-						"lower_frequency": "100.0",
-						"upper_frequency": "4000.0",
-						"snapshot_window_size": "100",
-						"covariance_average_index": "0.8"
-					}
-				}
-				[TAILER]
-			*/
+			if (!root.contains("params") || !root["params"].is_object())
+				return false;
 			cmd->cmd = vuprs::ServerCommand::SERVER_CMD__CHANGE_ALG_PARAM;
 			auto params = root["params"];
-			if (params.contains("fs"))
+			std::vector<std::string> _cmd_strings = {"fs", "wave_velocity",
+													 "lower_frequency", "upper_frequency",
+													 "snapshot_window_size", "covariance_average_index"};
+			std::vector<double *> _bind_target = {&cmd->config.fs,
+												  &cmd->config.bf_wave_velocity,
+												  &cmd->config.bf_freq__lower, &cmd->config.bf_freq__upper,
+												  &cmd->config.bf_cov_snapshots_window_size, &cmd->config.bf_cov_freq_average_index};
+			std::vector<bool *> _bind_target_mask = {&cmd->config.mask.m_fs,
+													 &cmd->config.mask.m_bf_wave_velocity,
+													 &cmd->config.mask.m_bf_freq__lower, &cmd->config.mask.m_bf_freq__upper,
+													 &cmd->config.mask.m_bf_cov_snapshots_window_size, &cmd->config.mask.m_bf_cov_freq_average_index};
+			int param_number = _cmd_strings.size();
+			for (int i = 0; i < param_number; i++)
 			{
-				double fs = 0.0;
-				vuprs::__JsonStringParseFLOAT<double>(&fs, params, "fs", true);
-				cmd->config.fs = fs;
-				cmd->config.mask.m_fs = true;
-			}
-			if (params.contains("wave_velocity"))
-			{
-				double wave_velocity = 0.0;
-				vuprs::__JsonStringParseFLOAT<double>(&wave_velocity, params, "wave_velocity", true);
-				cmd->config.bf_wave_velocity = wave_velocity;
-				cmd->config.mask.m_bf_waveVelocity = true;
-			}
-			if (params.contains("lower_frequency"))
-			{
-				double lowerFreq = 0.0;
-				vuprs::__JsonStringParseFLOAT<double>(&lowerFreq, params, "lower_frequency", true);
-				cmd->config.bf_freq__lower = lowerFreq;
-				cmd->config.mask.m_bf_freq__lower = true;
-			}
-			if (params.contains("upper_frequency"))
-			{
-				double upperFreq = 0.0;
-				vuprs::__JsonStringParseFLOAT<double>(&upperFreq, params, "upper_frequency", true);
-				cmd->config.bf_freq__upper = upperFreq;
-				cmd->config.mask.m_bf_freq__upper = true;
-			}
-			if (params.contains("snapshot_window_size"))
-			{
-				int snapshotWindowSize = 0;
-				vuprs::__JsonStringParseFLOAT<int>(&snapshotWindowSize, params, "snapshot_window_size", true);
-				cmd->config.bf_cov_snapshots_window_size = snapshotWindowSize;
-				cmd->config.mask.m_bf_cov_snapshots_window_size = true;
-			}
-			if (params.contains("covariance_average_index"))
-			{
-				double covarianceAverageIndex = 0.0;
-				vuprs::__JsonStringParseFLOAT<double>(&covarianceAverageIndex, params, "covariance_average_index", true);
-				cmd->config.bf_cov_freq_average_index = covarianceAverageIndex;
-				cmd->config.mask.m_bf_cov_freq_average_index = true;
+				if (params.contains(_cmd_strings[i]))
+				{
+					double val = 0.0;
+					vuprs::__JsonStringParseFLOAT<double>(&val, params, _cmd_strings[i], true);
+					*_bind_target[i] = val;
+					*_bind_target_mask[i] = true;
+				}
 			}
 			return true;
 		}
@@ -202,9 +154,19 @@ bool vuprs::PROTOCOL_ParseCommandFromMessage(const std::string &message, vuprs::
 			cmd->cmd = vuprs::ServerCommand::SERVER_CMD__STOP;
 			return true;
 		}
+		else if (command == SERVER_CMD__DISABLE_SCAN__STR)
+		{
+			cmd->cmd = vuprs::ServerCommand::SERVER_CMD__DISABLE_SCAN;
+			return true;
+		}
 		else if (command == SERVER_CMD__GET_NEW_DATA__STR)
 		{
-			cmd->cmd = vuprs::ServerCommand::SERVER_CMD__GET_NEW_DATA;
+			cmd->cmd = vuprs::ServerCommand::SERVER_CMD__GET_BF_DATA;
+			return true;
+		}
+		else if (command == SERVER_CMD__GET_SCAN_DATA__STR)
+		{
+			cmd->cmd = vuprs::ServerCommand::SERVER_CMD__GET_SCAN_DATA;
 			return true;
 		}
 	}
@@ -212,11 +174,10 @@ bool vuprs::PROTOCOL_ParseCommandFromMessage(const std::string &message, vuprs::
 	{
 		return false;
 	}
-
 	return false;
 }
 
-std::string vuprs::PROTOCOL_MakeServerOperationResponse(const vuprs::ServerCommandInformation &cmd, const std::string &info, bool operation_status)
+std::string vuprs::PROTOCOL_server_response__normal(const vuprs::ServerCommandInformation &cmd, const std::string &info, bool operation_status)
 {
 	nlohmann::json response;
 	response["response_cmd"] = __ServerCommandToString(cmd.cmd);
@@ -225,7 +186,7 @@ std::string vuprs::PROTOCOL_MakeServerOperationResponse(const vuprs::ServerComma
 	return response.dump();
 }
 
-std::string vuprs::PROTOCOL_MakeServerResultDataResponse(const std::string &info,
+std::string vuprs::PROTOCOL_server_response__get_bf_data(const std::string &info,
 														 int inference_identity,
 														 bool operation_status)
 {
@@ -239,22 +200,8 @@ std::string vuprs::PROTOCOL_MakeServerResultDataResponse(const std::string &info
 	return response.dump();
 }
 
-std::string vuprs::PROTOCOL_MakeServerParameterResponse(const vuprs::HybridBeamformerConfig &config)
+std::string vuprs::PROTOCOL_server_response__algo_params(const vuprs::HybridBeamformerConfig &config)
 {
-	/*
-		{
-			"response_cmd": "read_algorithm_parameters",
-			"operation-status": "done",
-			"params": {
-				"fs": "40000.0",
-				"wave_velocity": "346.0",
-				"lower_frequency": "100.0",
-				"upper_frequency": "4000.0",
-				"snapshot_window_size": "100",
-				"covariance_average_index": "0.8"
-			}
-		}
-	*/
 	nlohmann::json response;
 	response["response_cmd"] = SERVER_CMD__GET_ALG_PARAM__STR;
 	response["operation-status"] = "done";
@@ -267,25 +214,12 @@ std::string vuprs::PROTOCOL_MakeServerParameterResponse(const vuprs::HybridBeamf
 	return response.dump();
 }
 
-std::string vuprs::PROTOCOL_MakeServerScanningResponse(const vuprs::ScanningConfig &scan_config,
-													   double min_scan_power_dB, double max_scan_power_dB,
-													   const std::string &info, bool operation_status)
+std::string vuprs::PROTOCOL_server_response__get_scan_data(const vuprs::ScanningConfig &scan_config,
+														   double min_scan_power_dB, double max_scan_power_dB,
+														   const std::string &info, bool operation_status)
 {
-	/*
-		{
-			"response_cmd": "power_scan",
-			"operation-status": "done",
-			"params": {
-				"points": "70",
-				"min_alt": "15.0",
-				"max_power": "12.04046",
-				"min_power": "-15.00231",
-				"data_format": "uint16_t"
-			}
-		}
-	*/
 	nlohmann::json response;
-	response["response_cmd"] = SERVER_CMD__SCAN_FOR_POSITION_POWER__STR;
+	response["response_cmd"] = SERVER_CMD__GET_SCAN_DATA__STR;
 	response["operation-status"] = operation_status ? "done" : "failed";
 	response["info"] = info;
 	response["params"]["points"] = std::to_string(scan_config.points_in_hemisphere);

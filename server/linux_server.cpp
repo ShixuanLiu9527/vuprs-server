@@ -1,5 +1,9 @@
+#include "config.h"
 #include "server/linux_server.h"
 #include "logger/check.h"
+#include "logger/log_manager.h"
+
+#define SERVER_LOG(level) _LOG(this->server_logger, level)
 
 bool vuprs::SystemLoggerConfig::InitFromJson(const std::string &filename)
 {
@@ -34,6 +38,7 @@ vuprs::LinuxServer::LinuxServer()
     this->control_irq = false;
     this->server_response_irq = false;
     this->sending_irq = false; /* true: should send */
+    this->sending_format = static_cast<uint32_t>(vuprs::ServerCommand::SERVER_CMD__INVALID); /* invalid: no sending format */
     this->control_irq = false;
     this->session_need_response = false; /* false = no need to send response */
 }
@@ -64,7 +69,6 @@ bool vuprs::LinuxServer::LoadServerConfigFromJson(const std::string &json_filena
     if (json_data.contains("protocol"))
     {
         auto protocol = json_data["protocol"];
-
         vuprs::__JsonParseString(&this->server_config.protocol.command_header, protocol, "command-header", true);
         vuprs::__JsonParseString(&this->server_config.protocol.command_tailer, protocol, "command-tailer", true);
     }
@@ -333,7 +337,9 @@ void vuprs::LinuxServer::THREAD__Send()
         }
         if (!manager)
         {
+#if DEBUG
             std::cout << "[server][send] no client connected, cannot send." << std::endl;
+#endif
             continue;
         }
         /* ---------------------------------------------------------------------- */
@@ -348,13 +354,13 @@ void vuprs::LinuxServer::THREAD__Send()
                 std::lock_guard<std::mutex> lock(this->mut_bf); /* LOCK */
                 switch (this->sending_format)
                 {
-                case static_cast<uint32_t>(vuprs::ServerCommand::SERVER_CMD__GET_NEW_DATA):
+                case static_cast<uint32_t>(vuprs::ServerCommand::SERVER_CMD__GET_BF_DATA):
                 {
                     status = this->beamformer.ReadResult(&bf_result_meta);
                     send_data_size = bf_result_meta.signal.size() * sizeof(uint32_t);
                     break;
                 }
-                case static_cast<uint32_t>(vuprs::ServerCommand::SERVER_CMD__SCAN_FOR_POSITION_POWER):
+                case static_cast<uint32_t>(vuprs::ServerCommand::SERVER_CMD__GET_SCAN_DATA):
                 {
                     status = this->beamformer.ReadScanPower(&scan_result_to_send, &max_scan_power_dB, &min_scan_power_dB);
                     send_data_size = scan_result_to_send.size() * sizeof(uint16_t);
@@ -362,49 +368,53 @@ void vuprs::LinuxServer::THREAD__Send()
                 }
                 }
             }
-            /* STEP 2: Generate send string */
-            if (!status)
-            {
-                info = "failed";
-            }
+            /* STEP 2: Generate sending string (header message) */
+            info = status ? "success" : "failed";
             switch (this->sending_format)
             {
-            case static_cast<uint32_t>(vuprs::ServerCommand::SERVER_CMD__GET_NEW_DATA):
+            case static_cast<uint32_t>(vuprs::ServerCommand::SERVER_CMD__GET_BF_DATA):
             {
-                send_string = vuprs::PROTOCOL_MakeServerResultDataResponse(info,
+                send_string = vuprs::PROTOCOL_server_response__get_bf_data(info,
                                                                            bf_result_meta.inference_result_identity,
                                                                            status);
                 break;
             }
-            case static_cast<uint32_t>(vuprs::ServerCommand::SERVER_CMD__SCAN_FOR_POSITION_POWER):
+            case static_cast<uint32_t>(vuprs::ServerCommand::SERVER_CMD__GET_SCAN_DATA):
             {
-                vuprs::ScanningConfig _scanConfig;
+                vuprs::ScanningConfig _scan_config;
                 {
                     std::lock_guard<std::mutex> lock(this->mut_scan_config); /* LOCK */
-                    _scanConfig = this->scan_config;
+                    _scan_config = this->scan_config;
                 }
-                send_string = vuprs::PROTOCOL_MakeServerScanningResponse(_scanConfig, min_scan_power_dB, max_scan_power_dB, info, status);
+                send_string = vuprs::PROTOCOL_server_response__get_scan_data(_scan_config,
+                                                                             min_scan_power_dB,
+                                                                             max_scan_power_dB,
+                                                                             info,
+                                                                             status);
                 break;
             }
             }
             send_string = vuprs::AddFrameIfMissing(send_string, header, tailer);
-
             /* STEP 3: Send data frames */
-            /* Frame 1: basic information */
+            /* - Frame 1: basic information */
             send_ok &= manager->SendMessage(send_string);
-            /* Frame 2: actual data */
+            if (send_ok)
+            {
+                SERVER_LOG(V_INFO) << "Send message (info): " << send_string;
+            }
+            /* - Frame 2: actual data */
             if (status)
             {
                 send_ok &= manager->SendMessage(header);                /* Send header */
                 send_ok &= manager->SendWord<uint32_t>(send_data_size); /* Send data size */
                 switch (this->sending_format)
                 {
-                case static_cast<uint32_t>(vuprs::ServerCommand::SERVER_CMD__GET_NEW_DATA):
+                case static_cast<uint32_t>(vuprs::ServerCommand::SERVER_CMD__GET_BF_DATA):
                 {
                     send_ok &= manager->SendBuffer<uint32_t>(bf_result_meta.signal); /* Send data */
                     break;
                 }
-                case static_cast<uint32_t>(vuprs::ServerCommand::SERVER_CMD__SCAN_FOR_POSITION_POWER):
+                case static_cast<uint32_t>(vuprs::ServerCommand::SERVER_CMD__GET_SCAN_DATA):
                 {
                     send_ok &= manager->SendBuffer<uint16_t>(scan_result_to_send); /* Send data */
                     break;
@@ -412,16 +422,21 @@ void vuprs::LinuxServer::THREAD__Send()
                 }
                 send_ok &= manager->SendMessage(tailer); /* Send tailer */
             }
-            if (!send_ok)
+            if (send_ok)
             {
+                SERVER_LOG(V_INFO) << "Send message (data): size = " << send_data_size << " bytes";
+            }
+            else
+            {
+#if DEBUG
                 std::cout << "[server][send] send data frame failed." << std::endl;
+#endif
+                SERVER_LOG(V_WARN) << "Failed to send data to client";
             }
         }
-
         /* ---------------------------------------------------------------------- */
         /* ------------------- Fork 2: Send algorithm parameters ---------------- */
         /* ---------------------------------------------------------------------- */
-
         else if (this->sending_format == static_cast<uint32_t>(vuprs::ServerCommand::SERVER_CMD__GET_ALG_PARAM))
         {
             try
@@ -431,20 +446,28 @@ void vuprs::LinuxServer::THREAD__Send()
                     std::lock_guard<std::mutex> lock(this->mut_bf_config); /* LOCK */
                     config = this->bf_config;
                 }
-                send_string = vuprs::PROTOCOL_MakeServerParameterResponse(config);
+                send_string = vuprs::PROTOCOL_server_response__algo_params(config);
                 send_string = vuprs::AddFrameIfMissing(send_string, header, tailer);
             }
             catch (const std::exception &e)
             {
+#if DEBUG
                 std::cout << "Error in [LinuxServer::THREAD__Send] " << e.what() << std::endl;
+#endif
+                SERVER_LOG(V_WARN) << "Error in sending: " << e.what();
             }
-            send_ok = manager->SendMessage(send_string); /* Send data */
-            if (!send_ok)
+            if (!send_string.empty())
             {
-                std::cout << "[server][send] send data frame failed." << std::endl;
+                send_ok = manager->SendMessage(send_string); /* Send data */
+                if (!send_ok)
+                {
+#if DEBUG
+                    std::cout << "[server][send] send data frame failed." << std::endl;
+#endif
+                    SERVER_LOG(V_WARN) << "Failed to send algorithm parameters to client.";
+                }
             }
         }
-
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
 }
@@ -493,12 +516,18 @@ void vuprs::LinuxServer::THREAD__Control()
                 std::lock_guard<std::mutex> lock(this->mut_bf_config); /* LOCK */
                 config = this->bf_config;
             }
-            config += _cmd_info.config; /* merge config with mask */
-            bool check_valid = false;
+            {
+                std::lock_guard<std::mutex> lock(this->mut_scan_config); /* LOCK */
+                scan_config = this->scan_config;
+            }
+            config += _cmd_info.config;           /* merge config with mask */
+            scan_config += _cmd_info.scan_config; /* merge config with mask */
+            bool check_valid = true;
             std::string check_info;
             {
                 std::lock_guard<std::mutex> lock(this->mut_bf); /* LOCK */
-                check_valid = this->beamformer.CheckConfigValid(config, &check_info);
+                check_valid &= this->beamformer.CheckConfigValid(config, &check_info);
+                check_valid &= this->beamformer.CheckScanningConfigValid(scan_config, &check_info);
             }
             if (check_valid)
             {
@@ -507,6 +536,11 @@ void vuprs::LinuxServer::THREAD__Control()
                     std::lock_guard<std::mutex> lock(this->mut_bf_config); /* LOCK */
                     this->bf_config = config;
                 }
+                {
+                    std::lock_guard<std::mutex> lock(this->mut_scan_config); /* LOCK */
+                    this->scan_config = scan_config;
+                }
+                /* Handle command */
                 switch (_cmd_info.cmd)
                 {
                 case vuprs::ServerCommand::SERVER_CMD__ACK:
@@ -517,32 +551,23 @@ void vuprs::LinuxServer::THREAD__Control()
                 case vuprs::ServerCommand::SERVER_CMD__RESET:
                 {
                     std::lock_guard<std::mutex> lock(this->mut_bf); /* LOCK */
-                    this->beamformer.stop();
-                    this->beamformer.run(config);
+                    operation_status &= this->beamformer.stop();
+                    operation_status &= this->beamformer.run(config);
                     break;
                 }
                 case vuprs::ServerCommand::SERVER_CMD__CHANGE_BEAMFORMER:
                 {
-                    if (_cmd_info.beamformer_name == "dcrcb")
+                    if (IS_VALID_BEAMFORMER_SELECTION(_cmd_info.beamformer_name))
                     {
                         std::lock_guard<std::mutex> lock(this->mut_bf); /* LOCK */
-                        this->beamformer.BindBeamformer(std::make_unique<vuprs::Beamformer_DCRCB>());
-                        this->beamformer.stop();
-                        this->beamformer.run(config);
-                    }
-                    else if (_cmd_info.beamformer_name == "cbf")
-                    {
-                        std::lock_guard<std::mutex> lock(this->mut_bf); /* LOCK */
-                        this->beamformer.BindBeamformer(std::make_unique<vuprs::Beamformer_CBF>());
-                        this->beamformer.stop();
-                        this->beamformer.run(config);
-                    }
-                    else if (_cmd_info.beamformer_name == "mvdr")
-                    {
-                        std::lock_guard<std::mutex> lock(this->mut_bf); /* LOCK */
-                        this->beamformer.BindBeamformer(std::make_unique<vuprs::Beamformer_MVDR>());
-                        this->beamformer.stop();
-                        this->beamformer.run(config);
+                        if (_cmd_info.beamformer_name == "dcrcb")
+                            operation_status &= this->beamformer.BindBeamformer(std::make_unique<vuprs::Beamformer_DCRCB>());
+                        else if (_cmd_info.beamformer_name == "cbf")
+                            operation_status &= this->beamformer.BindBeamformer(std::make_unique<vuprs::Beamformer_CBF>());
+                        else if (_cmd_info.beamformer_name == "mvdr")
+                            operation_status &= this->beamformer.BindBeamformer(std::make_unique<vuprs::Beamformer_MVDR>());
+                        operation_status &= this->beamformer.stop();
+                        operation_status &= this->beamformer.run(config);
                     }
                     else
                     {
@@ -553,57 +578,54 @@ void vuprs::LinuxServer::THREAD__Control()
                 case vuprs::ServerCommand::SERVER_CMD__REDIRECT:
                 {
                     std::lock_guard<std::mutex> lock(this->mut_bf); /* LOCK */
-                    this->beamformer.ReDirect(config.bf_target__alt,
-                                              config.bf_target__az,
-                                              config.bf_wave_velocity);
+                    operation_status &= this->beamformer.ReDirect(config.bf_target__alt,
+                                                                  config.bf_target__az,
+                                                                  config.bf_wave_velocity);
                     break;
                 }
                 case vuprs::ServerCommand::SERVER_CMD__START:
                 {
                     std::lock_guard<std::mutex> lock(this->mut_bf); /* LOCK */
-                    this->beamformer.run(config);
+                    operation_status &= this->beamformer.run(config);
                     break;
                 }
                 case vuprs::ServerCommand::SERVER_CMD__STOP:
                 {
                     std::lock_guard<std::mutex> lock(this->mut_bf); /* LOCK */
-                    this->beamformer.stop();
+                    operation_status &= this->beamformer.stop();
                     break;
                 }
-                case vuprs::ServerCommand::SERVER_CMD__SCAN_FOR_POSITION_POWER:
+                case vuprs::ServerCommand::SERVER_CMD__ENABLE_SCAN:
                 {
-                    /* Validate scan options first (ScanOptions throws on invalid parameters,
-                       and session_need_response is still true so the error reaches the client) */
-                    {
-                        std::lock_guard<std::mutex> lock(this->mut_bf); /* LOCK */
-                        this->beamformer.ScanOptions(_cmd_info.scan_config.points_in_hemisphere,
-                                                     _cmd_info.scan_config.alt_min,
-                                                     config.bf_wave_velocity);
-                    }
+                    std::lock_guard<std::mutex> lock(this->mut_bf); /* LOCK */
+                    operation_status &= this->beamformer.ScanOptions(scan_config, config.bf_wave_velocity);
+                    if (operation_status && !this->beamformer.ScanSwitch())
+                        this->beamformer.ScanSwitch(true); /* Enable scanning */
+                    break;
+                }
+                case vuprs::ServerCommand::SERVER_CMD__DISABLE_SCAN:
+                {
+                    /* Disable scanning */
+                    std::lock_guard<std::mutex> lock(this->mut_bf); /* LOCK */
+                    if (this->beamformer.ScanSwitch())
+                        this->beamformer.ScanSwitch(false); /* disable scanning */
+                    break;
+                }
+                case vuprs::ServerCommand::SERVER_CMD__GET_SCAN_DATA:
+                {
                     /* No need to response in session (data will be send in THREAD__Send) */
                     this->session_need_response = false;
-                    this->sending_format = static_cast<uint32_t>(vuprs::ServerCommand::SERVER_CMD__SCAN_FOR_POSITION_POWER);
-                    /* Update scan config to server global */
-                    {
-                        std::lock_guard<std::mutex> lock(this->mut_scan_config); /* LOCK */
-                        this->scan_config = _cmd_info.scan_config;
-                    }
-                    /* Enable scanning */
-                    {
-                        std::lock_guard<std::mutex> lock(this->mut_bf); /* LOCK */
-                        if (!this->beamformer.ScanSwitch())
-                            this->beamformer.ScanSwitch(true); /* Enable scanning */
-                    }
+                    this->sending_format = static_cast<uint32_t>(vuprs::ServerCommand::SERVER_CMD__GET_SCAN_DATA);
                     /* Wake up THREAD__Send */
                     this->sending_irq = true;
                     this->sending_cv.notify_all();
                     break;
                 }
-                case vuprs::ServerCommand::SERVER_CMD__GET_NEW_DATA:
+                case vuprs::ServerCommand::SERVER_CMD__GET_BF_DATA:
                 {
                     /* No need to response in session, will send in THREAD__Send */
                     this->session_need_response = false;
-                    this->sending_format = static_cast<uint32_t>(vuprs::ServerCommand::SERVER_CMD__GET_NEW_DATA);
+                    this->sending_format = static_cast<uint32_t>(vuprs::ServerCommand::SERVER_CMD__GET_BF_DATA);
                     /* Wake up THREAD__Send */
                     this->sending_irq = true;
                     this->sending_cv.notify_all();
@@ -622,8 +644,8 @@ void vuprs::LinuxServer::THREAD__Control()
                 case vuprs::ServerCommand::SERVER_CMD__CHANGE_ALG_PARAM:
                 {
                     std::lock_guard<std::mutex> lock(this->mut_bf); /* LOCK */
-                    this->beamformer.stop();
-                    this->beamformer.run(config);
+                    operation_status &= this->beamformer.stop();
+                    operation_status &= this->beamformer.run(config);
                     break;
                 }
                 default:
@@ -643,19 +665,25 @@ void vuprs::LinuxServer::THREAD__Control()
         {
             operation_status = false;
             error_info = e.what();
+#if DEBUG
             std::cout << "Error in [LinuxServer::THREAD__Control] " << error_info << std::endl;
+#endif
+            SERVER_LOG(V_WARN) << "Failed to handle command: " << error_info;
         }
         /* Make server response in session callback (if needed) */
         if (this->session_need_response)
         {
             try
             {
-                response_message = vuprs::PROTOCOL_MakeServerOperationResponse(_cmd_info, error_info, operation_status);
+                response_message = vuprs::PROTOCOL_server_response__normal(_cmd_info, error_info, operation_status);
                 response_message = vuprs::AddFrameIfMissing(response_message, header, tailer);
             }
             catch (const std::exception &e)
             {
+#if DEBUG
                 std::cout << "Error occurred while making server response: " << e.what() << std::endl;
+#endif
+                SERVER_LOG(V_WARN) << "Error occurred while making server response: " << error_info;
             }
             std::lock_guard<std::mutex> lock(this->mut_response); /* LOCK */
             this->server_response_message = response_message;
@@ -691,22 +719,29 @@ void vuprs::LinuxServer::SessionCallback(std::weak_ptr<vuprs::SocketIOManager> m
     }
     catch (const std::exception &e)
     {
+#if DEBUG
         std::cout << "Error occurred while parsing command from message: " << e.what() << std::endl;
+#endif
+        SERVER_LOG(V_WARN) << "Error occurred while parsing command from message: " << e.what();
     }
+    SERVER_LOG(V_INFO) << "Receive message: " << _message;
     /* --------------------------------------------------------------- */
     /* --------- Failed (invalid command): Immediate response -------- */
     /* --------------------------------------------------------------- */
     if (!parse_status)
     {
         /* Invalid command, response with error message */
-        send_string = vuprs::PROTOCOL_MakeServerOperationResponse(_cmd_info, "invalid command", false);
+        send_string = vuprs::PROTOCOL_server_response__normal(_cmd_info, "invalid command", false);
         send_string = vuprs::AddFrameIfMissing(send_string, header, tailer);
         std::shared_ptr<vuprs::SocketIOManager> _manager = manager.lock();
         if (_manager != nullptr)
         {
             if (!_manager->SendMessage(send_string))
             {
+#if DEBUG
                 std::cout << "[server][response] failed to send parse-error response." << std::endl;
+#endif
+                SERVER_LOG(V_WARN) << "Failed to send parse-error response.";
             }
         }
         return;
@@ -750,8 +785,12 @@ void vuprs::LinuxServer::SessionCallback(std::weak_ptr<vuprs::SocketIOManager> m
         {
             if (!_manager->SendMessage(send_string))
             {
+#if DEBUG
                 std::cout << "[server][response] failed to send response message." << std::endl;
+#endif
+                SERVER_LOG(V_WARN) << "Failed to send response message.";
             }
         }
+        SERVER_LOG(V_INFO) << "Send message (info): " << send_string;
     }
 }

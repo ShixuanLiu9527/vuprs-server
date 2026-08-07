@@ -146,7 +146,7 @@ void vuprs::WidebandBeamformerTemplate::UpdateCovarianceMatrix()
     this->first_snapshot = false;
 }
 
-void vuprs::WidebandBeamformerTemplate::SetCovarianceMatrixFittingParam(int snaps_window_size, double adjacent_freq_average_index)
+void vuprs::WidebandBeamformerTemplate::SetCovarianceMatrixFittingParam(double snaps_window_size, double adjacent_freq_average_index)
 {
     this->covariance_snap_window_size = snaps_window_size;
     this->adjacent_freq_average_index = adjacent_freq_average_index;
@@ -155,8 +155,8 @@ void vuprs::WidebandBeamformerTemplate::SetCovarianceMatrixFittingParam(int snap
 
 void vuprs::WidebandBeamformerTemplate::UpdateParameters()
 {
-    this->exp_weighed_moving_average_index = 2.0 / double(this->covariance_snap_window_size + 1); /* N = 2/a - 1 */
-    this->exp_weighed_moving_average_index_1 = 1.0 - this->exp_weighed_moving_average_index;      /* 1 - a */
+    this->exp_weighed_moving_average_index = 2.0 / (this->covariance_snap_window_size + 1.0); /* N = 2/a - 1 */
+    this->exp_weighed_moving_average_index_1 = 1.0 - this->exp_weighed_moving_average_index;  /* 1 - a */
     this->adjacent_freq_average_index_1 = 0.5 * (1.0 - this->adjacent_freq_average_index);
 }
 

@@ -30,7 +30,7 @@
         "description": "upper boundary of beam former work frequency"
     },
     "bf_cov_snapshots_window_size": {
-        "value": "200",
+        "value": "200.0",
         "description": "snapshots window size to fit covariance matrix"
     },
     "bf_cov_freq_average_index": {

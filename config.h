@@ -52,8 +52,8 @@
  * @defgroup Covariance matrix fitting parameters.
  * @{
  */
-#define DEFAULT_COVARIANCE_SNAP_WINDOW_SIZE 100 /* Equivalent snapshot window size of covariance matrix EMA */
-#define DEFAULT_ADJACENT_FREQ_AVERAGE_INDEX 0.8 /* Adjacent frequency average index of covariance estimation */
+#define DEFAULT_COVARIANCE_SNAP_WINDOW_SIZE 100.0 /* Equivalent snapshot window size of covariance matrix EMA */
+#define DEFAULT_ADJACENT_FREQ_AVERAGE_INDEX 0.8   /* Adjacent frequency average index of covariance estimation */
 /**
  * @}
  */
