@@ -221,7 +221,9 @@ void vuprs::FFT(const Eigen::Matrix<Eigen::dcomplex, -1, 1> &input_data,
     fftw_free(output);
 }
 
-void vuprs::FFT(const std::vector<std::complex<double>> &input_data, std::vector<std::complex<double>> *output_data, bool inverse)
+void vuprs::FFT(const std::vector<std::complex<double>> &input_data,
+                std::vector<std::complex<double>> *output_data,
+                bool inverse)
 {
     uint64_t data_size = input_data.size();
     PARAM_CHECK(data_size > 0, "signal_processing", " in [vuprs::FFT] The input data is empty.");

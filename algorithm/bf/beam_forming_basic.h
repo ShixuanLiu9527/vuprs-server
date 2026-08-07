@@ -221,11 +221,23 @@ namespace vuprs
                                      double wave_velocity) const;
 
         /**
-         * @brief Calculate steering vector for one frequency domain.
+         * @brief Calculate real time delay matrix for all scan positions.
          *
-         * @note output->col{i} = [jT{1}, jT{2}, ..., jT{M}].T
+         * @note output->col{i} = [T{1}, T{2}, ..., T{M}].T, T is real.
          *
-         * @param matrix output steering vector.
+         * @param alt alt of the target position (relative to array), unit: deg.
+         * @param az az of the target position (relative to array), unit: deg.
+         * @param wave_velocity velocity of wave, unit: m/sec.
+         */
+        Eigen::Matrix<double, -1, -1> GetTimeDelay(const std::vector<double> &alt,
+                                                   const std::vector<double> &az,
+                                                   double wave_velocity) const;
+
+        /**
+         * @brief Calculate imaginary time delay matrix for all scan positions.
+         *
+         * @note output->col{i} = [jT{1}, jT{2}, ..., jT{M}].T, jT = j * T
+         *
          * @param alt alt of the target position (relative to array), unit: deg.
          * @param az az of the target position (relative to array), unit: deg.
          * @param wave_velocity velocity of wave, unit: m/sec.

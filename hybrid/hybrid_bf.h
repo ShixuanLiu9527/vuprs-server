@@ -94,6 +94,8 @@ namespace vuprs
         vuprs::FIRCalculator fir;                                /* FIR algorithm, [controlled by mut_alg] (can be only used in THREAD__AlgorithmCalculation) */
         std::unique_ptr<vuprs::WidebandBeamformerTemplate> bf;   /* Beam forming algorithm, [controlled by mut_alg] (can be only used in THREAD__AlgorithmCalculation) */
         double hardware_fs;                                      /* Hardware sampling frequency, calculate by SCI register, [controlled by mut_alg] */
+        double bf_freq__lower;                                   /* Bandpass lower boundary (Hz), set at start, read-only afterwards */
+        double bf_freq__upper;                                   /* Bandpass upper boundary (Hz), set at start, read-only afterwards */
 
         /* DMA Interrupt */
         std::atomic<uint32_t> dma_current_desc{0xFFFFFFFF}; /* current descriptor address, initialized to an invalid value */

@@ -249,6 +249,8 @@ bool vuprs::HybridBeamformer::StartBeamformerWithConfiguration(const vuprs::Hybr
                                               &channel_name);
         /* - Set bandpass range */
         this->fir.SetFrequencyRange(config.bf_freq__lower, config.bf_freq__upper);
+        this->bf_freq__lower = config.bf_freq__lower; /* used by scan to filter out-of-band frequency bins */
+        this->bf_freq__upper = config.bf_freq__upper;
         /* - Get zero FIR coefficients */
         this->fir.GetZeroFIRBankCoefficient(&fir_coefficients, this->bf->ElementCount());
         FIR_LENGTH = this->fir.FIRLength();
@@ -430,6 +432,7 @@ bool vuprs::HybridBeamformer::ReadScanPower(std::vector<uint16_t> *scanPower, do
 void vuprs::HybridBeamformer::THREAD__ScanPowerCalculation()
 {
     vuprs::ScanResult scan_result;
+    vuprs::ScanCovarianceSnapshot cov_snapshot;
     std::vector<double> alt, az, _scan_result;
     double wave_velocity, power_range;
     size_t points_count;
@@ -455,13 +458,25 @@ void vuprs::HybridBeamformer::THREAD__ScanPowerCalculation()
             wave_velocity = this->scan_wave_velocity;
             this->scan_options_initialized = true;
         }
-        /* Calculate scan power */
+        /* Snapshot covariance matrices (hold mut_alg only for the fast copy) */
         {
             std::lock_guard<std::mutex> lock(this->mut_alg); /* LOCK */
-            calculate_status = this->bf->ScanForPositionPower(&_scan_result, &scan_result.max_power_db, &scan_result.min_power_db,
-                                                              alt, az, wave_velocity,
-                                                              this->scan_options_changed, true);
+            calculate_status = this->bf->SnapshotScanCovariance(&cov_snapshot,
+                                                                this->bf_freq__lower,
+                                                                this->bf_freq__upper);
         }
+        if (!calculate_status)
+            continue;
+        /* Calculate scan power (lock-free, uses the consistent snapshot) */
+        calculate_status = this->bf->ScanForPositionPower(&_scan_result,
+                                                          &scan_result.max_power_db,
+                                                          &scan_result.min_power_db,
+                                                          alt,
+                                                          az,
+                                                          wave_velocity,
+                                                          this->scan_options_changed,
+                                                          true,
+                                                          cov_snapshot);
         if (!calculate_status)
             continue; /* If calculation failed, skip this loop */
         /* Convert to uint16_t */

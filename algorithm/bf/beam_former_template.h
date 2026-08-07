@@ -7,10 +7,25 @@
 
 namespace vuprs
 {
+    /**
+     * @brief Scan covariance snapshot.
+     *
+     * @note Captured by WidebandBeamformerTemplate::SnapshotScanCovariance() while the caller
+     * @note holds its own lock (fast copy), then consumed by ScanForPositionPower() which
+     * @note reads no shared state and therefore needs no lock.
+     */
+    struct ScanCovarianceSnapshot
+    {
+        vuprs::AlignedEigenVector<Eigen::Matrix<Eigen::dcomplex, -1, -1>> covariance; /* In-band covariance matrices, size = f_count */
+        Eigen::Matrix<double, -1, 1> frequency_list;                                  /* In-band bin frequencies, size = f_count */
+        double fs;                                                                    /* Sampling frequency at snapshot time */
+    };
+
     class WidebandBeamformerTemplate
     {
     private:
         std::unique_ptr<ThreadPool> thread_pool;
+        std::unique_ptr<ThreadPool> thread_pool_scan;
         double covariance_snap_window_size;
         double adjacent_freq_average_index;
         double adjacent_freq_average_index_1;
@@ -41,9 +56,15 @@ namespace vuprs
         bool first_snapshot;
         bool is_array_config_done;
         bool is_signal_empty, is_cov_matrix_empty;
-        std::mutex mut;
         std::mutex mut_scan;
-        Eigen::Matrix<Eigen::dcomplex, -1, -1> imag_timedelay;                                 /* Size: M x numScans, jT{m, s} = j * T{m, s}), controlled by mut_scan */
+        Eigen::Matrix<double, -1, -1> scan_timedelay;                                          /* Size: M x numScans, real time delay T{m, s} = pos{m}.dot(pv{s}) / v, controlled by mut_scan */
+        vuprs::AlignedEigenVector<Eigen::Matrix<Eigen::dcomplex, -1, -1>> scan_weight_cache;   /* Size: numScans x numBands(in-band), scan weight W{f, s} = exp(-j * 2 * pi * f * T{m, s}), controlled by mut_scan */
+        bool scan_cache_valid;                                                                 /* Scan weight cache valid flag, controlled by mut_scan */
+        double scan_cache_fs;                                                                  /* Cache key: sampling frequency, controlled by mut_scan */
+        double scan_cache_wave_velocity;                                                       /* Cache key: wave velocity, controlled by mut_scan */
+        std::vector<double> scan_cache_alt;                                                    /* Cache key: altitude list, controlled by mut_scan */
+        std::vector<double> scan_cache_az;                                                     /* Cache key: azimuth list, controlled by mut_scan */
+        Eigen::Matrix<double, -1, 1> scan_cache_freq_list;                                     /* Cache key: in-band frequency list, controlled by mut_scan */
         vuprs::BeamFormingArray array;                                                         /* beamforming array */
         vuprs::BeamFormingScanArray scan_array;                                                /* for scanning, which has same element position as array but different time delay */
         Eigen::Matrix<Eigen::dcomplex, -1, -1> snap_signal_matrix_freq_domain;                 /* Size: (M) x (N / 2 + 1) */
@@ -196,7 +217,32 @@ namespace vuprs
         bool CalculateEnable() const;
 
         /**
+         * @brief Snapshot the in-band covariance matrices and their frequencies.
+         *
+         * @note Must be called while the caller guarantees that estimate_cov_matrix /
+         * @note signal_frequency_list / fs are stable (e.g. under the caller's lock).
+         * @note The copy itself is fast, so the lock is only held for the duration of this call.
+         *
+         * @param snapshot output snapshot.
+         * @param freq_lower lower boundary of the scanned frequency band (unit: Hz). <= 0 means no lower bound.
+         * @param freq_upper upper boundary of the scanned frequency band (unit: Hz). <= 0 means no upper bound.
+         *
+         * @retval true: success.
+         * @retval false: failed (e.g. covariance matrix not ready).
+         */
+        bool SnapshotScanCovariance(ScanCovarianceSnapshot *snapshot,
+                                    double freq_lower,
+                                    double freq_upper);
+
+        /**
          * @brief Scan for position power.
+         *
+         * @note Power map = sum over in-band bins of w(f,s).H * R(f) * w(f,s), where w is the CBF scan weight.
+         * @note Scan weights only depend on (fs, scan geometry, wave velocity) and are cached; they are
+         * @note NOT recomputed unless `need_regenerate` is set or the cache key (fs / alt / az / wave_velocity /
+         * @note frequency list) has changed.
+         * @note Lock-free: reads only the caller-provided `snapshot` and the scan-only weight cache, so it
+         * @note can be called outside any lock as long as scan calls do not overlap.
          *
          * @param res output position power result. Size: alt.size()
          * @param max_value output max power value in scan result. (optional, can be NULL)
@@ -204,8 +250,9 @@ namespace vuprs
          * @param alt altitude list (degree).
          * @param az azimuth list (degree).
          * @param wave_velocity wave velocity (m/s).
-         * @param need_regenerate true: regenerate scan points, false: do not regenerate scan points.
+         * @param need_regenerate true: regenerate scan weights, false: do not regenerate scan weights.
          * @param log true: log, false: do not log.
+         * @param snapshot covariance snapshot captured by SnapshotScanCovariance().
          *
          * @retval true: success.
          * @retval false: failed.
@@ -217,7 +264,8 @@ namespace vuprs
                                   const std::vector<double> &az,
                                   double wave_velocity,
                                   bool need_regenerate,
-                                  bool log = true);
+                                  bool log,
+                                  const ScanCovarianceSnapshot &snapshot);
 
         /**
          * @brief Reset all.

@@ -276,15 +276,16 @@ bool vuprs::BeamFormingScanArray::LoadArrayFromJson(const std::string &filename)
     return true;
 }
 
-Eigen::Matrix<Eigen::dcomplex, -1, -1> vuprs::BeamFormingScanArray::GetImagTimedelay(const std::vector<double> &alt, const std::vector<double> &az, double wave_velocity) const
+Eigen::Matrix<double, -1, -1> vuprs::BeamFormingScanArray::GetTimeDelay(const std::vector<double> &alt,
+                                                                        const std::vector<double> &az,
+                                                                        double wave_velocity) const
 {
-    PARAM_CHECK(!this->empty(), "bf", " in [BeamFormingScanArray::GetSteeringVectorMatrix] Array is empty.");
-    PARAM_CHECK(alt.size() == az.size(), "bf", " in [BeamFormingScanArray::GetSteeringVectorMatrix] Size of alt and az should be the same.");
+    PARAM_CHECK(!this->empty(), "bf", " in [BeamFormingScanArray::GetTimeDelay] Array is empty.");
+    PARAM_CHECK(alt.size() == az.size(), "bf", " in [BeamFormingScanArray::GetTimeDelay] Size of alt and az should be the same.");
 
     int k = alt.size();
     int M = this->element_array.size();
-    Eigen::Matrix<Eigen::dcomplex, -1, -1> res(M, k);
-    std::complex<double> j(0, 1);
+    Eigen::Matrix<double, -1, -1> res(M, k);
     Eigen::Matrix<double, 3, 1> pointing_vector;
     Eigen::Matrix<double, -1, -1> element_position_matrix(M, 3);
     for (int i = 0; i < M; i++)
@@ -294,9 +295,14 @@ Eigen::Matrix<Eigen::dcomplex, -1, -1> vuprs::BeamFormingScanArray::GetImagTimed
     for (int i = 0; i < k; i++)
     {
         pointing_vector = vuprs::AltAz2PointingVector(alt[i], az[i]);
-        res.col(i) = element_position_matrix * pointing_vector * j / wave_velocity;
+        res.col(i) = element_position_matrix * pointing_vector / wave_velocity;
     }
     return res;
+}
+
+Eigen::Matrix<Eigen::dcomplex, -1, -1> vuprs::BeamFormingScanArray::GetImagTimedelay(const std::vector<double> &alt, const std::vector<double> &az, double wave_velocity) const
+{
+    return this->GetTimeDelay(alt, az, wave_velocity).cast<Eigen::dcomplex>() * std::complex<double>(0.0, 1.0);
 }
 
 void vuprs::BeamFormingScanArray::GetSteeringVectorMatrix(Eigen::Matrix<Eigen::dcomplex, -1, -1> *matrix, const std::vector<double> &alt, const std::vector<double> &az, double frequency, double wave_velocity) const
