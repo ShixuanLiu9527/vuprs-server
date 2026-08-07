@@ -6,7 +6,7 @@ BLUE='\033[1;34m'
 NC='\033[0m'  # No Color
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-VUPRS_ROOT="${SCRIPT_DIR}/../"
+VUPRS_ROOT="${SCRIPT_DIR}/.."
 BUILD_OUTPUT="${VUPRS_ROOT}/build"
 
 XDMA_DRIVER="${BUILD_OUTPUT}/xdma/xdma.ko"
@@ -45,8 +45,13 @@ cp "${XDMA_DRIVER}" "${OUTPUT_DIR}/xdma.ko"
 cp "${RUN_SHELL}" "${OUTPUT_DIR}/run_server.sh"
 cp "${SERVER}" "${OUTPUT_DIR}/server"
 cp "${RKNPU2_LIB_DIR}"/*.so "${OUTPUT_DIR}/rknpu2/"
-cp -r "${CONFIGS}/" "${OUTPUT_DIR}/configs/"
-cp -r "${FFTW_OUTPUT_DIR}/" "${OUTPUT_DIR}/fftw3/"
+cp "${CONFIGS}/"* "${OUTPUT_DIR}/configs/"
+cp "${FFTW_OUTPUT_DIR}/libfftw3_threads.so" "${OUTPUT_DIR}/fftw3/"
+cp "${FFTW_OUTPUT_DIR}/libfftw3_threads.so.3" "${OUTPUT_DIR}/fftw3/"
+cp "${FFTW_OUTPUT_DIR}/libfftw3_threads.so.3.6.9" "${OUTPUT_DIR}/fftw3/"
+cp "${FFTW_OUTPUT_DIR}/libfftw3.so" "${OUTPUT_DIR}/fftw3/"
+cp "${FFTW_OUTPUT_DIR}/libfftw3.so.3" "${OUTPUT_DIR}/fftw3/"
+cp "${FFTW_OUTPUT_DIR}/libfftw3.so.3.6.9" "${OUTPUT_DIR}/fftw3/"
 
 echo -e "${GREEN}Generate DONE${NC}"
 echo -e "${GREEN}You can find run_dir in ./run_dir${NC}"

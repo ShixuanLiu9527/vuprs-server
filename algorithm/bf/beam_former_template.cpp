@@ -78,12 +78,13 @@ void vuprs::WidebandBeamformerTemplate::InputSignal(const vuprs::SignalData &sig
     RUNTIME_CHECK(this->ConfigDone(), "bf", "Config not complete");
     this->array.InputElementSignal(signal);
     this->is_signal_empty = false;
-    if (signal.signal_points != this->signal_points && std::abs(signal.fs - this->fs) > 1e-3)
+    if (signal.signal_points != this->signal_points && std::abs(signal.fs - this->fs) > 1e-5)
     {
         this->fs = signal.fs;
         this->signal_points = signal.signal_points;
         this->signal_frequency_list = vuprs::GenerateRealFrequencyList(this->signal_points, this->fs);
         this->signal_frequency_list_complex = vuprs::GenerateComplexFrequencyList(this->signal_points, this->fs);
+        this->UpdatePredelayExpMatrix();                              /* update matrix here */
         this->array.GetSteeringVectorMatrix(&this->steering_vectors); /* Get steering vectors */
     }
 }
@@ -120,32 +121,87 @@ void vuprs::WidebandBeamformerTemplate::UpdateCovarianceMatrix()
     {
         RUNTIME_CHECK(false, "bf", "Data points in snapshot != latest");
     }
-    /* Update mean covariance matrix */
-    for (int i = 0; i < data_points; i++)
+    /* Chunked parallel update.
+     * Phase 1: mean_cov[i] = a * x_i * x_i.H + (1 - a) * mean_cov[i], where x_i is the i-th
+     * column of the snapshot signal matrix. Each chunk keeps one preallocated M x M scratch
+     * matrix so the bin loop performs no heap allocation. */
+    int M = this->snap_signal_matrix_freq_domain.rows();
+    int n_chunks = std::max(1, std::min(std::max(1, static_cast<int>(std::thread::hardware_concurrency())), data_points));
+    int chunk_size = (data_points + n_chunks - 1) / n_chunks;
+    if (static_cast<int>(this->covariance_update_scratch.size()) != n_chunks)
     {
-        Eigen::Matrix<Eigen::dcomplex, -1, 1> snapshot_freq_signal = this->snap_signal_matrix_freq_domain.col(i);           /* each col of Snapshot Signal Matrix */
-        Eigen::Matrix<Eigen::dcomplex, -1, -1> snapshot_cov_matrix = snapshot_freq_signal * snapshot_freq_signal.adjoint(); /* cov matrix for each frequency band */
-        if (this->first_snapshot)
-        {
-            this->mean_cov_matrix[i] = snapshot_cov_matrix;
-        }
-        else
-        {
-            this->mean_cov_matrix[i] = this->exp_weighed_moving_average_index * snapshot_cov_matrix +
-                                       this->exp_weighed_moving_average_index_1 * this->mean_cov_matrix[i];
-        }
+        this->covariance_update_scratch.resize(n_chunks);
     }
-    /* Update estimate covariance matrix */
-    for (int i = 0; i < data_points; i++)
+    for (auto &scratch : this->covariance_update_scratch)
     {
-        if (i <= 1 || i == data_points - 1)
+        scratch.resize(M, M);
+    }
+    {
+        std::vector<std::future<void>> futures;
+        futures.reserve(n_chunks);
+        for (int c = 0; c < n_chunks; c++)
         {
-            this->estimate_cov_matrix[i] = this->mean_cov_matrix[i];
-            continue;
+            int start = c * chunk_size;
+            int end = std::min((c + 1) * chunk_size, data_points);
+            if (start >= end)
+            {
+                break;
+            }
+            futures.emplace_back(this->thread_pool->enqueue(
+                [this, c, start, end]()
+                {
+                    Eigen::Matrix<Eigen::dcomplex, -1, -1> &xcov = this->covariance_update_scratch[c]; /* cov matrix for each frequency band */
+                    for (int i = start; i < end; i++)
+                    {
+                        xcov.noalias() = this->snap_signal_matrix_freq_domain.col(i) *
+                                         this->snap_signal_matrix_freq_domain.col(i).adjoint();
+                        if (this->first_snapshot)
+                        {
+                            this->mean_cov_matrix[i] = xcov;
+                        }
+                        else
+                        {
+                            /* in-place EWMA (same rounding as a * xcov + (1 - a) * mean) */
+                            this->mean_cov_matrix[i] *= this->exp_weighed_moving_average_index_1;
+                            this->mean_cov_matrix[i] += this->exp_weighed_moving_average_index * xcov;
+                        }
+                    }
+                }));
         }
-        this->estimate_cov_matrix[i] = this->adjacent_freq_average_index_1 * this->mean_cov_matrix[i - 1] +
-                                       this->adjacent_freq_average_index * this->mean_cov_matrix[i] +
-                                       this->adjacent_freq_average_index_1 * this->mean_cov_matrix[i + 1];
+        for (auto &f : futures)
+            f.get();
+    }
+    /* Phase 2: estimate_cov[i] = b * mean[i - 1] + a * mean[i] + b * mean[i + 1].
+     * All mean matrices are ready after phase 1 (barrier), so the chunks are independent again. */
+    {
+        std::vector<std::future<void>> futures;
+        futures.reserve(n_chunks);
+        for (int c = 0; c < n_chunks; c++)
+        {
+            int start = c * chunk_size;
+            int end = std::min((c + 1) * chunk_size, data_points);
+            if (start >= end)
+            {
+                break;
+            }
+            futures.emplace_back(this->thread_pool->enqueue(
+                [this, start, end, data_points]()
+                {
+                    for (int i = start; i < end; i++)
+                    {
+                        if (i <= 1 || i == data_points - 1)
+                        {
+                            this->estimate_cov_matrix[i] = this->mean_cov_matrix[i];
+                            continue;
+                        }
+                        this->estimate_cov_matrix[i] = this->adjacent_freq_average_index_1 * this->mean_cov_matrix[i - 1] +
+                                                       this->adjacent_freq_average_index * this->mean_cov_matrix[i] +
+                                                       this->adjacent_freq_average_index_1 * this->mean_cov_matrix[i + 1];
+                    }
+                }));
+        }
+        for (auto &f : futures)
+            f.get();
     }
     this->is_cov_matrix_empty = false;
     this->first_snapshot = false;
@@ -190,13 +246,8 @@ void vuprs::WidebandBeamformerTemplate::GetFIRExpectedFrequencyResponse(Eigen::M
         *dst = this->result_weight_vectors;
         return;
     }
-    uint64_t M = this->array.size();
-    /* [T1, T2, ..., TM] */
-    Eigen::Map<const Eigen::VectorXd> Tm_vec(this->element_predelay_time.data(), M);
-    /* [ exp(j*2*pi*fk*Tm) ] */
-    Eigen::Matrix<Eigen::dcomplex, -1, -1> exp_arg = (Tm_vec * this->signal_frequency_list_complex.transpose() * 2.0 * PI).array().exp();
     /* w*(fk) x exp(j*2*pi*fk*Tm) */
-    *dst = this->result_weight_vectors.array().conjugate() * exp_arg.array();
+    *dst = this->result_weight_vectors.array().conjugate() * this->pre_delay_exp_arg.array();
     *channel_name = this->element_channel_name;
     /* set 0 & nyquist to real */
     int nyquist_idx = dst->cols() - 1;
@@ -230,6 +281,15 @@ void vuprs::WidebandBeamformerTemplate::UpdateElementPredelay_externalFS(double 
     *element_predelay_time = this->element_predelay_time;
     *element_predelay_count = this->element_predelay_count;
     *channel_name = this->element_channel_name;
+}
+
+void vuprs::WidebandBeamformerTemplate::UpdatePredelayExpMatrix()
+{
+    uint64_t M = this->array.size();
+    /* [T1, T2, ..., TM] */
+    Eigen::Map<const Eigen::VectorXd> Tm_vec(this->element_predelay_time.data(), M);
+    /* [ exp(j*2*pi*fk*Tm) ] */
+    this->pre_delay_exp_arg = (Tm_vec * this->signal_frequency_list_complex.transpose() * 2.0 * PI).array().exp();
 }
 
 void vuprs::WidebandBeamformerTemplate::UpdateAndGetElementPredelay(double fir_length,
@@ -431,26 +491,48 @@ void vuprs::WidebandBeamformerTemplate::CalculateBeamforming()
     if (num_freqs == 0)
         return;
     int M = this->array.size();
-    std::vector<std::future<void>> futures;
     this->result_weight_vectors.resize(M, num_freqs);
-    futures.reserve(num_freqs);
-    for (int i = 0; i < num_freqs; i++)
+    /* - for DC response */
+    this->result_weight_vectors.col(0) *= 0;
+    /* - for Nyquist frequency */
+    Eigen::Matrix<Eigen::dcomplex, -1, 1> ps = this->steering_vectors.col(num_freqs - 1); /* ps */
+    this->result_weight_vectors.col(num_freqs - 1) = ps / M;
+    this->result_weight_vectors.col(num_freqs - 1).imag().setZero();
+    /* Chunk iteration */
+    int chunk_number = std::thread::hardware_concurrency();
+    int freqs_per_chunk = num_freqs / chunk_number;
+    int freqs_for_last_chunk = (freqs_per_chunk > 0) ? num_freqs % freqs_per_chunk : num_freqs;
+    if (freqs_for_last_chunk != 0)
+        chunk_number++;
+    /* Prepare threads */
+    std::vector<std::future<void>> futures;
+    futures.reserve(chunk_number);
+    /* Reserve cache */
+    this->PrepareCalculationCache(num_freqs);
+    for (int chunk_idx = 0; chunk_idx < chunk_number; chunk_idx++)
     {
-        if (i == 0)
-        {
-            this->result_weight_vectors.col(i) *= 0;
-            continue;
-        }
-        else if (i == num_freqs - 1) /* for Nyquist frequency */
-        {
-            Eigen::Matrix<Eigen::dcomplex, -1, 1> ps = this->steering_vectors.col(i); /* ps */
-            this->result_weight_vectors.col(i) = ps / M;
-            this->result_weight_vectors.col(i).imag().setZero();
-            continue;
-        }
         futures.emplace_back(this->thread_pool->enqueue(
-            [this, i]()
-            { this->CalculateBeamformingForOneFreq(i); }));
+            [this, num_freqs, chunk_idx, chunk_number, freqs_per_chunk, freqs_for_last_chunk, M]()
+            {
+                int start_idx = chunk_idx * freqs_per_chunk;
+                int process_points = (freqs_for_last_chunk != 0 && chunk_idx == chunk_number - 1) ? freqs_for_last_chunk
+                                                                                                  : freqs_per_chunk;
+                for (int j = 0; j < process_points; j++)
+                {
+                    int global_idx = j + start_idx;
+                    if (global_idx == 0 || global_idx == num_freqs - 1)
+                        continue;
+                    try
+                    {
+                        this->CalculateBeamformingForOneFreq(global_idx);
+                    }
+                    catch (...)
+                    {
+                        Eigen::Matrix<Eigen::dcomplex, -1, 1> ps = this->steering_vectors.col(num_freqs - 1);
+                        this->result_weight_vectors.col(global_idx) = ps / M;
+                    }
+                }
+            }));
     }
     for (auto &f : futures)
         f.get();

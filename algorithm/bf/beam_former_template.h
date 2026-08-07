@@ -72,6 +72,7 @@ namespace vuprs
         Eigen::Matrix<Eigen::dcomplex, -1, -1> result_weight_vectors;                          /* Size: (M) x (N / 2 + 1) */
         Eigen::Matrix<double, -1, 1> signal_frequency_list;                                    /* [F0, F1, ..., FN/2] Size: (N / 2 + 1) */
         Eigen::Matrix<Eigen::dcomplex, -1, 1> signal_frequency_list_complex;                   /* [jF0, jF1, ..., jFN/2] Size: (N / 2 + 1) */
+        Eigen::Matrix<Eigen::dcomplex, -1, -1> pre_delay_exp_arg;                              /* Predelay exp matrix */
         double fs;                                                                             /* Current sampling frequency */
         int signal_points;                                                                     /* Current signal points */
         std::vector<int> element_predelay_count;                                               /* Predelay count (size = M) */
@@ -79,6 +80,7 @@ namespace vuprs
         std::vector<std::string> element_channel_name;                                         /* element channel name list (size = M) */
         vuprs::AlignedEigenVector<Eigen::Matrix<Eigen::dcomplex, -1, -1>> mean_cov_matrix;     /* Size: N / 2 + 1, cov_matrix[i] is the mean cov matrix in band [i] */
         vuprs::AlignedEigenVector<Eigen::Matrix<Eigen::dcomplex, -1, -1>> estimate_cov_matrix; /* Size: N / 2 + 1, cov_matrix[i] is the mean cov matrix in band [i] */
+        std::vector<Eigen::Matrix<Eigen::dcomplex, -1, -1>> covariance_update_scratch;         /* Size: n_chunks, one M x M scratch per worker chunk (UpdateCovarianceMatrix), algorithm thread only */
 
         /**
          * @brief Calculate beamforming for one frequency.
@@ -90,6 +92,10 @@ namespace vuprs
          * @param freq_index frequency index
          */
         virtual void CalculateBeamformingForOneFreq(int freq_index) = 0;
+
+        virtual void PrepareCalculationCache(int freq_nums) = 0;
+
+        void UpdatePredelayExpMatrix();
 
     public:
         WidebandBeamformerTemplate();
