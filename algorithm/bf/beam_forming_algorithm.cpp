@@ -251,6 +251,20 @@ void vuprs::EigenvalueDecomposition(const Eigen::Matrix<Eigen::dcomplex, -1, -1>
     *eigenvectors = solver.eigenvectors();
 }
 
+void vuprs::EigenvalueDecomposition(const Eigen::Matrix<Eigen::dcomplex, -1, -1> &cov_matrix,
+                                    Eigen::SelfAdjointEigenSolver<Eigen::MatrixXcd> &solver,
+                                    Eigen::Matrix<double, -1, 1> *eigenvalues,
+                                    Eigen::Matrix<Eigen::dcomplex, -1, -1> *eigenvectors)
+{
+    RUNTIME_CHECK(cov_matrix.rows() == cov_matrix.cols(), "bf", "Covariance matrix must be square");
+    RUNTIME_CHECK(eigenvalues && eigenvectors, "bf", "Output pointers cannot be null");
+    Eigen::MatrixXcd H = (cov_matrix + cov_matrix.adjoint()) / 2.0;
+    solver.compute(H);
+    RUNTIME_CHECK(solver.info() == Eigen::Success, "bf", "Failed to solving eigenvalues");
+    *eigenvalues = solver.eigenvalues().real();
+    *eigenvectors = solver.eigenvectors();
+}
+
 void vuprs::CholeskyDecomposition(const Eigen::Matrix<Eigen::dcomplex, -1, -1> &cov_matrix,
                                   Eigen::Matrix<Eigen::dcomplex, -1, -1> *G)
 {

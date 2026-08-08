@@ -216,6 +216,19 @@ namespace vuprs
                                  Eigen::Matrix<Eigen::dcomplex, -1, -1> *eigenvectors);
 
     /**
+     * @brief Eigenvalue decomposition for covariance matrix (external solver).
+     *
+     * @param cov_matrix input covariance matrix.
+     * @param solver eigen decomposition solver.
+     * @param eigenvalues output eigenvalues [eig1, eig2, ..., eigM].T
+     * @param eigenvectors output eigenvectors [eigenvector1, eigenvector2, ..., eigenvectorM] (size = M x M).
+     */
+    void EigenvalueDecomposition(const Eigen::Matrix<Eigen::dcomplex, -1, -1> &cov_matrix,
+                                 Eigen::SelfAdjointEigenSolver<Eigen::MatrixXcd> &solver,
+                                 Eigen::Matrix<double, -1, 1> *eigenvalues,
+                                 Eigen::Matrix<Eigen::dcomplex, -1, -1> *eigenvectors);
+
+    /**
      * @brief Cholesky decomposition for covariance matrix.
      *
      * @param R input covariance matrix.

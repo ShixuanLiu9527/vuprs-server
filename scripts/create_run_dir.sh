@@ -55,3 +55,4 @@ cp "${FFTW_OUTPUT_DIR}/libfftw3.so.3.6.9" "${OUTPUT_DIR}/fftw3/"
 
 echo -e "${GREEN}Generate DONE${NC}"
 echo -e "${GREEN}You can find run_dir in ./run_dir${NC}"
+echo -e "${BLUE}Note: Before running, you need to place the *.rknn in the directory: run_dir/model ${NC}"
