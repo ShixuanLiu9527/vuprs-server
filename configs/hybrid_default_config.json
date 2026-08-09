@@ -37,10 +37,10 @@
         "value": "0.8",
         "description": "frequency average index to fit covariance matrix"
     },
-    "dma__buffer_size": {
-        "value": "32768",
-        "unit": "bytes",
-        "description": "AXI DMA descriptor buffer size, the sampling points of the frame can be calculated as [dma__buffer_size] / 4"
+    "dma__buffer_points": {
+        "value": "8192",
+        "unit": "points",
+        "description": "Sampling points of the frame, and the corresponding buffer size can be calculated as [dma__buffer_points] * 4"
     },
     "dma__buffer_count": {
         "value": "20",

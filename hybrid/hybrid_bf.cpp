@@ -79,7 +79,11 @@ bool vuprs::HybridBeamformer::InitHybridBeamformer(const std::string &fpga_confi
 bool vuprs::HybridBeamformer::InitInference(const std::string &model_config_json,
                                             const std::string &inference_log_dir)
 {
+#if ENABLE_INFERENCE
     return this->fault_detector.InitDetector(model_config_json, inference_log_dir);
+#else
+    return true;
+#endif
 }
 
 bool vuprs::HybridBeamformer::CheckScanningConfigValid(const ScanningConfig &config, std::string *info) const
@@ -152,10 +156,10 @@ bool vuprs::HybridBeamformer::CheckConfigValid(const vuprs::HybridBeamformerConf
     retval &= (config.bf_cov_freq_average_index >= 0.0 && config.bf_cov_freq_average_index < 1.0);
     _CHECK_AND_RETURN("bf_cov out of range (window_size > 0, freq_average_index in [0,1))")
     /* DMA buffers: non-zero size, aligned, and the total size must fit in DDR (use uint64 to avoid overflow) */
-    retval &= (config.dma__buffer_size > 0 && config.dma__buffer_size % DMA_BUFFER_ALIGNMENT_1_WORD == 0);
-    retval &= (config.dma__buffer_count > 0);
-    retval &= (static_cast<uint64_t>(config.dma__buffer_size) * static_cast<uint64_t>(config.dma__buffer_count) <=
-               static_cast<uint64_t>(this->controller.mem__ddr.MaxSizeBytes()));
+    retval &= (config.dma__buffer_count > 0 && config.dma__buffer_points > 0);
+    uint64_t total_ddr_capacity = static_cast<uint64_t>(config.dma__buffer_count) *
+                                  static_cast<uint64_t>(config.dma__buffer_points) * sizeof(uint32_t);
+    retval &= (total_ddr_capacity <= static_cast<uint64_t>(this->controller.mem__ddr.MaxSizeBytes()));
     _CHECK_AND_RETURN("dma buffer size/count invalid or total exceeds DDR capacity")
     /* Data queues */
     retval &= (config.queue__circular_buffer_queue_size_max > 0);
@@ -189,14 +193,14 @@ bool vuprs::HybridBeamformer::StartBeamformerWithConfiguration(const vuprs::Hybr
     std::vector<double> predelay_time;
     std::vector<std::string> channel_name;
     int descriptor_update_cycle_us;
-    uint32_t FIR_LENGTH;
+    uint32_t fir_len;
     bool retval = true;
     HYBRID_LOG(V_DEBUG) << "Start hybrid beamformer with parameters:";
     HYBRID_LOG(V_DEBUG) << "Bandpass frequency range [" + std::to_string(config.bf_freq__lower) + ", " +
                                std::to_string(config.bf_freq__upper) + "]";
     HYBRID_LOG(V_DEBUG) << "Beamformer pointing position [Alt = " + std::to_string(config.bf_target__alt) + ", Az = " +
                                std::to_string(config.bf_target__az) + "]";
-    HYBRID_LOG(V_DEBUG) << "DDR buffer size = " + std::to_string(config.dma__buffer_size) + " bytes.";
+    HYBRID_LOG(V_DEBUG) << "DDR buffer size = " + std::to_string(config.dma__buffer_points * sizeof(uint32_t)) + " bytes.";
     HYBRID_LOG(V_DEBUG) << "DDR buffer count = " + std::to_string(config.dma__buffer_count);
     /* Max queue size */
     this->circular_buffer_queue_size_max = config.queue__circular_buffer_queue_size_max;
@@ -205,13 +209,13 @@ bool vuprs::HybridBeamformer::StartBeamformerWithConfiguration(const vuprs::Hybr
     {
         std::lock_guard<std::mutex> lock(this->mut); /* LOCK */
         this->sg_descriptor_config.buffer_count = config.dma__buffer_count;
-        this->sg_descriptor_config.buffer_size = config.dma__buffer_size;
+        this->sg_descriptor_config.buffer_size = config.dma__buffer_points * sizeof(uint32_t);
         this->sg_descriptor_config.ddr_fpga_base_addr = this->controller.mem__ddr.FPGAAddress();
         this->sg_descriptor_config.sg_bram_fpga_base_addr = this->controller.mem__sg_bram.FPGAAddress();
         this->sg_descriptor_config.is_cyclic_dma_mode = true;
         vuprs::CreateDMAScatterGatherDescriptorChain(&this->dma_descriptors, this->sg_descriptor_config);
         _dma_descriptors = this->dma_descriptors;
-        descriptor_update_cycle_us = static_cast<int>(1000000 * static_cast<double>(config.dma__buffer_size) / config.fs);
+        descriptor_update_cycle_us = static_cast<int>(1000000 * static_cast<double>(config.dma__buffer_points) / config.fs);
     }
     /* Step 2: Initialize loop cycle */
     this->interrupt_wait_time_us = descriptor_update_cycle_us / 20;
@@ -253,19 +257,19 @@ bool vuprs::HybridBeamformer::StartBeamformerWithConfiguration(const vuprs::Hybr
         this->bf_freq__upper = config.bf_freq__upper;
         /* - Get zero FIR coefficients */
         this->fir.GetZeroFIRBankCoefficient(&fir_coefficients, this->bf->ElementCount());
-        FIR_LENGTH = this->fir.FIRLength();
+        fir_len = this->fir.FIRLength();
     }
+#if ENABLE_INFERENCE
     /* Step 4.5: Check whether one DMA buffer can provide at least one inference frame */
     {
-        uint32_t samples_per_buffer = config.dma__buffer_size / sizeof(uint32_t);
         std::lock_guard<std::mutex> lock(this->mut_npu); /* LOCK */
-        if (!this->fault_detector.ValidateInputSignalLength(samples_per_buffer, this->hardware_fs))
+        if (!this->fault_detector.ValidateInputSignalLength(config.dma__buffer_points, this->hardware_fs))
         {
-            HYBRID_LOG(V_WARN) << "DMA buffer (" << config.dma__buffer_size << " bytes = "
-                               << samples_per_buffer << " samples) is shorter than one inference frame at fs = "
+            HYBRID_LOG(V_WARN) << "DMA buffer (" << config.dma__buffer_points << " samples) is shorter than one inference frame at fs = "
                                << this->hardware_fs << " Hz. Fault inference will never start.";
         }
     }
+#endif
     /* Step 5: System reset FPGA */
     retval &= this->ResetHardwareBeamformer();
     /* Step 6: Config FPGA */
@@ -284,7 +288,7 @@ bool vuprs::HybridBeamformer::StartBeamformerWithConfiguration(const vuprs::Hybr
     retval &= vuprs::FPGA_API__FIR__SetLengthAndCoefficients(&this->controller,
                                                              &fir_coefficients,
                                                              0.0,
-                                                             FIR_LENGTH);
+                                                             fir_len);
     /* - FPGA config step 5 - Start ADC */
     retval &= vuprs::FPGA_API__ADC__StartADC(&this->controller, config.fs);
     RUNTIME_CHECK(retval, "hybrid_bf", " in [HybridBeamformer::StartBeamformerWithConfiguration] Cannot start beam former with config");
@@ -550,12 +554,11 @@ void vuprs::HybridBeamformer::THREAD__ListenDMAInterrupt()
 
 void vuprs::HybridBeamformer::THREAD__ReadResult()
 {
-    vuprs::AXI_DMA_ScatterGatherDescriptor current_descriptor, previous_descriptor, next_descriptor;
+    vuprs::AXI_DMA_ScatterGatherDescriptor curr_desc, prev_desc, next_desc;
     std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> _ref_descriptors;
     vuprs::AlignedBufferDMA buffer;
     std::vector<double> result_d;
     Eigen::Matrix<double, -1, 1> inference_res;
-    std::vector<double> std_inference_res;
     bool has_interrupt;
     double _hardware_fs;
 #if DEBUG
@@ -591,22 +594,28 @@ void vuprs::HybridBeamformer::THREAD__ReadResult()
         /* Get previous descriptor */
         if (vuprs::MatchDescriptor(_ref_descriptors,
                                    this->dma_current_desc.load(),
-                                   &current_descriptor,
-                                   &next_descriptor,
-                                   &previous_descriptor))
+                                   &curr_desc,
+                                   &next_desc,
+                                   &prev_desc))
         {
             try
             {
                 /* Read previous buffer (previous of current) from DDR */
                 vuprs::FPGA_API__DDR__ReadDDR(&this->controller,
                                               &buffer,
-                                              previous_descriptor.BUFFER_ADDRESS,
-                                              previous_descriptor.ALIGNMENT_2_BUFFER_SIZE);
+                                              prev_desc.BUFFER_ADDRESS,
+                                              prev_desc.ALIGNMENT_2_BUFFER_SIZE);
+                HYBRID_LOG(V_DEBUG) << "Read bf result from buffer, with FPGA address ["
+                                    << vuprs::Number2HexString(prev_desc.BUFFER_ADDRESS) << "], size ["
+                                    << prev_desc.ALIGNMENT_2_BUFFER_SIZE << "]";
                 vuprs::BeamformerResultMeta result_meta;
                 /* Convert buffer to vector */
                 result_meta.signal = buffer.to_vector<uint32_t>();
+#if ENABLE_INFERENCE || DEBUG
                 /* Convert to double */
                 vuprs::Q16__UINT32_TO_DOUBLE(result_meta.signal, &result_d);
+#endif
+#if ENABLE_INFERENCE
                 /* Inference */
                 {
                     std::lock_guard<std::mutex> lock(this->mut_npu); /* LOCK */
@@ -618,13 +627,13 @@ void vuprs::HybridBeamformer::THREAD__ReadResult()
                                                        &result_meta.inference_result_identity,
                                                        false);
                         /* Convert to uint32_t Q31 inference result */
-                        vuprs::eigenVector2stdVector(inference_res, &std_inference_res);
-                        vuprs::Q31__DOUBLE_TO_UINT32(std_inference_res,
+                        vuprs::Q31__DOUBLE_TO_UINT32(inference_res,
                                                      &result_meta.inference_result,
                                                      inference_res.array().abs().maxCoeff());
                         result_meta.inference_valid = true;
                     }
                 }
+#endif
 #if DEBUG
                 buffer.to_file(std::string(DEBUG_FILES_ROOT_DIR) + "/" +
                                std::string(DEBUG_FILES_DIR) + "-" + std::to_string(debug_file_group) + "/" +

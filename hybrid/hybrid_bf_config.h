@@ -23,8 +23,8 @@ namespace vuprs
         bool m_bf_freq__upper;                        /* Mask of [bf_freq_upper] */
         bool m_bf_cov_snapshots_window_size;          /* Mask of [bf_cov_snapshots_window_size] */
         bool m_bf_cov_freq_average_index;             /* Mask of [bf_cov_freq_average_index] */
-        bool m_dma__bufferSize;                       /* Mask of [dma__buffer_size] */
-        bool m_dma__bufferCount;                      /* Mask of [dma__buffer_count] */
+        bool m_dma__buffer_points;                    /* Mask of [dma__buffer_points] */
+        bool m_dma__buffer_count;                     /* Mask of [dma__buffer_count] */
         bool m_queue__circular_buffer_queue_size_max; /* Mask of [queue__circular_buffer_queue_size_max] */
         bool m_queue__result_queue_size_max;          /* Mask of [queue__result_queue_size_max] */
 
@@ -44,7 +44,7 @@ namespace vuprs
     public:
         /*
             Note: The sampling time for each package is:
-            dma__buffer_size / (sizeof(uint32_t)) / fs (seconds)
+            dma__buffer_points / fs (seconds)
          */
         double fs;                                      /* sampling frequency (unit: Hz), the valid range is [10, 120000] Hz */
         double bf_target__alt;                          /* altitude (unit: degree) of beam former pointing target */
@@ -54,7 +54,7 @@ namespace vuprs
         double bf_freq__upper;                          /* upper boundary of beam former work frequency (unit: Hz), the valid range is [10, 120000] Hz */
         double bf_cov_snapshots_window_size;            /* Snapshots window size (to fit covariance matrix) */
         double bf_cov_freq_average_index;               /* frequency average index (to fit covariance matrix) */
-        uint32_t dma__buffer_size;                      /* [internal param] AXI DMA descriptor buffer size in bytes */
+        uint32_t dma__buffer_points;                    /* Sampling points for each AXI DMA buffer */
         uint32_t dma__buffer_count;                     /* [internal param] AXI DMA descriptor buffer count */
         uint32_t queue__circular_buffer_queue_size_max; /* [internal param] MAX size of circular buffer data queue */
         uint32_t queue__result_queue_size_max;          /* [internal param] MAX size of result data queue */
@@ -80,8 +80,8 @@ namespace vuprs
             this->bf_freq__upper = other.mask.m_bf_freq__upper ? other.bf_freq__upper : this->bf_freq__upper;
             this->bf_cov_snapshots_window_size = other.mask.m_bf_cov_snapshots_window_size ? other.bf_cov_snapshots_window_size : this->bf_cov_snapshots_window_size;
             this->bf_cov_freq_average_index = other.mask.m_bf_cov_freq_average_index ? other.bf_cov_freq_average_index : this->bf_cov_freq_average_index;
-            this->dma__buffer_size = other.mask.m_dma__bufferSize ? other.dma__buffer_size : this->dma__buffer_size;
-            this->dma__buffer_count = other.mask.m_dma__bufferCount ? other.dma__buffer_count : this->dma__buffer_count;
+            this->dma__buffer_points = other.mask.m_dma__buffer_points ? other.dma__buffer_points : this->dma__buffer_points;
+            this->dma__buffer_count = other.mask.m_dma__buffer_count ? other.dma__buffer_count : this->dma__buffer_count;
             this->queue__circular_buffer_queue_size_max = other.mask.m_queue__circular_buffer_queue_size_max ? other.queue__circular_buffer_queue_size_max : this->queue__circular_buffer_queue_size_max;
             this->queue__result_queue_size_max = other.mask.m_queue__result_queue_size_max ? other.queue__result_queue_size_max : this->queue__result_queue_size_max;
         }

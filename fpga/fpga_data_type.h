@@ -6,6 +6,7 @@
 #include <vector>
 #include <stdexcept>
 #include <iostream>
+#include <Eigen/Dense>
 #include "logger/check.h"
 
 /**
@@ -119,19 +120,36 @@ namespace vuprs
      *
      * @throw std::runtime_error
      */
-    void inline Q31__DOUBLE_TO_UINT32(const std::vector<double> &input, std::vector<uint32_t> *output, double max_abs)
+    template <typename T_INPUT>
+    void inline Q31__DOUBLE_TO_UINT32(const T_INPUT &input,
+                                      std::vector<uint32_t> *output,
+                                      double max_abs)
     {
-        uint64_t coefficient_size = input.size();
-        PARAM_CHECK(coefficient_size > 0, "fpga", " in [Q31__DOUBLE_TO_UINT32] Input FIR coefficient is empty.");
-        output->resize(coefficient_size);
+        static_assert(std::is_same_v(T_INPUT, Eigen::Matrix<double, -1, 1>) ||
+                          std::is_same_v(T_INPUT, Eigen::Matrix<float, -1, 1>) ||
+                          std::is_same_v(T_INPUT, std::vector<double>) ||
+                          std::is_same_v(T_INPUT, std::vector<float>),
+                      "invalid type.");
+        uint64_t data_number = input.size();
+        PARAM_CHECK(data_number > 0, "fpga", " in [Q31__DOUBLE_TO_UINT32] Input vector is empty.");
+        PARAM_CHECK(max_abs >= 0.0, "fpga", "max absolute value must >= 0.0");
+        output->resize(data_number);
         if (std::abs(max_abs - 0.0) < FPGA_TYPE_EPS)
         {
-            memset(output->data(), 0, coefficient_size * sizeof(uint32_t));
+            memset(output->data(), 0, data_number * sizeof(uint32_t));
             return;
         }
-        for (uint64_t i = 0; i < coefficient_size; i++)
+        if constexpr (std::is_same_v(T_INPUT, Eigen::Matrix<double, -1, 1>) ||
+                      std::is_same_v(T_INPUT, Eigen::Matrix<float, -1, 1>))
         {
-            (*output)[i] = Q31__DOUBLE_TO_UINT32(input[i] / max_abs);
+            for (uint64_t i = 0; i < data_number; i++)
+                (*output)[i] = Q31__DOUBLE_TO_UINT32((double)input(i) / max_abs);
+        }
+        else if constexpr (std::is_same_v(T_INPUT, std::vector<double>) ||
+                           std::is_same_v(T_INPUT, std::vector<float>))
+        {
+            for (uint64_t i = 0; i < data_number; i++)
+                (*output)[i] = Q31__DOUBLE_TO_UINT32((double)input[i] / max_abs);
         }
     }
 

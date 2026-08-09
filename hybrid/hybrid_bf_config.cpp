@@ -12,8 +12,8 @@ void vuprs::HybridBeamformerConfig::SetDefault()
     this->bf_freq__upper = 3000.0;                    /* upper boundary of beam former work frequency (unit: Hz) */
     this->bf_cov_snapshots_window_size = 200.0;       /* Snapshots window size (to fit covariance matrix) >= 200 */
     this->bf_cov_freq_average_index = 0.8;            /* frequency average index (to fit covariance matrix) */
-    this->dma__buffer_size = 32768;                   /* [internal param] AXI DMA descriptor buffer size */
-    this->dma__buffer_count = 20;                     /* [internal param] AXI DMA descriptor buffer count */
+    this->dma__buffer_points = 8192;                  /* Sampling points for each AXI DMA buffer */
+    this->dma__buffer_count = 20;                     /* AXI DMA descriptor buffer count */
     this->queue__circular_buffer_queue_size_max = 10; /* [internal param] depth of multi-channel data queue */
     this->queue__result_queue_size_max = 10;          /* [internal param] depth of result data queue */
 }
@@ -37,62 +37,74 @@ bool vuprs::HybridBeamformerConfig::FromJson(const std::string &json_filename)
     this->ResetMask(false);
     if (json_data.contains("fs"))
     {
-        vuprs::__JsonStringParseFLOAT<double>(&this->fs, json_data["fs"], "value", true);
+        vuprs::__JsonStringParseFLOAT<double>(&this->fs,
+                                              json_data["fs"], "value", true);
         this->mask.m_fs = true;
     }
     if (json_data.contains("bf_target__alt"))
     {
-        vuprs::__JsonStringParseFLOAT<double>(&this->bf_target__alt, json_data["bf_target__alt"], "value", true);
+        vuprs::__JsonStringParseFLOAT<double>(&this->bf_target__alt,
+                                              json_data["bf_target__alt"], "value", true);
         this->mask.m_bf_target__alt = true;
     }
     if (json_data.contains("bf_target__az"))
     {
-        vuprs::__JsonStringParseFLOAT<double>(&this->bf_target__az, json_data["bf_target__az"], "value", true);
+        vuprs::__JsonStringParseFLOAT<double>(&this->bf_target__az,
+                                              json_data["bf_target__az"], "value", true);
         this->mask.m_bf_target__az = true;
     }
     if (json_data.contains("bf_wave_velocity"))
     {
-        vuprs::__JsonStringParseFLOAT<double>(&this->bf_wave_velocity, json_data["bf_wave_velocity"], "value", true);
+        vuprs::__JsonStringParseFLOAT<double>(&this->bf_wave_velocity,
+                                              json_data["bf_wave_velocity"], "value", true);
         this->mask.m_bf_wave_velocity = true;
     }
     if (json_data.contains("bf_freq__lower"))
     {
-        vuprs::__JsonStringParseFLOAT<double>(&this->bf_freq__lower, json_data["bf_freq__lower"], "value", true);
+        vuprs::__JsonStringParseFLOAT<double>(&this->bf_freq__lower,
+                                              json_data["bf_freq__lower"], "value", true);
         this->mask.m_bf_freq__lower = true;
     }
     if (json_data.contains("bf_freq__upper"))
     {
-        vuprs::__JsonStringParseFLOAT<double>(&this->bf_freq__upper, json_data["bf_freq__upper"], "value", true);
+        vuprs::__JsonStringParseFLOAT<double>(&this->bf_freq__upper,
+                                              json_data["bf_freq__upper"], "value", true);
         this->mask.m_bf_freq__upper = true;
     }
     if (json_data.contains("bf_cov_snapshots_window_size"))
     {
-        vuprs::__JsonStringParseFLOAT<double>(&this->bf_cov_snapshots_window_size, json_data["bf_cov_snapshots_window_size"], "value", true);
+        vuprs::__JsonStringParseFLOAT<double>(&this->bf_cov_snapshots_window_size,
+                                              json_data["bf_cov_snapshots_window_size"], "value", true);
         this->mask.m_bf_cov_snapshots_window_size = true;
     }
     if (json_data.contains("bf_cov_freq_average_index"))
     {
-        vuprs::__JsonStringParseFLOAT<double>(&this->bf_cov_freq_average_index, json_data["bf_cov_freq_average_index"], "value", true);
+        vuprs::__JsonStringParseFLOAT<double>(&this->bf_cov_freq_average_index,
+                                              json_data["bf_cov_freq_average_index"], "value", true);
         this->mask.m_bf_cov_freq_average_index = true;
     }
-    if (json_data.contains("dma__buffer_size"))
+    if (json_data.contains("dma__buffer_points"))
     {
-        vuprs::__JsonStringParseINT<uint32_t>(&this->dma__buffer_size, json_data["dma__buffer_size"], "value", true);
-        this->mask.m_dma__bufferSize = true;
+        vuprs::__JsonStringParseINT<uint32_t>(&this->dma__buffer_points,
+                                              json_data["dma__buffer_points"], "value", true);
+        this->mask.m_dma__buffer_points = true;
     }
     if (json_data.contains("dma__buffer_count"))
     {
-        vuprs::__JsonStringParseINT<uint32_t>(&this->dma__buffer_count, json_data["dma__buffer_count"], "value", true);
-        this->mask.m_dma__bufferCount = true;
+        vuprs::__JsonStringParseINT<uint32_t>(&this->dma__buffer_count,
+                                              json_data["dma__buffer_count"], "value", true);
+        this->mask.m_dma__buffer_count = true;
     }
     if (json_data.contains("queue__circular_buffer_queue_size_max"))
     {
-        vuprs::__JsonStringParseINT<uint32_t>(&this->queue__circular_buffer_queue_size_max, json_data["queue__circular_buffer_queue_size_max"], "value", true);
+        vuprs::__JsonStringParseINT<uint32_t>(&this->queue__circular_buffer_queue_size_max,
+                                              json_data["queue__circular_buffer_queue_size_max"], "value", true);
         this->mask.m_queue__circular_buffer_queue_size_max = true;
     }
     if (json_data.contains("queue__result_queue_size_max"))
     {
-        vuprs::__JsonStringParseINT<uint32_t>(&this->queue__result_queue_size_max, json_data["queue__result_queue_size_max"], "value", true);
+        vuprs::__JsonStringParseINT<uint32_t>(&this->queue__result_queue_size_max,
+                                              json_data["queue__result_queue_size_max"], "value", true);
         this->mask.m_queue__result_queue_size_max = true;
     }
     return true;
@@ -108,8 +120,8 @@ void vuprs::HybridBeamformerConfigMask::Reset(bool val)
     this->m_bf_freq__upper = val;
     this->m_bf_cov_snapshots_window_size = val;
     this->m_bf_cov_freq_average_index = val;
-    this->m_dma__bufferSize = val;
-    this->m_dma__bufferCount = val;
+    this->m_dma__buffer_points = val;
+    this->m_dma__buffer_count = val;
     this->m_queue__circular_buffer_queue_size_max = val;
     this->m_queue__result_queue_size_max = val;
 }

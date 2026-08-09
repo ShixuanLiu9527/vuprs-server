@@ -21,19 +21,14 @@ void vuprs::WidebandBeamformerTemplate::ResetAll()
 {
     this->fs = 0.0;
     this->signal_points = 0;
-
     /* flags */
-
     this->is_array_config_done = false;
     this->is_signal_empty = true;
     this->is_cov_matrix_empty = true;
-
     this->first_snapshot = true;
     this->covariance_snap_window_size = DEFAULT_COVARIANCE_SNAP_WINDOW_SIZE;
     this->adjacent_freq_average_index = DEFAULT_ADJACENT_FREQ_AVERAGE_INDEX;
-
     this->scan_cache_valid = false;
-
     this->ResetCovarianceMatrices();
     this->UpdateParameters();
 }
