@@ -1,9 +1,6 @@
 {
-    "initialize-port": "8080",
-    "max-port": "10000",
-    "accept-client-counts": "1",
-    "protocol": {
-        "command-header": "[HEADER]",
-        "command-tailer": "[TAILER]"
-    }
+    "port": "8080",
+    "max-payload-bytes": "8388608",
+    "data-queue-frames": "64",
+    "control-queue-frames": "16"
 }

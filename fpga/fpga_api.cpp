@@ -19,6 +19,8 @@ bool vuprs::FPGA_API__ADC__StartADC(vuprs::FPGAController *controller, double fs
     operate_status &= controller->dev__adc_controller.WaitForRegisterBIT(vuprs::ADC_Controller__Registers::ADC_STR, 0, 1, 100);
     /* STEP 3: Set sampling frequency fs */
     w_val = controller->dev__adc_controller.GetSCIValueForSamplingFrequency(fs);
+    if (w_val == 0xFFFFFFFF)
+        return false;
     operate_status &= controller->dev__adc_controller.WriteSingleRegister(vuprs::ADC_Controller__Registers::ADC_SCI, w_val);
     /* STEP 4: Set continuous sampling */
     w_val = 0x00000001;
@@ -378,18 +380,17 @@ bool vuprs::FPGA_API__DMA__GetCurrentDescriptor(vuprs::FPGAController *controlle
 {
     PARAM_CHECK(controller->ConfigDone(), "fpga", " in [vuprs::FPGA_API__DMA__GetCurrentDescriptor] FPGA Controller not configured in advance.");
 
-    bool operate_status = true, found = false;
+    bool operate_status = true;
     uint32_t r_val = INVALID_SG_DESCRIPTOR_POINTER + 1;
-    uint32_t next_addr, previous_addr;
     operate_status &= vuprs::FPGA_API__DMA__ReadCurrentDescriptor(controller, &r_val);
     /* Match */
-    operate_status &= vuprs::MatchDescriptor(reference_descriptors,
-                                             r_val,
-                                             current_descriptor,
-                                             next_descriptor,
-                                             previous_descriptor);
+    const bool found = vuprs::MatchDescriptor(reference_descriptors,
+                                              r_val,
+                                              current_descriptor,
+                                              next_descriptor,
+                                              previous_descriptor);
     RUNTIME_CHECK(found, "fpga", " in [vuprs::FPGA_API__DMA__GetCurrentDescriptor] Cannot found current descriptor with address: " + std::to_string(r_val));
-    return operate_status;
+    return operate_status && found;
 }
 
 bool vuprs::FPGA_API__DMA__ReadCurrentDescriptor(vuprs::FPGAController *controller,

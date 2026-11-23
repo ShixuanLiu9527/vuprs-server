@@ -465,7 +465,7 @@ bool vuprs::WidebandBeamformerTemplate::ScanForPositionPower(std::vector<double>
     if (log)
     {
         if (min_power > 0.0)
-            total_power = total_power.array().log10() * 20.0; /* Convert to dB */
+            total_power = total_power.array().log10() * 10.0; /* power -> dB */
         else
             total_power.setZero();
         max_power = total_power.maxCoeff();

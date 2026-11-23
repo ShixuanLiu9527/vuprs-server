@@ -23,7 +23,7 @@
 
 ```bash
 root/
-├── 3rdparty          # 第三方库: eigen, fftw3, nlohmann-json, rknpu2 (RKNN Runtime), spdlog
+├── 3rdparty          # 第三方库: asio, eigen, fftw3, nlohmann-json, rknpu2 (RKNN Runtime), spdlog
 ├── algorithm         # 算法模块
 │   ├── bf            #   波束形成 (Beam Forming) 与 FIR 滤波
 │   ├── inference     #   特征提取 / RKNN NPU 推理 / 后处理
@@ -51,7 +51,7 @@ root/
 - `Linux` (开发机: x86_64; 目标板: RK3568, `aarch64`);
 - `CMake` >= 3.10, 支持 `C++17` 的交叉编译器 (如 `gcc-linaro-7.5.0` aarch64 工具链);
 - 目标板内核源码及其构建环境 (编译 `XDMA` 驱动用);
-- `3rdparty` 中已内置 `eigen`、`fftw3`、`nlohmann-json`、`rknpu2`、`spdlog`, 无需额外安装.
+- `3rdparty` 中已内置 `asio`、`eigen`、`fftw3`、`nlohmann-json`、`rknpu2`、`spdlog`, 无需额外安装.
 
 ## 构建
 
@@ -200,7 +200,7 @@ sudo sh ./run_server.sh
 | 配置文件 | 说明 |
 | :--- | :--- |
 | `fpga_config.json` | FPGA 侧各模块配置 (总线地址、DMA、寄存器偏移等), 用于 ARM 端与 FPGA 通信 |
-| `server_config.json` | 服务器信息配置, 包括端口号、命令流数据头/数据尾、协议指令集等 |
+| `server_config.json` | 服务器端口、最大帧负载、数据/控制队列长度 |
 | `array_config.json` | 麦克风阵列配置 (阵元坐标、ADC 通道), 通过修改该文件可适配不同的麦克风阵列 |
 | `fir_config.json` | FIR 滤波器模块参数配置 |
 | `rknn_config.json` | RKNN 模型推理配置 (分析频率范围、帧时长、模型路径) |
@@ -222,7 +222,20 @@ sudo sh ./scripts/load_xdma_driver.sh
 
 ## 网络通信协议
 
-[网络通信指令格式](./docs/protocol_cmd.md)
+[网络通信协议](./docs/protocol_cmd.md)
+
+[服务器代码审查记录](./docs/server_code_review.md)
+
+### 网络层 / mock server
+
+服务端网络层位于 `server/net/`，使用 `3rdparty/asio` 中的 Standalone Asio；协议为单端口、定长帧、控制 JSON + 二进制数据推送。网络层与 mock server 不依赖 FPGA/RKNN，可以在主机上单独构建和测试：
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --target vuprs_mock_server vuprs_net_tests
+ctest --test-dir build -R vuprs_net_tests --output-on-failure
+./build/vuprs_mock_server --bind 127.0.0.1 --port 18080 --rate 2
+```
 
 ---
 _Shixuan Liu 2025_

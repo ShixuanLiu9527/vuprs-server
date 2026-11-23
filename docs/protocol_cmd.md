@@ -1,123 +1,162 @@
-# VUPRS 网络命令格式
+# VUPRS 网络通信协议
 
-## 1. Data Header & Data Tailer
+> 协议版本: 1  
+> 传输: TCP，单端口，little-endian  
+> 实现: `server/net/`（Asio 1.30.2，Standalone）  
+> 说明: 旧版 `[HEADER]/[TAILER]` 轮询协议已移除，本文是唯一协议。
 
-无论数据类型, 传输的命令/数据都是具有数据头和数据尾部的, 如下所示.  
+## 1. 传输模型
+
+- TCP 单端口，默认 `8080`。
+- 同时只维护一个客户端；新连接替换旧连接。
+- 每帧 = 40 字节固定头 + `payload_bytes` 字节 payload。
+- 客户端发送控制请求；服务端返回控制响应并主动推送 BF/扫描数据。
+- 不再有 `get_bf/get_scan` 轮询。
+- 控制响应优先于数据帧发送；同一时刻只有一个写者，帧不会穿插。
+
+## 2. 帧格式
+
+| 偏移 | 大小 | 字段 | 说明 |
+| ---: | ---: | :--- | :--- |
+| 0 | 4 | `magic` | 字节 `"VUPR"` |
+| 4 | 2 | `version` | `1` |
+| 6 | 2 | `type` | 消息类型 |
+| 8 | 4 | `flags` | 保留，当前 0 |
+| 12 | 4 | `payload_bytes` | payload 长度，最大 8 MB（可配置） |
+| 16 | 4 | `request_id` | 控制请求/响应配对；数据帧为 0 |
+| 20 | 4 | `reserved` | 0 |
+| 24 | 8 | `sequence` | 数据帧序号；控制帧为 0 |
+| 32 | 8 | `timestamp_ns` | 服务器发送时间（UTC 纳秒） |
+
+服务端和客户端都先读满 40 字节，再按 `payload_bytes` 读取 payload；不搜索尾标记。
+
+## 3. 消息类型
+
+| 值 | 类型 | 方向 | payload |
+| ---: | :--- | :--- | :--- |
+| `0x0001` | `CONTROL_REQUEST` | 客户端 → 服务端 | JSON |
+| `0x0002` | `CONTROL_RESPONSE` | 服务端 → 客户端 | JSON |
+| `0x0003` | `BF_DATA` | 服务端 → 客户端 | 二进制 |
+| `0x0004` | `SCAN_DATA` | 服务端 → 客户端 | 二进制 |
+
+magic/version 错误、未知类型、方向错误、payload 超限时会关闭连接。
+
+## 4. 控制协议
+
+请求：
 
 ```json
-data header: "[HEADER]"
-data tailer: "[TAILER]"
+{"cmd":"start","params":{}}
 ```
 
-## 2. 通用说明
+响应：
 
-- 客户端数据格式采用 `[HEADER]``{json}``[TAILER]` 格式, 推荐在发送时去除空格和换行.  
-- 服务端协议解析函数只处理去除 `[HEADER]` 和 `[TAILER]` 后的JSON字符串.  
-- 服务端响应构造函数返回的也是纯JSON字符串, 由会话层统一拼接 `[HEADER]` 和 `[TAILER]`.  
-- 命令携带的所有数值参数统一使用**字符串**传输, 例如 `"fs": "40000.0"`.  
-- 普通命令的服务端响应格式为: `{"response_cmd":"<命令名>","operation-status":"done"|"failed","info":"<附加信息>"}`, 其中 `response_cmd` 与请求的 `cmd` 一致.  
-- 若客户端发送的命令无法解析或参数非法, 服务端直接返回: `{"response_cmd":"invalid","operation-status":"failed","info":"invalid command"}`.  
-
-接下来的协议描述都没有数据头部和数据尾部, 但是在实际传输时必须添加数据头和数据尾.  
-
-### 2.1 服务器应答指令
-| Command | description | client to server | server response |
-| :--- | :--- | :--- | :--- |
-| Ack | 用于客户端与主机端的应答测试 | {"cmd":"ack","params":{}} | {"response_cmd":"ack","operation-status":"done"} |
-
-### 2.2 波束形成算法指令
-| Command | description | client to server | server response |
-| :--- | :--- | :--- | :--- |
-| Change beamformer | 修改波束形成算法 | {"cmd":"change_beamformer","params":{"beamformer":"mvdr"}} | {"response_cmd":"change_beamformer","operation-status":"done"} |
-
-*Note: `beamformer` 可选值: `mvdr`、`cbf`、`dcrcb`.*  
-
-### 2.3 波束指向指令
-| Command | description | client to server | server response |
-| :--- | :--- | :--- | :--- |
-| Redirect | 修改当前波束形成指向位置 | {"cmd":"redirect","params":{"alt":"44.32","az":"-121.34"}} | {"response_cmd":"redirect","operation-status":"done"} |
-
-*Note 1: `alt` 和 `az` 是相对于麦克风阵列的.*  
-*Note 2: `alt` 和 `az` 为必填参数.*  
-
-### 2.4 波束形成器使能控制指令
-| Command | description | client to server | server response |
-| :--- | :--- | :--- | :--- |
-| Start beamformer | 开启波束形成器 | {"cmd":"start","params":{}} | {"response_cmd":"start","operation-status":"done"} |
-| Stop beamformer | 关闭波束形成器 | {"cmd":"stop","params":{}} | {"response_cmd":"stop","operation-status":"done"} |
-| Restart beamformer | 重启波束形成器 (Stop + Start) | {"cmd":"reset","params":{}} | {"response_cmd":"reset","operation-status":"done"} |
-
-### 2.5 算法参数控制指令
-| Command | description | client to server | server response |
-| :--- | :--- | :--- | :--- |
-| Change algorithm parameters | 修改算法参数 | {"cmd": "change_algorithm_parameters","params":{"fs": "40000.0","wave_velocity": "346.0","lower_frequency": "100.0","upper_frequency": "4000.0","snapshot_window_size": "100.0","covariance_average_index": "0.8"}} | {"response_cmd":"change_algorithm_parameters","operation-status":"done"} |
-| Read algorithm parameters | 获取当前算法参数 | {"cmd": "read_algorithm_parameters","params":{}} | {"response_cmd":"read_algorithm_parameters","operation-status":"done","params":{"fs": "40000.0","wave_velocity": "346.0","lower_frequency": "100.0","upper_frequency":"4000.0","snapshot_window_size":"100.000000","covariance_average_index":"0.800000"}} |
-
-*Note 1: 使用 Change algorithm parameters 时参数可以不给全, 表示只修改当前参数, 但 `params` 字段必须存在 (可以为空对象).*  
-*Note 2: 参数意义如下:*  
-| 名称 | 意义 | 典型值 | 单位 |
-| :--- | :--- | :--- | :--- |
-| `fs` | ADC 采样频率 | 10000.0 | Hz |
-| `wave_velocity` | 音速 | 346.0 | m/s |
-| `lower_frequency` | 波束形成器通带最低频率 | 100.0 | Hz |
-| `upper_frequency` | 波束形成器通带最高频率 | 4000.0 | Hz |
-| `snapshot_window_size` | 协方差矩阵快照窗口大小 (双精度) | 100.0 | 1 |
-| `covariance_average_index` | 协方差矩阵拟合系数 | 0.8 | 1 |
-
-*Note 3: Read algorithm parameters 响应的参数值由服务端以双精度格式化, 例如快照窗口大小会返回 `"100.000000"`.*  
-
-### 2.6 获取波束形成输出
-| Command | description | client to server | server response |
-| :--- | :--- | :--- | :--- |
-| Get data | 获取波束形成器输出 | {"cmd":"get_bf","params":{}} | `response 1st`: {"response_cmd":"get_bf","operation-status":"done","params":{"data_format":"uint32_t","quantization":"q31","inference_identity":"1"}}<br>`response 2nd`: binary data |
-
-*Note 1: 该命令不会收到会话层应答, 数据由服务端发送线程直接发送, 共两帧.*  
-*Note 2: 第一帧 (JSON信息帧) 与第二帧 (二进制数据帧) 分别带数据头和数据尾.*  
-*Note 3: 第二帧二进制数据格式为: `[HEADER]` + `uint32_t` 数据大小 (字节数) + `uint32_t[]` 波束形成输出数据 + `[TAILER]`.*  
-*Note 4: 若获取数据失败, 只发送第一帧, `operation-status` 为 `"failed"`, 不发送二进制帧.*  
-
-### 2.7 空间能量扫描指令
-| Command | description | client to server | server response |
-| :--- | :--- | :--- | :--- |
-| Enable scan | 配置并开启空间能量扫描 | {"cmd":"enable_scan","params":{"points":"70","alt_min":"15.0"}} | {"response_cmd":"enable_scan","operation-status":"done"} |
-| Disable scan | 关闭空间能量扫描 | {"cmd":"disable_scan","params":{}} | {"response_cmd":"disable_scan","operation-status":"done"} |
-| Get scan data | 获取空间能量扫描结果 | {"cmd":"get_scan","params":{}} | `response 1st`: {"response_cmd":"get_scan","operation-status":"done","params":{"points":"70","min_alt":"15.0","max_power":"12.04046","min_power":"-15.00231","data_format":"uint16_t","quantization":"q15"}}<br>`response 2nd`: binary data |
-
-*Note 1: `alt_min` 代表扫描的最低高度角, 合法范围为 [0, 90] (单位: 度), 为必填参数.*  
-*Note 2: `points` 代表半球上斐波那契点的一半, 必须大于 0, 为必填参数.*  
-*Note 3: 使用 `get_scan` 获取数据前必须先用 `enable_scan` 开启扫描.*  
-*Note 4: 该命令不会收到会话层应答, 数据由服务端发送线程直接发送, 共两帧.*  
-*Note 5: 第二帧二进制数据格式为: `[HEADER]` + `uint32_t` 数据大小 (字节数) + `uint16_t[]` 扫描能量数据 + `[TAILER]`.*  
-*Note 6: `points` 代表半球上斐波那契点的一半, 客户端和服务端必须使用相同的扫描点生成函数, 否则数据无法对齐.*  
-函数如下:  
-```cpp
-void vuprs::FibonacciGrid(int points,
-                          double alt_min,
-                          std::vector<double> *alt,
-                          std::vector<double> *az)
-{
-    double phi = (std::sqrt(5.0) - 1.0) / 2.0; /* Golden ratio */
-    double xn, yn, zn, _alt, _az;
-    int N = 2 * points + 1, n;
-    int start_n = (N + 1) / 2; /* Number of points in upper hemisphere */
-    int result_size = N - start_n + 1;
-    Eigen::Matrix<double, 3, 1> vec;
-    alt->clear();
-    az->clear();
-    alt->reserve(result_size);
-    az->reserve(result_size);
-    for (int i = 0; i < result_size; i++)
-    {
-        n = start_n + i;
-        zn = 2.0 * (double)n / (double)N - 1.0;
-        xn = std::sqrt(1.0 - zn * zn) * std::cos(2.0 * PI * (double)n * phi);
-        yn = std::sqrt(1.0 - zn * zn) * std::sin(2.0 * PI * (double)n * phi);
-        vec << xn, yn, zn;
-        vuprs::PointingVector2AltAz(vec, &_alt, &_az);
-        if (_alt < alt_min)
-            continue;
-        alt->push_back(_alt);
-        az->push_back(_az);
-    }
-}
+```json
+{"ok":true,"cmd":"start","error":0,"info":"","params":{}}
 ```
+
+错误码：
+
+| code | 含义 |
+| ---: | :--- |
+| 0 | 成功 |
+| 1 | JSON 格式错误 |
+| 2 | 未知命令 |
+| 3 | 参数非法 |
+| 4 | 设备/算法未就绪 |
+| 5 | 忙（控制队列满） |
+| 6 | 内部错误 |
+
+命令：
+
+| 命令 | params | 说明 |
+| :--- | :--- | :--- |
+| `ack` | `{}` | 协议版本、服务器版本、能力 |
+| `start` | `{}` | 启动波束形成器 |
+| `stop` | `{}` | 停止波束形成器 |
+| `reset` | `{}` | 停止后按当前配置重启 |
+| `change_beamformer` | `{"beamformer":"mvdr"}` | `mvdr/cbf/dcrcb` |
+| `redirect` | `{"alt":"44.32","az":"-121.34"}` | 修改指向 |
+| `change_algorithm_parameters` | 部分字段 | 修改并重启 |
+| `read_algorithm_parameters` | `{}` | 读取参数 |
+| `enable_scan` | `{"points":"70","alt_min":"15.0"}` | 开启扫描并推送扫描帧 |
+| `disable_scan` | `{}` | 关闭扫描 |
+| `get_status` | `{}` | 运行/连接/推理/扫描状态 |
+
+所有数值参数仍使用 JSON 字符串。
+
+## 5. BF_DATA
+
+payload 前 32 字节为数据头，随后是 `sample_count` 个 little-endian `int32` Q16.16 采样：
+
+| 偏移 | 大小 | 字段 |
+| ---: | ---: | :--- |
+| 0 | 4 | `sample_rate_millihz`（Hz × 1000） |
+| 4 | 4 | `sample_count` |
+| 8 | 4 | `sample_format`：`1 = int32 Q16.16` |
+| 12 | 4 | `inference_identity`（int32，-1 表示无效） |
+| 16 | 4 | `inference_valid`（0/1） |
+| 20 | 12 | reserved |
+
+- `sequence` 每个 BF 帧递增，客户端据此检测丢帧。
+- 故障类别直接从 BF 头读取，不再有独立故障流。
+- 服务端在波束形成器运行且数据客户端存在时推送。
+
+## 6. SCAN_DATA
+
+payload 前 32 字节为数据头，随后是 `data_points` 个 little-endian `uint16` 能量值：
+
+| 偏移 | 大小 | 字段 |
+| ---: | ---: | :--- |
+| 0 | 4 | `points_half`（斐波那契点半数量） |
+| 4 | 4 | `data_points`（实际点数） |
+| 8 | 4 | `sample_rate_millihz` |
+| 12 | 4 | `alt_min_mdeg`（度 × 1000） |
+| 16 | 4 | `min_power_mdb`（dB × 1000） |
+| 20 | 4 | `max_power_mdb`（dB × 1000） |
+| 24 | 4 | `scan_format`：`1 = uint16 min-max normalized` |
+| 28 | 4 | reserved |
+
+客户端用 `points_half/alt_min_mdeg` 生成同一套斐波那契网格，用 `data_points` 校验长度，用 `min/max_power_mdb` 还原 dB：
+
+```text
+power_dB = min_power_mdb/1000 + (raw / 65535.0) * (max_power_mdb - min_power_mdb)/1000
+```
+
+扫描帧只在 `enable_scan` 后推送；`disable_scan` 后停止。
+
+## 7. 发送与背压
+
+- 单连接单写者；控制响应优先，数据帧其次。
+- 数据队列默认 64 帧；满时丢最旧帧，客户端通过 `sequence` 缺口检测。
+- 控制响应队列默认 16；满时关闭连接。
+- 新客户端连接替换旧客户端。
+- `get_status` 返回运行状态、连接状态、推理是否可用等；队列深度/丢帧统计可按需扩展。
+- 控制命令在独立 worker 线程串行执行，`start/stop` 不会阻塞网络读写。
+
+## 8. 服务端实现位置
+
+```text
+server/net/frame.h/.cpp            # 帧头、BF/扫描数据头、OutFrame、编解码
+server/net/control_worker.h/.cpp   # IControlService + 单线程命令执行
+server/net/session.h/.cpp          # 单连接读写、优先级写队列、JSON 控制
+server/net/frame_publisher.h/.cpp  # DSP/扫描线程 -> Session 的线程安全桥
+server/net/asio_server.h/.cpp      # 单端口 acceptor、io_context、生命周期
+server/server_core.h/.cpp          # 算法/配置/命令执行，发布 BF/扫描帧
+tools/mock_control_service.h       # mock 控制服务
+tools/mock_server.cpp              # 无板卡 mock server
+tests/net_tests.cpp                # 帧编解码 + loopback 控制/数据测试
+```
+
+Asio: `3rdparty/asio`，Standalone Asio 1.30.2，Boost Software License。
+
+## 9. 构建与联调
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --target vuprs_mock_server vuprs_net_tests
+ctest --test-dir build -R vuprs_net_tests --output-on-failure
+./build/vuprs_mock_server --bind 127.0.0.1 --port 18080 --rate 2
+```
+
+mock server 支持控制命令和合成 BF/扫描数据，不依赖 FPGA/RKNN，可在 Windows/Linux 主机运行，便于客户端联调。

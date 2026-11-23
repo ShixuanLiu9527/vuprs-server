@@ -117,9 +117,11 @@ namespace vuprs
 
     struct ScanResult
     {
-        std::vector<uint16_t> scan_result; /* scan result in power, unit: dB */
-        double min_power_db;               /* minimum power in dB for scan result */
-        double max_power_db;               /* maximum power in dB for scan result */
+        std::vector<uint16_t> scan_result;   /* scan result in power, unit: dB */
+        double min_power_db = 0.0;           /* minimum power in dB for scan result */
+        double max_power_db = 0.0;           /* maximum power in dB for scan result */
+        int points_in_hemisphere = 0;        /* grid half-count used for this result */
+        double alt_min = 0.0;                /* grid minimum altitude used for this result */
     };
 }
 

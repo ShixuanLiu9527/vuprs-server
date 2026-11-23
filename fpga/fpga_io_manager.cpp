@@ -124,6 +124,9 @@ bool vuprs::FPGA_IOManagerForDevice::RegisterIO(uint32_t *io_value, uint32_t abs
 {
     RUNTIME_CHECK(this->IsOpen(), "fpga", " in [FPGA_IOManagerForDevice::RegisterIO] FPGA device file is not opened.");
     PARAM_CHECK(io_value != nullptr, "fpga", " in [FPGA_IOManagerForDevice::RegisterIO] iovalue is NULL.");
+    PARAM_CHECK(absolute_address % sizeof(uint32_t) == 0 &&
+                    absolute_address <= __XDMA_AXI_LITE_MMAP_SIZE__ - sizeof(uint32_t),
+                "fpga", " in [FPGA_IOManagerForDevice::RegisterIO] register address out of mapped range.");
     uint8_t *_mmap_base;
     {
         std::lock_guard<std::mutex> lock(this->mut); /* LOCK */
@@ -165,6 +168,9 @@ bool vuprs::FPGA_IOManagerForDevice::RegisterListIO(std::vector<uint32_t> *io_va
     {
         for (int i = 0; i < register_numer; i++)
         {
+            PARAM_CHECK(absolute_address_list[i] % sizeof(uint32_t) == 0 &&
+                            absolute_address_list[i] <= __XDMA_AXI_LITE_MMAP_SIZE__ - sizeof(uint32_t),
+                        "fpga", " in [FPGA_IOManagerForDevice::RegisterListIO] register address out of mapped range.");
             volatile uint32_t *reg_addr = (volatile uint32_t *)(_mmap_base + absolute_address_list[i]);
             if (is_read)
             {

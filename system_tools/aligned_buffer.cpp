@@ -187,18 +187,21 @@ bool vuprs::AlignedBuffer::from_file(const std::string &filename, const uint64_t
 #endif
     if (file_fd < 0)
     {
+        this->release();
         return false;
     }
     seek_position = lseek(file_fd, file_offset, SEEK_SET);
     if (static_cast<uint64_t>(seek_position) != file_offset || seek_position == (off_t)-1 || seek_position < 0)
     {
         close(file_fd);
+        this->release();
         return false;
     }
     current_read_bytes = read(file_fd, this->allocated, loadBytes);
     if (static_cast<uint64_t>(current_read_bytes) != loadBytes)
     {
         close(file_fd);
+        this->release();
         return false;
     }
     close(file_fd);

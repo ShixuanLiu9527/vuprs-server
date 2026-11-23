@@ -1,3 +1,5 @@
+#include <cmath>
+#include <limits>
 #include "fpga/fpga_device.h"
 #include "logger/check.h"
 
@@ -7,6 +9,7 @@
 
 vuprs::FPGA_Device__AXIDirectMemoryAccess::FPGA_Device__AXIDirectMemoryAccess()
 {
+    this->s2mm_transfer_register_length = 0;
     this->GenerateRegisterTable();
     this->SetRegisterOffsetDefault();
 }
@@ -87,7 +90,7 @@ bool vuprs::MatchDescriptor(const std::vector<vuprs::AXI_DMA_ScatterGatherDescri
                             vuprs::AXI_DMA_ScatterGatherDescriptor *next_desc,
                             vuprs::AXI_DMA_ScatterGatherDescriptor *prev_desc)
 {
-    uint32_t next_addr, previous_addr;
+    uint32_t next_addr = 0, previous_addr = 0;
     bool find_cur = false, find_next = false, find_prev = false;
     PARAM_CHECK(cur_desc != nullptr && next_desc != nullptr && prev_desc != nullptr, "fpga", " in [vuprs::MatchDescriptor] target descriptor is NULL.");
     for (auto &desc : descriptor_list)
@@ -101,6 +104,8 @@ bool vuprs::MatchDescriptor(const std::vector<vuprs::AXI_DMA_ScatterGatherDescri
             break;
         }
     }
+    if (!find_cur)
+        return false;
     for (auto &desc : descriptor_list)
     {
         if (desc.ALIGNMENT_0_CURRENT_ADDR == next_addr)
@@ -169,14 +174,20 @@ bool vuprs::FPGA_Device__ADCController::LoadFromJsonObj(const nlohmann::json &ob
 uint32_t vuprs::FPGA_Device__ADCController::GetSCIValueForSamplingFrequency(double fs) const
 {
     PARAM_CHECK(this->config_done, "fpga", " in [vuprs::FPGA_Device__ADCController] Config not complete.");
-    if (fs > this->max_fs || fs <= 1e-2)
+    if (!std::isfinite(fs) || fs > this->max_fs || fs <= 1e-2)
     {
         return 0xFFFFFFFF;
     }
     uint32_t SCI;
     {
         std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
-        SCI = std::round(this->work_clock_frequency / (2.0 * fs));
+        const double sci_value = this->work_clock_frequency / (2.0 * fs);
+        if (!std::isfinite(sci_value) || sci_value < 1.0 ||
+            sci_value >= static_cast<double>(std::numeric_limits<uint32_t>::max()))
+            return 0xFFFFFFFF;
+        SCI = static_cast<uint32_t>(std::round(sci_value));
+        if (SCI == 0 || SCI >= std::numeric_limits<uint32_t>::max())
+            return 0xFFFFFFFF;
     }
     uint32_t SCI_u = SCI + 1;
     uint32_t SCI_l = SCI - 1;
@@ -203,6 +214,8 @@ uint32_t vuprs::FPGA_Device__ADCController::GetSCIValueForSamplingFrequency(doub
 
 double vuprs::FPGA_Device__ADCController::SCI2FS(uint32_t SCI) const
 {
+    if (SCI == 0)
+        return 0.0;
     std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
     return this->work_clock_frequency / (2.0 * static_cast<double>(SCI));
 }

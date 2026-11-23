@@ -6,6 +6,7 @@
 #include <deque>
 #include <atomic>
 #include <condition_variable>
+#include <functional>
 #include "algorithm/bf/beam_former.h"
 #include "algorithm/bf/fir.h"
 #include "hybrid/hybrid_bf_config.h"
@@ -73,6 +74,7 @@ namespace vuprs
         /* NPU */
         std::mutex mut_npu;
         FaultDetector fault_detector;
+        std::atomic<bool> inference_ready{false}; /* true only after successful model init */
 
         /* Scan */
         std::mutex mut_scan_opt;                         /* Scan mutex lock */
@@ -80,6 +82,11 @@ namespace vuprs
         int scan_points_in_hemisphere;                   /* controlled by mut_scan_opt */
         double scan_wave_velocity, scan_alt_min;         /* controlled by mut_scan_opt */
         std::atomic<bool> new_scan_points_input{false};  /* scan points changed flag */
+        std::atomic<uint64_t> scan_generation{0};        /* incremented when a new covariance snapshot is ready */
+        std::atomic<uint64_t> scan_options_generation{0}; /* incremented when points/alt_min/wave velocity change */
+        std::mutex mut_scan_snapshot;                    /* protects scan_snapshot */
+        vuprs::ScanCovarianceSnapshot scan_snapshot;     /* cached covariance snapshot for scan */
+        std::atomic<bool> scan_snapshot_valid{false};    /* scan_snapshot is usable */
         std::mutex mut_scan_result;                      /* Scan result mutex lock */
         std::condition_variable scan_cv;                 /* Scan condition var, controlled by mut_scan */
         std::deque<vuprs::ScanResult> scan_result_queue; /* Scan result, controlled by mut_scan_result */
@@ -115,6 +122,10 @@ namespace vuprs
         std::atomic<bool> scan_enable{false};                 /* Scan enable flag */
         std::atomic<bool> scan_options_changed{false};        /* Scan options changed flag */
         std::atomic<bool> scan_options_initialized{false};    /* Scan options initialized flag */
+
+        /* Optional consumers; set before run() and left unchanged while running. */
+        std::function<void(BeamformerResultMeta &&)> result_callback_;
+        std::function<void(ScanResult &&)> scan_callback_;
 
         /* Threads */
 
@@ -190,6 +201,18 @@ namespace vuprs
          * @retval false: config not complete.
          */
         bool ConfigDone() const;
+
+        /**
+         * @brief Set optional result consumers.
+         *
+         * @note Call before run(); callbacks execute on DSP/scan threads and
+         * @note must be non-blocking.
+         */
+        void SetResultCallback(std::function<void(BeamformerResultMeta &&)> callback);
+        void SetScanCallback(std::function<void(ScanResult &&)> callback);
+
+        bool InferenceReady() const { return this->inference_ready.load(); }
+        double HardwareSamplingFrequency();
 
         /* ------ Part 1: Control (Run & Stop) ------ */
 

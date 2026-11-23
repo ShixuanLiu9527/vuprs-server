@@ -141,6 +141,7 @@ namespace vuprs
         mutable std::mutex mut;       /* Global lock */
         mutable std::mutex mut_dev;   /* Device IO manager lock */
         mutable std::mutex mut_event; /* Event IO manager lock */
+        mutable std::mutex mut_reg;   /* Serialize read-modify-write register operations */
         std::atomic<bool> config_done;
 
         virtual void GenerateRegisterTable() = 0;
@@ -421,7 +422,7 @@ namespace vuprs
         {
             PARAM_CHECK(bit <= 31, "fpga", " in [FPGADeviceTemplate::ReadSingleRegisterBIT] Invalid Bit position (valid <= 31).");
             bool operate_status = true;
-            uint32_t r_val;
+            uint32_t r_val = 0;
             operate_status &= this->RegisterIO(reg_addr, &r_val, true); /* read */
             *value = FPGA_REG_BIT(r_val, bit);
             return operate_status;
@@ -439,8 +440,9 @@ namespace vuprs
         bool WriteSingleRegisterBIT(REG_SEL_ENUM reg_selection, uint32_t bit, bool isSet)
         {
             PARAM_CHECK(bit <= 31, "fpga", " in [FPGADeviceTemplate::WriteSingleRegisterBIT] Invalid Bit position (valid <= 31).");
+            std::lock_guard<std::mutex> lock(this->mut_reg);
             bool operate_status = true;
-            uint32_t r_val, w_val;
+            uint32_t r_val = 0, w_val;
             uint32_t reg_addr = this->GetRegisterAbsoluteAddress(reg_selection);
             operate_status &= this->RegisterIO(reg_addr, &r_val, true); /* read */
             if (isSet)
@@ -543,8 +545,9 @@ namespace vuprs
             {
                 return this->WriteSingleRegisterBIT(reg_selection, lower, (bool)(value & 0x01));
             }
+            std::lock_guard<std::mutex> lock(this->mut_reg);
             bool operate_status = true;
-            uint32_t r_val, w_val;
+            uint32_t r_val = 0, w_val;
             uint32_t reg_addr = this->GetRegisterAbsoluteAddress(reg_selection);
             operate_status &= this->RegisterIO(reg_addr, &r_val, true); /* read */
             uint32_t bit_count = upper - lower + 1;

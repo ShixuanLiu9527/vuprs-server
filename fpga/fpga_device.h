@@ -127,6 +127,8 @@ namespace vuprs
     public:
         FPGA_Device__AXIDirectMemoryAccess();
         bool LoadFromJsonObj(const nlohmann::json &obj) override;
+
+        uint32_t TransferLengthWidth() const { return this->s2mm_transfer_register_length; }
     };
 
     /* ---------------------------------------------------------------------- */

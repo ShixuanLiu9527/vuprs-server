@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <cmath>
+#include <type_traits>
 #include <vector>
 #include <stdexcept>
 #include <iostream>
@@ -125,10 +126,10 @@ namespace vuprs
                                       std::vector<uint32_t> *output,
                                       double max_abs)
     {
-        static_assert(std::is_same_v(T_INPUT, Eigen::Matrix<double, -1, 1>) ||
-                          std::is_same_v(T_INPUT, Eigen::Matrix<float, -1, 1>) ||
-                          std::is_same_v(T_INPUT, std::vector<double>) ||
-                          std::is_same_v(T_INPUT, std::vector<float>),
+        static_assert(std::is_same_v<T_INPUT, Eigen::Matrix<double, -1, 1>> ||
+                          std::is_same_v<T_INPUT, Eigen::Matrix<float, -1, 1>> ||
+                          std::is_same_v<T_INPUT, std::vector<double>> ||
+                          std::is_same_v<T_INPUT, std::vector<float>>,
                       "invalid type.");
         uint64_t data_number = input.size();
         PARAM_CHECK(data_number > 0, "fpga", " in [Q31__DOUBLE_TO_UINT32] Input vector is empty.");
@@ -139,14 +140,14 @@ namespace vuprs
             memset(output->data(), 0, data_number * sizeof(uint32_t));
             return;
         }
-        if constexpr (std::is_same_v(T_INPUT, Eigen::Matrix<double, -1, 1>) ||
-                      std::is_same_v(T_INPUT, Eigen::Matrix<float, -1, 1>))
+        if constexpr (std::is_same_v<T_INPUT, Eigen::Matrix<double, -1, 1>> ||
+                      std::is_same_v<T_INPUT, Eigen::Matrix<float, -1, 1>>)
         {
             for (uint64_t i = 0; i < data_number; i++)
                 (*output)[i] = Q31__DOUBLE_TO_UINT32((double)input(i) / max_abs);
         }
-        else if constexpr (std::is_same_v(T_INPUT, std::vector<double>) ||
-                           std::is_same_v(T_INPUT, std::vector<float>))
+        else if constexpr (std::is_same_v<T_INPUT, std::vector<double>> ||
+                           std::is_same_v<T_INPUT, std::vector<float>>)
         {
             for (uint64_t i = 0; i < data_number; i++)
                 (*output)[i] = Q31__DOUBLE_TO_UINT32((double)input[i] / max_abs);

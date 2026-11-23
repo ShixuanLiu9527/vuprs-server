@@ -52,6 +52,7 @@
  * @{
  */
 #define DEFAULT_SCANNING_POINTS_IN_HALF 100 /* Number of Fibonacci points in the scanning hemisphere */
+#define MAX_SCANNING_POINTS_IN_HALF 10000   /* Upper bound to avoid unreasonable scan grid memory/time */
 #define DEFAULT_SCANNING_ALTITUDE_MIN 15.0  /* Minium altitude angle for scanning */
 /**
  * @}
