@@ -203,6 +203,9 @@ namespace vuprs
          */
         uint32_t FrameLengthSamples(double fs) const;
 
+        /** @brief Configured frame time in milliseconds. */
+        double FrameTimeMs() const { return this->frame_time_ms; }
+
         /**
          * @brief Flushed flag.
          *

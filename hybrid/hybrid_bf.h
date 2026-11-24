@@ -215,6 +215,13 @@ namespace vuprs
         bool InferenceReady() const { return this->inference_ready.load(); }
         double HardwareSamplingFrequency();
 
+        /* ------ Capability/limits queries ------ */
+        double MaxSamplingFrequency() const;
+        uint32_t SignalPoints() const;
+        uint32_t FIRLength() const;
+        double InferenceFrameTimeMs() const;
+        uint32_t InferenceFrameSamples(double fs) const;
+
         /* ------ Part 1: Control (Run & Stop) ------ */
 
         /**

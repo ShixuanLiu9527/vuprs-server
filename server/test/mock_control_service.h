@@ -26,6 +26,19 @@ namespace vuprs
                     result.params["protocol_version"] = "1";
                     result.params["server_version"] = "mock-1";
                     result.params["capabilities"] = nlohmann::json::object({{"bf", "1"}, {"scan", "1"}, {"inference", "0"}});
+                    result.params["limits"] = nlohmann::json::object({
+                        {"min_fs", "10.0"},
+                        {"max_fs", "120000.0"},
+                        {"min_frequency", "10.0"},
+                        {"max_frequency", "60000.0"},
+                        {"fft_points", "512"},
+                        {"dma_buffer_points", "8192"},
+                        {"dma_buffer_count", "20"},
+                        {"fir_length", "256"},
+                        {"inference_frame_time_ms", "15.0"},
+                        {"inference_enabled", "0"},
+                        {"max_scan_points", "10000"},
+                        {"max_wave_velocity", "100000.0"}});
                     return result;
                 }
                 if (cmd == "start")
@@ -70,21 +83,71 @@ namespace vuprs
                 }
                 if (cmd == "change_algorithm_parameters")
                 {
-                    if (!params.is_object())
-                        return Err(ControlError::INVALID_PARAMS, "params must be an object");
-                    if (params.contains("fs") && !AssignDouble(params, "fs", &this->fs_))
-                        return Err(ControlError::INVALID_PARAMS, "invalid fs");
-                    if (params.contains("wave_velocity") && !AssignDouble(params, "wave_velocity", &this->wave_velocity_))
-                        return Err(ControlError::INVALID_PARAMS, "invalid wave_velocity");
-                    if (params.contains("lower_frequency") && !AssignDouble(params, "lower_frequency", &this->lower_frequency_))
-                        return Err(ControlError::INVALID_PARAMS, "invalid lower_frequency");
-                    if (params.contains("upper_frequency") && !AssignDouble(params, "upper_frequency", &this->upper_frequency_))
-                        return Err(ControlError::INVALID_PARAMS, "invalid upper_frequency");
-                    if (params.contains("snapshot_window_size") && !AssignDouble(params, "snapshot_window_size", &this->snapshot_window_size_))
-                        return Err(ControlError::INVALID_PARAMS, "invalid snapshot_window_size");
-                    if (params.contains("covariance_average_index") && !AssignDouble(params, "covariance_average_index", &this->covariance_average_index_))
-                        return Err(ControlError::INVALID_PARAMS, "invalid covariance_average_index");
+                    double fs = this->fs_.load();
+                    double wave_velocity = this->wave_velocity_.load();
+                    double lower = this->lower_frequency_.load();
+                    double upper = this->upper_frequency_.load();
+                    double snapshot = this->snapshot_window_size_.load();
+                    double covariance = this->covariance_average_index_.load();
+                    if (!AssignDoubleField(params, "fs", &fs) ||
+                        !AssignDoubleField(params, "wave_velocity", &wave_velocity) ||
+                        !AssignDoubleField(params, "lower_frequency", &lower) ||
+                        !AssignDoubleField(params, "upper_frequency", &upper) ||
+                        !AssignDoubleField(params, "snapshot_window_size", &snapshot) ||
+                        !AssignDoubleField(params, "covariance_average_index", &covariance))
+                        return Err(ControlError::INVALID_PARAMS, "invalid algorithm parameters");
+                    std::string error;
+                    if (!ValidateAlgorithmConfig(fs, wave_velocity, lower, upper, snapshot, covariance, &error))
+                        return Err(ControlError::INVALID_PARAMS, error);
+                    this->fs_ = fs;
+                    this->wave_velocity_ = wave_velocity;
+                    this->lower_frequency_ = lower;
+                    this->upper_frequency_ = upper;
+                    this->snapshot_window_size_ = snapshot;
+                    this->covariance_average_index_ = covariance;
                     return Ok();
+                }
+                if (cmd == "validate_config")
+                {
+                    double fs = this->fs_.load();
+                    double wave_velocity = this->wave_velocity_.load();
+                    double lower = this->lower_frequency_.load();
+                    double upper = this->upper_frequency_.load();
+                    double snapshot = this->snapshot_window_size_.load();
+                    double covariance = this->covariance_average_index_.load();
+                    if (!AssignDoubleField(params, "fs", &fs) ||
+                        !AssignDoubleField(params, "wave_velocity", &wave_velocity) ||
+                        !AssignDoubleField(params, "lower_frequency", &lower) ||
+                        !AssignDoubleField(params, "upper_frequency", &upper) ||
+                        !AssignDoubleField(params, "snapshot_window_size", &snapshot) ||
+                        !AssignDoubleField(params, "covariance_average_index", &covariance))
+                        return Err(ControlError::INVALID_PARAMS, "invalid algorithm parameters");
+                    std::string error;
+                    if (!ValidateAlgorithmConfig(fs, wave_velocity, lower, upper, snapshot, covariance, &error))
+                        return Err(ControlError::INVALID_PARAMS, error);
+
+                    const double df = fs / 512.0;
+                    const double low_index = std::ceil(lower / df);
+                    const double high_index = std::floor(upper / df);
+                    const int band_bins = high_index >= low_index
+                                              ? static_cast<int>(high_index - low_index + 1.0)
+                                              : 0;
+                    std::string warnings;
+                    if (band_bins < 16)
+                    {
+                        warnings += "band covers only " + std::to_string(band_bins) +
+                                    " FFT bins at df=" + std::to_string(df) + " Hz; ";
+                    }
+                    ControlResult result = Ok();
+                    result.params["frequency_resolution_hz"] = std::to_string(df);
+                    result.params["band_bins"] = std::to_string(band_bins);
+                    result.params["inference_frame_samples"] = "0";
+                    result.params["dma_buffer_points"] = "8192";
+                    result.params["fir_length"] = "256";
+                    result.params["snapshot_time_seconds"] = std::to_string(snapshot * 512.0 / fs);
+                    result.params["block_period_seconds"] = std::to_string(8192.0 / fs);
+                    result.params["warnings"] = warnings;
+                    return result;
                 }
                 if (cmd == "read_algorithm_parameters")
                 {
@@ -112,8 +175,8 @@ namespace vuprs
                     {
                         return Err(ControlError::INVALID_PARAMS, "invalid points");
                     }
-                    if (points <= 0 || points > 10000 || !std::isfinite(alt_min) || alt_min < 0.0 || alt_min > 90.0)
-                        return Err(ControlError::INVALID_PARAMS, "scan parameters out of range");
+                    if (points <= 0 || points > 10000 || !std::isfinite(alt_min) || alt_min <= 10.0 || alt_min > 90.0)
+                        return Err(ControlError::INVALID_PARAMS, "scan parameters out of range (alt_min must be > 10 deg)");
                     this->scan_points_ = points;
                     this->scan_alt_min_ = alt_min;
                     this->scan_enabled_ = true;
@@ -179,14 +242,52 @@ namespace vuprs
                 }
             }
 
-            static bool AssignDouble(const nlohmann::json &params, const std::string &key, std::atomic<double> *target)
+            static bool AssignDoubleField(const nlohmann::json &params, const std::string &key, double *target)
             {
+                if (!params.contains(key))
+                    return true;
                 if (!params[key].is_string())
                     return false;
                 const double value = ParseDouble(params[key].get<std::string>());
                 if (!std::isfinite(value))
                     return false;
                 *target = value;
+                return true;
+            }
+
+            static bool ValidateAlgorithmConfig(double fs,
+                                                double wave_velocity,
+                                                double lower,
+                                                double upper,
+                                                double snapshot,
+                                                double covariance,
+                                                std::string *error)
+            {
+                if (!(fs >= 10.0 && fs <= 120000.0))
+                {
+                    *error = "fs out of range";
+                    return false;
+                }
+                if (!(wave_velocity > 0.0 && wave_velocity <= 100000.0))
+                {
+                    *error = "invalid wave_velocity";
+                    return false;
+                }
+                if (!(lower >= 10.0 && upper >= 10.0 && lower < upper && upper < fs / 2.0))
+                {
+                    *error = "band out of range";
+                    return false;
+                }
+                if (!(snapshot >= 1.0))
+                {
+                    *error = "invalid snapshot_window_size";
+                    return false;
+                }
+                if (!(covariance >= 0.0 && covariance < 1.0))
+                {
+                    *error = "invalid covariance_average_index";
+                    return false;
+                }
                 return true;
             }
 

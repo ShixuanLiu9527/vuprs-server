@@ -40,6 +40,53 @@ namespace
         return true;
     }
 
+    bool ParseAlgorithmParams(const nlohmann::json &params,
+                              vuprs::HybridBeamformerConfig *config,
+                              std::string *error)
+    {
+        if (!params.is_object())
+        {
+            *error = "params must be an object";
+            return false;
+        }
+        if (params.contains("fs") && (!GetDouble(params, "fs", &config->fs) || config->fs <= 0.0))
+        {
+            *error = "invalid fs";
+            return false;
+        }
+        if (params.contains("wave_velocity") &&
+            (!GetDouble(params, "wave_velocity", &config->bf_wave_velocity) || config->bf_wave_velocity <= 0.0))
+        {
+            *error = "invalid wave_velocity";
+            return false;
+        }
+        if (params.contains("lower_frequency") && !GetDouble(params, "lower_frequency", &config->bf_freq__lower))
+        {
+            *error = "invalid lower_frequency";
+            return false;
+        }
+        if (params.contains("upper_frequency") && !GetDouble(params, "upper_frequency", &config->bf_freq__upper))
+        {
+            *error = "invalid upper_frequency";
+            return false;
+        }
+        if (params.contains("snapshot_window_size") &&
+            (!GetDouble(params, "snapshot_window_size", &config->bf_cov_snapshots_window_size) ||
+             config->bf_cov_snapshots_window_size < MIN_COVARIANCE_SNAPSHOT_WINDOW))
+        {
+            *error = "invalid snapshot_window_size";
+            return false;
+        }
+        if (params.contains("covariance_average_index") &&
+            (!GetDouble(params, "covariance_average_index", &config->bf_cov_freq_average_index) ||
+             config->bf_cov_freq_average_index < 0.0 || config->bf_cov_freq_average_index >= 1.0))
+        {
+            *error = "invalid covariance_average_index";
+            return false;
+        }
+        return true;
+    }
+
     vuprs::net::ControlResult Error(vuprs::net::ControlError code, const std::string &info)
     {
         vuprs::net::ControlResult result;
@@ -136,9 +183,9 @@ void vuprs::ServerCore::InitSystemConfigFiles(const vuprs::SystemConfigFiles &co
         {
             std::lock_guard<std::mutex> lock(this->mut_bf_); /* LOCK */
             config_result &= this->beamformer_.InitHybridBeamformer(config.fpga_config_json,
-                                                                   config.bf_array_config_json,
-                                                                   config.fir_config_json,
-                                                                   config.logger_configs.hybrid_logger_dir);
+                                                                    config.bf_array_config_json,
+                                                                    config.fir_config_json,
+                                                                    config.logger_configs.hybrid_logger_dir);
             try
             {
                 if (!this->beamformer_.InitInference(config.inference_model_config_json,
@@ -258,6 +305,26 @@ vuprs::net::ControlResult vuprs::ServerCore::Execute(const std::string &cmd, con
         result.params["protocol_version"] = "1";
         result.params["server_version"] = "vuprs-1";
         result.params["capabilities"] = nlohmann::json::object({{"bf", "1"}, {"scan", "1"}, {"inference", this->beamformer_.InferenceReady() ? "1" : "0"}});
+
+        HybridBeamformerConfig config;
+        {
+            std::lock_guard<std::mutex> lock(this->mut_bf_config_); /* LOCK */
+            config = this->bf_config_;
+        }
+        nlohmann::json limits;
+        limits["min_fs"] = std::to_string(MIN_SAMPLING_FREQUENCY);
+        limits["max_fs"] = std::to_string(this->beamformer_.MaxSamplingFrequency());
+        limits["min_frequency"] = std::to_string(MIN_BEAMFORMER_FREQUENCY);
+        limits["max_frequency"] = std::to_string(this->beamformer_.MaxSamplingFrequency() / 2.0);
+        limits["fft_points"] = std::to_string(this->beamformer_.SignalPoints());
+        limits["dma_buffer_points"] = std::to_string(config.dma__buffer_points);
+        limits["dma_buffer_count"] = std::to_string(config.dma__buffer_count);
+        limits["fir_length"] = std::to_string(this->beamformer_.FIRLength());
+        limits["inference_frame_time_ms"] = std::to_string(this->beamformer_.InferenceFrameTimeMs());
+        limits["inference_enabled"] = this->beamformer_.InferenceReady() ? "1" : "0";
+        limits["max_scan_points"] = std::to_string(MAX_SCANNING_POINTS_IN_HALF);
+        limits["max_wave_velocity"] = std::to_string(MAX_WAVE_VELOCITY);
+        result.params["limits"] = limits;
         return result;
     }
     if (cmd == "start")
@@ -268,6 +335,9 @@ vuprs::net::ControlResult vuprs::ServerCore::Execute(const std::string &cmd, con
             config = this->bf_config_;
         }
         std::lock_guard<std::mutex> lock(this->mut_bf_); /* LOCK */
+        std::string info;
+        if (!this->beamformer_.CheckConfigValid(config, &info))
+            return Error(ControlError::INVALID_PARAMS, info);
         return this->beamformer_.run(config) ? Ok() : Error(ControlError::NOT_READY, "start failed");
     }
     if (cmd == "stop")
@@ -331,27 +401,81 @@ vuprs::net::ControlResult vuprs::ServerCore::Execute(const std::string &cmd, con
         std::lock_guard<std::mutex> lock(this->mut_bf_); /* LOCK */
         return this->beamformer_.ReDirect(alt, az, config.bf_wave_velocity) ? Ok() : Error(ControlError::INTERNAL, "redirect failed");
     }
-    if (cmd == "change_algorithm_parameters")
+    if (cmd == "validate_config")
     {
-        if (!params.is_object())
-            return Error(ControlError::INVALID_PARAMS, "params must be an object");
         HybridBeamformerConfig config;
         {
             std::lock_guard<std::mutex> lock(this->mut_bf_config_); /* LOCK */
             config = this->bf_config_;
         }
-        if (params.contains("fs") && (!GetDouble(params, "fs", &config.fs) || config.fs <= 0.0))
-            return Error(ControlError::INVALID_PARAMS, "invalid fs");
-        if (params.contains("wave_velocity") && (!GetDouble(params, "wave_velocity", &config.bf_wave_velocity) || config.bf_wave_velocity <= 0.0))
-            return Error(ControlError::INVALID_PARAMS, "invalid wave_velocity");
-        if (params.contains("lower_frequency") && !GetDouble(params, "lower_frequency", &config.bf_freq__lower))
-            return Error(ControlError::INVALID_PARAMS, "invalid lower_frequency");
-        if (params.contains("upper_frequency") && !GetDouble(params, "upper_frequency", &config.bf_freq__upper))
-            return Error(ControlError::INVALID_PARAMS, "invalid upper_frequency");
-        if (params.contains("snapshot_window_size") && (!GetDouble(params, "snapshot_window_size", &config.bf_cov_snapshots_window_size) || config.bf_cov_snapshots_window_size <= 0.0))
-            return Error(ControlError::INVALID_PARAMS, "invalid snapshot_window_size");
-        if (params.contains("covariance_average_index") && (!GetDouble(params, "covariance_average_index", &config.bf_cov_freq_average_index) || config.bf_cov_freq_average_index < 0.0 || config.bf_cov_freq_average_index >= 1.0))
-            return Error(ControlError::INVALID_PARAMS, "invalid covariance_average_index");
+        std::string error;
+        if (!ParseAlgorithmParams(params, &config, &error))
+            return Error(ControlError::INVALID_PARAMS, error);
+
+        std::string info;
+        {
+            std::lock_guard<std::mutex> lock(this->mut_bf_); /* LOCK */
+            if (!this->beamformer_.CheckConfigValid(config, &info))
+                return Error(ControlError::INVALID_PARAMS, info);
+        }
+
+        const uint32_t fft_points = this->beamformer_.SignalPoints();
+        const double df = (fft_points > 0 && config.fs > 0.0)
+                              ? config.fs / static_cast<double>(fft_points)
+                              : 0.0;
+        int band_bins = 0;
+        if (df > 0.0 && config.bf_freq__upper > config.bf_freq__lower)
+        {
+            const double low_index = std::ceil(config.bf_freq__lower / df);
+            const double high_index = std::floor(config.bf_freq__upper / df);
+            const double count = high_index - low_index + 1.0;
+            band_bins = count > 0.0 ? static_cast<int>(count) : 0;
+        }
+
+        const uint32_t inference_samples = this->beamformer_.InferenceReady()
+                                               ? this->beamformer_.InferenceFrameSamples(config.fs)
+                                               : 0;
+        std::string warnings;
+        if (df > 0.0 && band_bins < 16)
+        {
+            warnings += "band covers only " + std::to_string(band_bins) +
+                        " FFT bins at df=" + std::to_string(df) + " Hz; ";
+        }
+        if (inference_samples > 0 && config.dma__buffer_points < inference_samples)
+        {
+            warnings += "DMA buffer " + std::to_string(config.dma__buffer_points) +
+                        " is shorter than one inference frame (" +
+                        std::to_string(inference_samples) + " samples); ";
+        }
+
+        auto result = Ok();
+        result.params["frequency_resolution_hz"] = std::to_string(df);
+        result.params["band_bins"] = std::to_string(band_bins);
+        result.params["inference_frame_samples"] = std::to_string(inference_samples);
+        result.params["dma_buffer_points"] = std::to_string(config.dma__buffer_points);
+        result.params["fir_length"] = std::to_string(this->beamformer_.FIRLength());
+        result.params["snapshot_time_seconds"] =
+            std::to_string(fft_points > 0 && config.fs > 0.0
+                               ? config.bf_cov_snapshots_window_size *
+                                     static_cast<double>(fft_points) / config.fs
+                               : 0.0);
+        result.params["block_period_seconds"] =
+            std::to_string(config.fs > 0.0
+                               ? static_cast<double>(config.dma__buffer_points) / config.fs
+                               : 0.0);
+        result.params["warnings"] = warnings;
+        return result;
+    }
+    if (cmd == "change_algorithm_parameters")
+    {
+        HybridBeamformerConfig config;
+        {
+            std::lock_guard<std::mutex> lock(this->mut_bf_config_); /* LOCK */
+            config = this->bf_config_;
+        }
+        std::string error;
+        if (!ParseAlgorithmParams(params, &config, &error))
+            return Error(ControlError::INVALID_PARAMS, error);
         std::string info;
         {
             std::lock_guard<std::mutex> lock(this->mut_bf_); /* LOCK */
@@ -390,8 +514,8 @@ vuprs::net::ControlResult vuprs::ServerCore::Execute(const std::string &cmd, con
         double alt_min = 0.0;
         if (!GetInt(params, "points", &points) || !GetDouble(params, "alt_min", &alt_min) ||
             points <= 0 || points > MAX_SCANNING_POINTS_IN_HALF ||
-            alt_min < 0.0 || alt_min > 90.0)
-            return Error(ControlError::INVALID_PARAMS, "invalid scan parameters");
+            alt_min <= MIN_SCANNING_ALTITUDE_DEG || alt_min > 90.0)
+            return Error(ControlError::INVALID_PARAMS, "invalid scan parameters (alt_min must be > 10 deg)");
         ScanningConfig scan_config;
         {
             std::lock_guard<std::mutex> lock(this->mut_scan_config_); /* LOCK */

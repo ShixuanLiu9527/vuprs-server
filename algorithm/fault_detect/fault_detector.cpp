@@ -85,6 +85,16 @@ bool vuprs::FaultDetector::ValidateInputSignalLength(uint32_t samples, double fs
     return samples >= this->extractor.FrameLengthSamples(fs);
 }
 
+double vuprs::FaultDetector::FrameTimeMs() const
+{
+    return this->extractor.FrameTimeMs();
+}
+
+uint32_t vuprs::FaultDetector::FrameLengthSamples(double fs) const
+{
+    return this->extractor.FrameLengthSamples(fs);
+}
+
 void vuprs::FaultDetector::RunInference()
 {
     RUNTIME_CHECK(this->CheckReady(), "default_detect", "Model not ready.");

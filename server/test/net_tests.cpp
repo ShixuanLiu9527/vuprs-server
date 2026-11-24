@@ -205,16 +205,39 @@ namespace
             CHECK(response["ok"].get<bool>());
             CHECK(response["cmd"].get<std::string>() == "ack");
             CHECK(response["params"]["protocol_version"].get<std::string>() == "1");
+            CHECK(response["params"]["limits"]["fft_points"].get<std::string>() == "512");
+            CHECK(response["params"]["limits"]["max_scan_points"].get<std::string>() == "10000");
         }
 
-        send_request(2, R"({"cmd":"start","params":{}})");
+        send_request(2, R"({"cmd":"validate_config","params":{"fs":"100000.0","wave_velocity":"346.0","lower_frequency":"500.0","upper_frequency":"3000.0","snapshot_window_size":"200.0","covariance_average_index":"0.8"}})");
         CHECK(read_one(&header, &payload));
         CHECK(header.request_id == 2);
+        {
+            auto response = nlohmann::json::parse(std::string(payload.begin(), payload.end()));
+            CHECK(response["ok"].get<bool>());
+            CHECK(response["params"]["band_bins"].get<std::string>() == "13");
+            CHECK(std::stod(response["params"]["frequency_resolution_hz"].get<std::string>()) > 195.0);
+            CHECK(!response["params"]["warnings"].get<std::string>().empty());
+        }
+
+        send_request(3, R"({"cmd":"start","params":{}})");
+        CHECK(read_one(&header, &payload));
+        CHECK(header.request_id == 3);
         CHECK(nlohmann::json::parse(std::string(payload.begin(), payload.end()))["ok"].get<bool>());
 
         for (int i = 0; i < 50 && !server.Publisher()->HasSession(); i++)
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         CHECK(server.Publisher()->HasSession());
+
+        send_request(4, R"({"cmd":"enable_scan","params":{"points":"100","alt_min":"10.0"}})");
+        CHECK(read_one(&header, &payload));
+        CHECK(header.request_id == 4);
+        CHECK(!nlohmann::json::parse(std::string(payload.begin(), payload.end()))["ok"].get<bool>());
+
+        send_request(5, R"({"cmd":"enable_scan","params":{"points":"100","alt_min":"15.0"}})");
+        CHECK(read_one(&header, &payload));
+        CHECK(header.request_id == 5);
+        CHECK(nlohmann::json::parse(std::string(payload.begin(), payload.end()))["ok"].get<bool>());
 
         vuprs::net::BfDataHeader bf;
         bf.sample_rate_millihz = 10000000;
@@ -260,9 +283,9 @@ namespace
         CHECK(scan_out.points_half == 100);
         CHECK(scan_out.data_points == 3);
 
-        send_request(3, R"({"cmd":"stop","params":{}})");
+        send_request(6, R"({"cmd":"stop","params":{}})");
         CHECK(read_one(&header, &payload));
-        CHECK(header.request_id == 3);
+        CHECK(header.request_id == 6);
         CHECK(nlohmann::json::parse(std::string(payload.begin(), payload.end()))["ok"].get<bool>());
 
         client.close(ec);

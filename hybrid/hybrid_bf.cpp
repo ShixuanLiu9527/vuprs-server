@@ -69,6 +69,31 @@ double vuprs::HybridBeamformer::HardwareSamplingFrequency()
     return this->hardware_fs.load();
 }
 
+double vuprs::HybridBeamformer::MaxSamplingFrequency() const
+{
+    return this->controller.dev__adc_controller.MaxSamplingFrequency();
+}
+
+uint32_t vuprs::HybridBeamformer::SignalPoints() const
+{
+    return this->controller.dev__circular_buffer.SignalPoints();
+}
+
+uint32_t vuprs::HybridBeamformer::FIRLength() const
+{
+    return this->fir.FIRLength();
+}
+
+double vuprs::HybridBeamformer::InferenceFrameTimeMs() const
+{
+    return this->fault_detector.FrameTimeMs();
+}
+
+uint32_t vuprs::HybridBeamformer::InferenceFrameSamples(double fs) const
+{
+    return this->fault_detector.FrameLengthSamples(fs);
+}
+
 void vuprs::HybridBeamformer::ScanSwitch(bool enable)
 {
     this->scan_enable = enable;
@@ -136,8 +161,9 @@ bool vuprs::HybridBeamformer::CheckScanningConfigValid(const ScanningConfig &con
     }
     retval &= config.points_in_hemisphere > 0 && config.points_in_hemisphere <= MAX_SCANNING_POINTS_IN_HALF;
     _CHECK_AND_RETURN("points_in_hemisphere must be in [1, MAX_SCANNING_POINTS_IN_HALF]")
-    retval &= std::isfinite(config.alt_min) && config.alt_min >= 0.0 && config.alt_min <= 90.0;
-    _CHECK_AND_RETURN("alt_min must be finite and in range [0.0, 90.0] deg")
+    retval &= std::isfinite(config.alt_min) &&
+              config.alt_min > MIN_SCANNING_ALTITUDE_DEG && config.alt_min <= 90.0;
+    _CHECK_AND_RETURN("alt_min must be finite, > 10.0 deg and <= 90.0 deg")
     return retval;
 }
 
@@ -185,22 +211,28 @@ bool vuprs::HybridBeamformer::CheckConfigValid(const vuprs::HybridBeamformerConf
     retval &= this->controller.ConfigDone();
     _CHECK_AND_RETURN("config not complete")
     /* Sampling frequency must be within the range supported by the ADC controller */
-    retval &= std::isfinite(config.fs) && (config.fs > 1e-2 && config.fs <= this->controller.dev__adc_controller.MaxSamplingFrequency());
-    _CHECK_AND_RETURN("fs out of range (must be 1e-2 < fs <= max_fs)")
+    retval &= std::isfinite(config.fs) &&
+              (config.fs >= MIN_SAMPLING_FREQUENCY && config.fs <= this->controller.dev__adc_controller.MaxSamplingFrequency()) &&
+              (this->controller.dev__adc_controller.GetSCIValueForSamplingFrequency(config.fs) != 0xFFFFFFFF);
+    _CHECK_AND_RETURN("fs out of range or not supported by the ADC (must be min_fs <= fs <= max_fs)")
     /* Bandpass frequency range must be positive and below the Nyquist frequency */
-    retval &= std::isfinite(config.bf_freq__lower) && (config.bf_freq__lower > 0 && config.bf_freq__lower < config.fs / 2.0);
-    retval &= std::isfinite(config.bf_freq__upper) && (config.bf_freq__upper > 0 && config.bf_freq__upper < config.fs / 2.0);
+    retval &= std::isfinite(config.bf_freq__lower) &&
+              (config.bf_freq__lower >= MIN_BEAMFORMER_FREQUENCY && config.bf_freq__lower < config.fs / 2.0);
+    retval &= std::isfinite(config.bf_freq__upper) &&
+              (config.bf_freq__upper >= MIN_BEAMFORMER_FREQUENCY && config.bf_freq__upper < config.fs / 2.0);
     retval &= (config.bf_freq__lower < config.bf_freq__upper);
-    _CHECK_AND_RETURN("bf_freq out of range (must be 0 < lower < upper < fs/2)")
+    _CHECK_AND_RETURN("bf_freq out of range (must be min_frequency <= lower < upper < fs/2)")
     /* Pointing direction must be within the physical hemisphere */
     retval &= std::isfinite(config.bf_target__alt) && (config.bf_target__alt >= -90.0 && config.bf_target__alt <= 90.0);
     retval &= std::isfinite(config.bf_target__az) && (config.bf_target__az >= -180.0 && config.bf_target__az <= 180.0);
-    retval &= std::isfinite(config.bf_wave_velocity) && (config.bf_wave_velocity > 0);
-    _CHECK_AND_RETURN("bf_target out of range (alt in [-90,90], az in [-180,180], wave_velocity > 0)")
+    retval &= std::isfinite(config.bf_wave_velocity) &&
+              (config.bf_wave_velocity > 0 && config.bf_wave_velocity <= MAX_WAVE_VELOCITY);
+    _CHECK_AND_RETURN("bf_target out of range (alt in [-90,90], az in [-180,180], 0 < wave_velocity <= max)")
     /* Covariance matrix fitting parameters */
-    retval &= std::isfinite(config.bf_cov_snapshots_window_size) && (config.bf_cov_snapshots_window_size > 0.0);
+    retval &= std::isfinite(config.bf_cov_snapshots_window_size) &&
+              (config.bf_cov_snapshots_window_size >= MIN_COVARIANCE_SNAPSHOT_WINDOW);
     retval &= std::isfinite(config.bf_cov_freq_average_index) && (config.bf_cov_freq_average_index >= 0.0 && config.bf_cov_freq_average_index < 1.0);
-    _CHECK_AND_RETURN("bf_cov out of range (window_size > 0, freq_average_index in [0,1))")
+    _CHECK_AND_RETURN("bf_cov out of range (window_size >= 1, freq_average_index in [0,1))")
     /* DMA buffers: non-zero size, aligned, and the total size must fit in DDR (use uint64 to avoid overflow) */
     retval &= (config.dma__buffer_count > 0 && config.dma__buffer_points > 0);
     uint64_t total_ddr_capacity = static_cast<uint64_t>(config.dma__buffer_count) *

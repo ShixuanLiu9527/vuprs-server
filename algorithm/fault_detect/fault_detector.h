@@ -43,6 +43,12 @@ namespace vuprs
          */
         bool ValidateInputSignalLength(uint32_t samples, double fs) const;
 
+        /** @brief Configured inference frame time in milliseconds. */
+        double FrameTimeMs() const;
+
+        /** @brief Samples required for one inference frame at fs. */
+        uint32_t FrameLengthSamples(double fs) const;
+
         bool CheckReady() const { return this->extractor.Flushed() && this->model.ModelReady(); }
 
         void RunInference();
