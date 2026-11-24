@@ -70,6 +70,17 @@ clean_server()
     rm -rf "${BUILD_OUTPUT}"
 }
 
+deploy_run_dir()
+{
+    local RUN_DIR_SCRIPT="${SCRIPT_DIR}/scripts/create_run_dir.sh"
+    # Only deploy when all build outputs exist, otherwise remind the user.
+    if [ -f "${BUILD_OUTPUT}/xdma/xdma.ko" ] && [ -f "${BUILD_OUTPUT}/server" ] && [ -f "${BUILD_OUTPUT}/fpga/cli/fpga_tool" ]; then
+        bash "${RUN_DIR_SCRIPT}" || exit 1
+    else
+        echo -e "${BLUE}Note: skip generating vuprs, missing build outputs (build/xdma/xdma.ko, build/server or build/fpga/cli/fpga_tool).${NC}"
+    fi
+}
+
 show_help()
 {
     echo ""
@@ -91,16 +102,18 @@ case "$1" in
     all)
         build_xdma
         build_server
+        deploy_run_dir
         echo -e "${GREEN}You can find the output in ./build${NC}"
         ;;
-    
+
     xdma)
         build_xdma
         echo -e "${GREEN}You can find the output in ./build${NC}"
         ;;
-    
+
     server)
         build_server
+        deploy_run_dir
         echo -e "${GREEN}You can find the output in ./build${NC}"
         ;;
     

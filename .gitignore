@@ -1,5 +1,5 @@
 .vscode/
-run_dir/
+vuprs/
 build*/
 
 # pcie/xdma 构建产物 (兜底, 正常构建后产物会移到 build/xdma/ 下)

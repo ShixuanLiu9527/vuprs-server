@@ -105,7 +105,7 @@ build/
 ├── server                    # 服务器可执行文件
 ├── fpga/
 │   └── cli/
-│       └── tool              # FPGA Tool 工具
+│       └── fpga_tool         # FPGA Tool 工具
 ├── xdma/
 │   └── xdma.ko               # XDMA 驱动
 └── 3rdparty/fftw3/           # FFTW 动态库
@@ -121,16 +121,16 @@ build/
 
 ### Step 1: 生成运行目录
 
-编译完成后, 在项目根目录运行脚本 `create_run_dir.sh` 自动生成运行目录 `run_dir`:
+编译完成后, 在项目根目录运行脚本 `create_run_dir.sh` 自动生成运行目录 `vuprs`:
 
 ```bash
 sudo sh ./scripts/create_run_dir.sh
 ```
 
-生成后的 `run_dir` 目录结构如下:
+生成后的 `vuprs` 目录结构如下:
 
 ```bash
-run_dir/
+vuprs/
 ├── run_server.sh           # 启动脚本
 ├── xdma.ko                 # XDMA 驱动
 ├── server                  # 编译得到的服务器可执行文件
@@ -147,11 +147,11 @@ run_dir/
 └── model/                  # 模型目录 (将 `model.rknn` 放到此处)
 ```
 
-注: 启动前请将推理模型 `model.rknn` 放入 `run_dir/model/` 目录 (路径对应 `rknn_config.json` 中的 `rknn-model.path`).
+注: 启动前请将推理模型 `model.rknn` 放入 `vuprs/model/` 目录 (路径对应 `rknn_config.json` 中的 `rknn-model.path`).
 
 ### Step 2: 配置启动脚本 (可选)
 
-默认情况下 `run_server.sh` 已指向 `run_dir` 内的 `configs` 目录, 无需修改. 如需自定义配置路径, 编辑 `run_server.sh` 中的 7 个配置文件路径:
+默认情况下 `run_server.sh` 已指向 `vuprs` 内的 `configs` 目录, 无需修改. 如需自定义配置路径, 编辑 `run_server.sh` 中的 7 个配置文件路径:
 
 ```shell
 FPGA_CONFIG="./configs/fpga_config.json"
@@ -187,10 +187,10 @@ sudo sh ./config_eth0.sh
 
 ### Step 4: 启动服务器
 
-将 `run_dir` 目录拷贝到板端任意位置, 进入目录, 以 `root` 权限执行启动脚本 (脚本会自动加载 `xdma.ko` 驱动并启动服务器):
+将 `vuprs` 目录拷贝到板端任意位置, 进入目录, 以 `root` 权限执行启动脚本 (脚本会自动加载 `xdma.ko` 驱动并启动服务器):
 
 ```bash
-cd run_dir/
+cd vuprs/
 sudo sh ./run_server.sh
 ```
 
