@@ -34,6 +34,6 @@ file(GLOB_RECURSE MISC_SRC "${PROJECT_ROOT}/misc/*.cpp")
 message(STATUS "FPGA_SRC: ${FPGA_SRC}")
 message(STATUS "MISC_SRC: ${MISC_SRC}")
 
-add_executable(tool main.cpp fpga_tool.cpp ${FPGA_SRC} ${MISC_SRC})
+add_executable(fpga_tool main.cpp fpga_tool.cpp ${FPGA_SRC} ${MISC_SRC})
 
-target_link_libraries(tool PRIVATE m Threads::Threads)
+target_link_libraries(fpga_tool PRIVATE m Threads::Threads)

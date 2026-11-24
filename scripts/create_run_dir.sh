@@ -3,6 +3,7 @@
 RED='\033[1;31m'
 GREEN='\033[1;32m'
 BLUE='\033[1;34m'
+YELLOW='\033[1;33m'
 NC='\033[0m'  # No Color
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -11,14 +12,16 @@ BUILD_OUTPUT="${VUPRS_ROOT}/build"
 
 XDMA_DRIVER="${BUILD_OUTPUT}/xdma/xdma.ko"
 SERVER="${BUILD_OUTPUT}/server"
+FPGA_TOOL="${BUILD_OUTPUT}/fpga/cli/fpga_tool"
 CONFIGS="${VUPRS_ROOT}/configs"
 FFTW_OUTPUT_DIR="${BUILD_OUTPUT}/3rdparty/fftw3"
 RUN_SHELL="${SCRIPT_DIR}/run_server.sh"
 RKNPU2_LIB_DIR="${VUPRS_ROOT}/3rdparty/rknpu2/librknn_api/aarch64"
+VM_SHARE_DIR="/mnt/hgfs/share-win"  # VMware shared folder mount point
 
 # Check file or directories exits.
 
-for file in "${XDMA_DRIVER}" "${SERVER}" "${RUN_SHELL}"; do
+for file in "${XDMA_DRIVER}" "${SERVER}" "${FPGA_TOOL}" "${RUN_SHELL}"; do
     if [ ! -f "${file}" ]; then
         echo -e "${RED}File not found: ${file}${NC}"
         exit 1
@@ -33,7 +36,7 @@ done
 
 # Copy file
 
-OUTPUT_DIR="${VUPRS_ROOT}/run_dir/"
+OUTPUT_DIR="${VUPRS_ROOT}/vuprs/"
 
 mkdir -p "${OUTPUT_DIR}"
 mkdir -p "${OUTPUT_DIR}/fftw3"
@@ -53,6 +56,21 @@ cp "${FFTW_OUTPUT_DIR}/libfftw3.so" "${OUTPUT_DIR}/fftw3/"
 cp "${FFTW_OUTPUT_DIR}/libfftw3.so.3" "${OUTPUT_DIR}/fftw3/"
 cp "${FFTW_OUTPUT_DIR}/libfftw3.so.3.6.9" "${OUTPUT_DIR}/fftw3/"
 
+# Deploy vuprs/ and fpga_tool to the VMware shared folder (if mounted).
+if mountpoint -q "${VM_SHARE_DIR}"; then
+    # fpga_tool sits next to vuprs/ in the shared folder.
+    if mkdir -p "${VM_SHARE_DIR}/vuprs" \
+        && cp -rf "${OUTPUT_DIR}/." "${VM_SHARE_DIR}/vuprs/" \
+        && cp "${FPGA_TOOL}" "${VM_SHARE_DIR}/fpga_tool"; then
+        echo -e "${GREEN}Deploy to VMware shared folder DONE: ${VM_SHARE_DIR}${NC}"
+    else
+        echo -e "${RED}Deploy to VMware shared folder FAILED: ${VM_SHARE_DIR}${NC}"
+        exit 1
+    fi
+else
+    echo -e "${YELLOW}Warning: ${VM_SHARE_DIR} is not mounted, skip deploy to VMware shared folder.${NC}"
+fi
+
 echo -e "${GREEN}Generate DONE${NC}"
-echo -e "${GREEN}You can find run_dir in ./run_dir${NC}"
-echo -e "${BLUE}Note: Before running, you need to place the *.rknn in the directory: run_dir/model ${NC}"
+echo -e "${GREEN}You can find vuprs in ./vuprs${NC}"
+echo -e "${BLUE}Note: Before running, you need to place the *.rknn in the directory: vuprs/model ${NC}"
