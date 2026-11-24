@@ -21,6 +21,10 @@ void vuprs::WidebandBeamformerTemplate::ResetAll()
 {
     this->fs = 0.0;
     this->signal_points = 0;
+    this->work_freq_lower = 0.0;
+    this->work_freq_upper = 0.0;
+    this->work_bin_lo = 0;
+    this->work_bin_hi = -1;
     /* flags */
     this->is_array_config_done = false;
     this->is_signal_empty = true;
@@ -73,7 +77,7 @@ void vuprs::WidebandBeamformerTemplate::InputSignal(vuprs::SignalData &&signal)
     RUNTIME_CHECK(this->ConfigDone(), "bf", "Config not complete");
     this->array.InputElementSignal(std::move(signal));
     this->is_signal_empty = false;
-    if (signal.signal_points != this->signal_points && std::abs(signal.fs - this->fs) > 1e-5)
+    if (signal.signal_points != this->signal_points || std::abs(signal.fs - this->fs) > 1e-5)
     {
         this->fs = signal.fs;
         this->signal_points = signal.signal_points;
@@ -81,6 +85,7 @@ void vuprs::WidebandBeamformerTemplate::InputSignal(vuprs::SignalData &&signal)
         this->signal_frequency_list_complex = vuprs::GenerateComplexFrequencyList(this->signal_points, this->fs);
         this->UpdatePredelayExpMatrix();                              /* update matrix here */
         this->array.GetSteeringVectorMatrix(&this->steering_vectors); /* Get steering vectors */
+        this->UpdateWorkBinRange();
     }
 }
 
@@ -207,6 +212,48 @@ void vuprs::WidebandBeamformerTemplate::SetCovarianceMatrixFittingParam(double s
     this->covariance_snap_window_size = snaps_window_size;
     this->adjacent_freq_average_index = adjacent_freq_average_index;
     this->UpdateParameters();
+}
+
+void vuprs::WidebandBeamformerTemplate::SetWorkFrequencyRange(double lower, double upper)
+{
+    this->work_freq_lower = lower;
+    this->work_freq_upper = upper;
+    this->UpdateWorkBinRange();
+}
+
+void vuprs::WidebandBeamformerTemplate::UpdateWorkBinRange()
+{
+    int f_total = static_cast<int>(this->signal_frequency_list.rows());
+    if (f_total <= 0 || this->fs <= 0.0 || this->signal_points <= 0)
+    {
+        this->work_bin_lo = 0;
+        this->work_bin_hi = -1;
+        return;
+    }
+    if (this->work_freq_lower <= 0.0 && this->work_freq_upper <= 0.0)
+    {
+        this->work_bin_lo = 0;
+        this->work_bin_hi = f_total - 1;
+        return;
+    }
+    /* Cover the FIR bandpass transition band (10 bins) so no bin with non-zero gain is skipped. */
+    double df = this->fs / static_cast<double>(this->signal_points);
+    double pad = 10.0 * df;
+    double f_lo = (this->work_freq_lower > 0.0) ? std::max(0.0, this->work_freq_lower - pad) : 0.0;
+    double f_hi = (this->work_freq_upper > 0.0) ? std::min(this->fs / 2.0, this->work_freq_upper + pad)
+                                                 : this->fs / 2.0;
+    const double *freq = this->signal_frequency_list.data();
+    int lo = static_cast<int>(std::lower_bound(freq, freq + f_total, f_lo) - freq);
+    int hi = static_cast<int>(std::upper_bound(freq, freq + f_total, f_hi) - freq) - 1;
+    lo = std::max(0, std::min(lo, f_total - 1));
+    hi = std::max(0, std::min(hi, f_total - 1));
+    if (hi < lo)
+    {
+        lo = 0;
+        hi = f_total - 1;
+    }
+    this->work_bin_lo = lo;
+    this->work_bin_hi = hi;
 }
 
 void vuprs::WidebandBeamformerTemplate::UpdateParameters()
@@ -483,48 +530,59 @@ void vuprs::WidebandBeamformerTemplate::CalculateBeamforming()
 {
     RUNTIME_CHECK(this->CalculateEnable(), "bf", "Cannot calculate beam forming at that time");
     int num_freqs = this->estimate_cov_matrix.size(); /* = N / 2 + 1 */
-    if (num_freqs == 0)
+    if (num_freqs <= 0)
         return;
     int M = this->array.size();
     this->result_weight_vectors.resize(M, num_freqs);
+    this->PrepareCalculationCache(num_freqs);
     /* - for DC response */
-    this->result_weight_vectors.col(0) *= 0;
+    this->result_weight_vectors.col(0).setZero();
     /* - for Nyquist frequency */
-    Eigen::Matrix<Eigen::dcomplex, -1, 1> ps = this->steering_vectors.col(num_freqs - 1); /* ps */
-    this->result_weight_vectors.col(num_freqs - 1) = ps / M;
+    this->result_weight_vectors.col(num_freqs - 1) = this->steering_vectors.col(num_freqs - 1) / M;
     this->result_weight_vectors.col(num_freqs - 1).imag().setZero();
-    /* Chunk iteration */
-    int chunk_number = std::thread::hardware_concurrency();
-    int freqs_per_chunk = num_freqs / chunk_number;
-    int freqs_for_last_chunk = (freqs_per_chunk > 0) ? num_freqs % freqs_per_chunk : num_freqs;
-    if (freqs_for_last_chunk != 0)
-        chunk_number++;
-    /* Prepare threads */
+    if (num_freqs <= 2)
+        return;
+    /* Only compute the work band (plus the FIR transition band); everything else is zeroed. */
+    int bin_lo = std::max(1, this->work_bin_lo);
+    int bin_hi = std::min(num_freqs - 2, this->work_bin_hi);
+    if (bin_hi < bin_lo)
+    {
+        bin_lo = 1;
+        bin_hi = num_freqs - 2;
+    }
+    for (int i = 1; i < num_freqs - 1; ++i)
+    {
+        if (i < bin_lo || i > bin_hi)
+            this->result_weight_vectors.col(i).setZero();
+    }
+    const int bin_count = bin_hi - bin_lo + 1;
+    if (bin_count <= 0)
+        return;
+    /* Chunk iteration (never spawn more chunks than bins, and never divide by zero). */
+    unsigned hw = std::max(1u, std::thread::hardware_concurrency());
+    int chunk_number = std::min<int>(static_cast<int>(hw), bin_count);
+    int chunk_size = (bin_count + chunk_number - 1) / chunk_number;
     std::vector<std::future<void>> futures;
     futures.reserve(chunk_number);
-    /* Reserve cache */
-    this->PrepareCalculationCache(num_freqs);
     for (int chunk_idx = 0; chunk_idx < chunk_number; chunk_idx++)
     {
+        int start_idx = bin_lo + chunk_idx * chunk_size;
+        int end_idx = std::min(start_idx + chunk_size, bin_hi + 1);
+        if (start_idx >= end_idx)
+            break;
         futures.emplace_back(this->thread_pool->enqueue(
-            [this, num_freqs, chunk_idx, chunk_number, freqs_per_chunk, freqs_for_last_chunk, M]()
+            [this, start_idx, end_idx, M]()
             {
-                int start_idx = chunk_idx * freqs_per_chunk;
-                int process_points = (freqs_for_last_chunk != 0 && chunk_idx == chunk_number - 1) ? freqs_for_last_chunk
-                                                                                                  : freqs_per_chunk;
-                for (int j = 0; j < process_points; j++)
+                for (int global_idx = start_idx; global_idx < end_idx; global_idx++)
                 {
-                    int global_idx = j + start_idx;
-                    if (global_idx == 0 || global_idx == num_freqs - 1)
-                        continue;
                     try
                     {
                         this->CalculateBeamformingForOneFreq(global_idx);
                     }
                     catch (...)
                     {
-                        Eigen::Matrix<Eigen::dcomplex, -1, 1> ps = this->steering_vectors.col(num_freqs - 1);
-                        this->result_weight_vectors.col(global_idx) = ps / M;
+                        /* Fall back to CBF weights at this frequency. */
+                        this->result_weight_vectors.col(global_idx) = this->steering_vectors.col(global_idx) / M;
                     }
                 }
             }));

@@ -57,6 +57,7 @@ vuprs::BeamFormingArray::BeamFormingArray()
     this->sampling_time = 0.0;
     this->signal_point_counts = 0;
     this->max_element_position_error = 0.0;
+    this->wave_velocity = DEFAULT_WAVE_VELOCITY;
     this->thread_pool = std::make_unique<vuprs::ThreadPool>(std::thread::hardware_concurrency());
 }
 
@@ -68,15 +69,14 @@ vuprs::BeamFormingArray::~BeamFormingArray()
 double vuprs::BeamFormingArray::CalculateSteeringVectorErrorRadius(double signal_frequency) const
 {
     RUNTIME_CHECK(!this->empty(), "bf", "Array is empty");
-    /* Calculate time delay error */
-    double timedelay_err = this->max_element_position_error / DEFAULT_WAVE_VELOCITY;
-    /* Get error */
-    Eigen::Matrix<double, -1, 1> vec;
-    vec.resize(this->element_array.size(), 1);
-    vec.setOnes();
-    vec *= PI * signal_frequency * timedelay_err;
-    vec = vec.array().sin().pow(2.0).matrix();
-    return 4.0 * vec.sum();
+    PARAM_CHECK(this->wave_velocity > 0.0, "bf", "Wave velocity must be positive.");
+    /* All elements share the same position error radius, so their error terms are identical:
+     * e0 = 4 * sum_m sin^2(pi * f * tau) = 4 * M * sin^2(pi * f * tau),
+     * tau = max_pos_err / c.
+     */
+    double timedelay_err = this->max_element_position_error / this->wave_velocity;
+    double s = std::sin(PI * signal_frequency * timedelay_err);
+    return 4.0 * (double)this->element_array.size() * s * s;
 }
 
 bool vuprs::BeamFormingArray::LoadArrayFromJson(const std::string &filename)
@@ -91,7 +91,7 @@ bool vuprs::BeamFormingArray::LoadArrayFromJson(const std::string &filename)
     }
     catch (const std::exception &e)
     {
-        RUNTIME_CHECK(false, "bf", " in [BeamFormingArray::LoadArrayFromJson] Failed to load array data from: " + filename);
+        RUNTIME_CHECK(false, "bf", " Failed to load array data from: " + filename);
     }
     RUNTIME_CHECK(json_data.contains("beam_forming_array"), "bf", "Missing keys.");
     RUNTIME_CHECK(json_data["beam_forming_array"].contains("array"), "bf", "Missing key.");
@@ -119,7 +119,7 @@ bool vuprs::BeamFormingArray::LoadArrayFromJson(const std::string &filename)
         one_element.position_vector(2, 0) = z;
         vuprs::__JsonParseString(&adc_channel, array_data[i], "adc-channel", true);
         one_element.adc_channel = adc_channel;
-        RUNTIME_CHECK(IS_ADC_CHANNEL_NAME(adc_channel), "bf", " in [BeamFormingArray::LoadArrayFromJson] Invalid ADC channel name in file: " + filename);
+        RUNTIME_CHECK(IS_ADC_CHANNEL_NAME(adc_channel), "bf", " Invalid ADC channel name in file: " + filename);
         this->element_array.push_back(std::move(one_element));
     }
     vuprs::__JsonStringParseFLOAT<double>(&this->max_element_position_error,
@@ -131,6 +131,7 @@ bool vuprs::BeamFormingArray::LoadArrayFromJson(const std::string &filename)
 
 void vuprs::BeamFormingArray::UpdateTimeDelay(double target_alt, double target_az, double wave_velocity)
 {
+    this->wave_velocity = wave_velocity;
     int array_size = this->element_array.size();
     this->time_delay_vector.resize(array_size, 1);
     for (int i = 0; i < array_size; i++)
@@ -244,7 +245,7 @@ bool vuprs::BeamFormingScanArray::LoadArrayFromJson(const std::string &filename)
     }
     catch (const std::exception &e)
     {
-        RUNTIME_CHECK(false, "bf", " in [BeamFormingArray::LoadArrayFromJson] Failed to load array data from: " + filename);
+        RUNTIME_CHECK(false, "bf", " Failed to load array data from: " + filename);
     }
     RUNTIME_CHECK(json_data.contains("beam_forming_array"), "bf", "Missing keys.");
     RUNTIME_CHECK(json_data["beam_forming_array"].contains("array"), "bf", "Missing key.");
@@ -270,7 +271,7 @@ bool vuprs::BeamFormingScanArray::LoadArrayFromJson(const std::string &filename)
         one_element.position_vector(2, 0) = z;
         vuprs::__JsonParseString(&adc_channel, array_data[i], "adc-channel", true);
         one_element.adc_channel = adc_channel;
-        RUNTIME_CHECK(IS_ADC_CHANNEL_NAME(adc_channel), "bf", " in [BeamFormingArray::LoadArrayFromJson] Invalid ADC channel name in file: " + filename);
+        RUNTIME_CHECK(IS_ADC_CHANNEL_NAME(adc_channel), "bf", " Invalid ADC channel name in file: " + filename);
         this->element_array.push_back(std::move(one_element));
     }
     return true;
@@ -280,8 +281,8 @@ Eigen::Matrix<double, -1, -1> vuprs::BeamFormingScanArray::GetTimeDelay(const st
                                                                         const std::vector<double> &az,
                                                                         double wave_velocity) const
 {
-    PARAM_CHECK(!this->empty(), "bf", " in [BeamFormingScanArray::GetTimeDelay] Array is empty.");
-    PARAM_CHECK(alt.size() == az.size(), "bf", " in [BeamFormingScanArray::GetTimeDelay] Size of alt and az should be the same.");
+    PARAM_CHECK(!this->empty(), "bf", " Array is empty.");
+    PARAM_CHECK(alt.size() == az.size(), "bf", " Size of alt and az should be the same.");
 
     int k = alt.size();
     int M = this->element_array.size();
@@ -307,8 +308,8 @@ Eigen::Matrix<Eigen::dcomplex, -1, -1> vuprs::BeamFormingScanArray::GetImagTimed
 
 void vuprs::BeamFormingScanArray::GetSteeringVectorMatrix(Eigen::Matrix<Eigen::dcomplex, -1, -1> *matrix, const std::vector<double> &alt, const std::vector<double> &az, double frequency, double wave_velocity) const
 {
-    PARAM_CHECK(!this->empty(), "bf", " in [BeamFormingScanArray::GetSteeringVectorMatrix] Array is empty.");
-    PARAM_CHECK(alt.size() == az.size(), "bf", " in [BeamFormingScanArray::GetSteeringVectorMatrix] Size of alt and az should be the same.");
+    PARAM_CHECK(!this->empty(), "bf", " Array is empty.");
+    PARAM_CHECK(alt.size() == az.size(), "bf", " Size of alt and az should be the same.");
     Eigen::Matrix<Eigen::dcomplex, -1, -1> jT = this->GetImagTimedelay(alt,
                                                                        az,
                                                                        wave_velocity);

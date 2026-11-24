@@ -49,9 +49,9 @@ void vuprs::AXI_DMA_ScatterGatherDescriptor_ToDefault(vuprs::AXI_DMA_ScatterGath
 void vuprs::CreateDMAScatterGatherDescriptorChain(std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> *descriptor_list,
                                                   const vuprs::AXI_DMA_SGDescriptor_Config &config)
 {
-    PARAM_CHECK(!(config.buffer_size == 0 || config.buffer_count == 0), "fpga", " in [vuprs::CreateDMAScatterGatherDescriptorChain] Buffer size or buffer count should not be 0.");
-    PARAM_CHECK(config.buffer_size % vuprs::DMA_BUFFER_ALIGNMENT_1_WORD == 0, "fpga", " in [vuprs::CreateDMAScatterGatherDescriptorChain] Buffer size must aligned to 1 word");
-    PARAM_CHECK(config.buffer_size <= vuprs::DMA_MAX_BUFFER_LENGTH, "fpga", " in [vuprs::CreateDMAScatterGatherDescriptorChain] Buffer size must be smaller than " + std::to_string(vuprs::DMA_MAX_BUFFER_LENGTH) + " bytes.");
+    PARAM_CHECK(!(config.buffer_size == 0 || config.buffer_count == 0), "fpga", " Buffer size or buffer count should not be 0.");
+    PARAM_CHECK(config.buffer_size % vuprs::DMA_BUFFER_ALIGNMENT_1_WORD == 0, "fpga", " Buffer size must aligned to 1 word");
+    PARAM_CHECK(config.buffer_size <= vuprs::DMA_MAX_BUFFER_LENGTH, "fpga", " Buffer size must be smaller than " + std::to_string(vuprs::DMA_MAX_BUFFER_LENGTH) + " bytes.");
 
     descriptor_list->resize(config.buffer_count);
     /* Operate as normal link list */
@@ -92,7 +92,7 @@ bool vuprs::MatchDescriptor(const std::vector<vuprs::AXI_DMA_ScatterGatherDescri
 {
     uint32_t next_addr = 0, previous_addr = 0;
     bool find_cur = false, find_next = false, find_prev = false;
-    PARAM_CHECK(cur_desc != nullptr && next_desc != nullptr && prev_desc != nullptr, "fpga", " in [vuprs::MatchDescriptor] target descriptor is NULL.");
+    PARAM_CHECK(cur_desc != nullptr && next_desc != nullptr && prev_desc != nullptr, "fpga", " target descriptor is NULL.");
     for (auto &desc : descriptor_list)
     {
         if (desc.ALIGNMENT_0_CURRENT_ADDR == currentDescriptorAddr)
@@ -173,7 +173,7 @@ bool vuprs::FPGA_Device__ADCController::LoadFromJsonObj(const nlohmann::json &ob
 
 uint32_t vuprs::FPGA_Device__ADCController::GetSCIValueForSamplingFrequency(double fs) const
 {
-    PARAM_CHECK(this->config_done, "fpga", " in [vuprs::FPGA_Device__ADCController] Config not complete.");
+    PARAM_CHECK(this->config_done, "fpga", " Config not complete.");
     if (!std::isfinite(fs) || fs > this->max_fs || fs <= 1e-2)
     {
         return 0xFFFFFFFF;
@@ -280,7 +280,7 @@ bool vuprs::FPGA_Device__CircularBuffer::Refreshed()
     uint32_t r_val;
     bool operation_status;
     operation_status = this->ReadSingleRegisterBIT(vuprs::Circular_Buffer__Registers::CBUF_RS, 1, &r_val);
-    RUNTIME_CHECK(operation_status, "fpga", " in [FPGA_Device__CircularBuffer::Refreshed] Cannot read circular buffer.");
+    RUNTIME_CHECK(operation_status, "fpga", " Cannot read circular buffer.");
     return r_val == 1;
 }
 

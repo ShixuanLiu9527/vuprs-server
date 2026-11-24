@@ -157,18 +157,6 @@ namespace vuprs
     bool SecantIteration1D(const vuprs::IterationConfig &config, double *result);
 
     /**
-     * @brief Robust secant iteration for 1D function.
-     *
-     * @note result = Solve(func(val) == 0), val in [lower_region, upper_region].
-     *
-     * @param config iteration configuration.
-     * @param result output result.
-     *
-     * @throw std::runtime_error
-     */
-    bool RobustSecantIteration1D(const vuprs::IterationConfig &config, double *result);
-
-    /**
      * @brief Newton iteration for 1D function.
      *
      * @note result = Solve(func(val) == 0), val in [lower_region, upper_region].

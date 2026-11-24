@@ -24,7 +24,7 @@ bool vuprs::FIRCalculator::ConfigFIRFromJsonFile(const std::string &json_filenam
 {
     std::ifstream f;
     f.open(json_filename);
-    RUNTIME_CHECK(f.is_open(), "bf", " in [FIRCalculator::ConfigFIRFromJsonFile] Cannot open file: " + json_filename);
+    RUNTIME_CHECK(f.is_open(), "bf", " Cannot open file: " + json_filename);
     nlohmann::json json_data;
     try
     {
@@ -32,7 +32,7 @@ bool vuprs::FIRCalculator::ConfigFIRFromJsonFile(const std::string &json_filenam
     }
     catch (const std::exception &e)
     {
-        RUNTIME_CHECK(false, "bf", " in [FIRCalculator::ConfigFIRFromJsonFile] Failed to load array data from: " + json_filename);
+        RUNTIME_CHECK(false, "bf", " Failed to load array data from: " + json_filename);
     }
     vuprs::__JsonStringParseINT<uint32_t>(&this->fir_length, json_data, "length", true);
     this->config_done = true;
@@ -41,7 +41,7 @@ bool vuprs::FIRCalculator::ConfigFIRFromJsonFile(const std::string &json_filenam
 
 void vuprs::FIRCalculator::SetFrequencyRange(double lower, double upper)
 {
-    PARAM_CHECK(lower < upper, "bf", " in [FIRCalculator::SetFrequencyRange] Lower >= Upper.");
+    PARAM_CHECK(lower < upper, "bf", " Lower >= Upper.");
     this->freq_range_l = lower;
     this->freq_range_u = upper;
 }
@@ -49,11 +49,11 @@ void vuprs::FIRCalculator::SetFrequencyRange(double lower, double upper)
 bool vuprs::FIRCalculator::SolveCoeffUseExpectedFrequencyResponse(const Eigen::Matrix<Eigen::dcomplex, -1, -1> &response,
                                                                   const std::vector<std::string> &channel_name, double fs)
 {
-    PARAM_CHECK(this->config_done, "bf", " in [FIRCalculator::SolveCoeffUseExpectedFrequencyResponse] Config not complete.");
+    PARAM_CHECK(this->config_done, "bf", " Config not complete.");
     int M = response.rows();          /* M */
     int N_2_plus_1 = response.cols(); /* N/2+1 */
     int N = (N_2_plus_1 - 1) * 2;     /* N */
-    PARAM_CHECK(N >= this->fir_length, "bf", " in [FIRCalculator::SolveCoeffUseExpectedFrequencyResponse] Too little response for solving.");
+    PARAM_CHECK(N >= this->fir_length, "bf", " Too little response for solving.");
     this->fir_coefficient.resize(M);
     for (auto &val : this->fir_coefficient)
         val.resize(this->fir_length);
@@ -115,8 +115,8 @@ bool vuprs::FIRCalculator::SolveCoeffUseExpectedFrequencyResponse(const Eigen::M
 
 void vuprs::FIRCalculator::GetZeroFIRBankCoefficient(std::vector<std::vector<double>> *dst, uint32_t channel_number) const
 {
-    PARAM_CHECK(this->config_done, "bf", " in [FIRCalculator::GetZeroFIRBankCoefficient] Config not complete.");
-    PARAM_CHECK(this->fir_length > 0, "bf", " in [FIRCalculator::GetZeroFIRBankCoefficient] FIR length = 0");
+    PARAM_CHECK(this->config_done, "bf", " Config not complete.");
+    PARAM_CHECK(this->fir_length > 0, "bf", " FIR length = 0");
     dst->resize(channel_number, std::vector<double>(this->fir_length, 0.0));
 }
 

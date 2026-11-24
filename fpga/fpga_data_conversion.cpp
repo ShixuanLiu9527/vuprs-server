@@ -22,14 +22,14 @@ bool vuprs::SignalData::contains(const std::string &channel_name) const
 void vuprs::SignalData::TakeChannelData(const std::string &channel_name, std::vector<std::complex<double>> *data)
 {
     auto it = this->CHANNEL_NAME__TO__CHANNEL_INDEX.find(channel_name);
-    PARAM_CHECK(it != this->CHANNEL_NAME__TO__CHANNEL_INDEX.end(), "fpga", " in [SignalData::TakeChannelData] Invalid channel name: " + channel_name);
-    PARAM_CHECK(data != nullptr, "fpga", " in [SignalData::TakeChannelData] Data cannot be NULL.");
+    PARAM_CHECK(it != this->CHANNEL_NAME__TO__CHANNEL_INDEX.end(), "fpga", " Invalid channel name: " + channel_name);
+    PARAM_CHECK(data != nullptr, "fpga", " Data cannot be NULL.");
     data->swap(this->_channel_data[it->second]);
 }
 
 void vuprs::SignalData::_UpdataHashMap()
 {
-    PARAM_CHECK(this->_channel_data.size() == this->_channel_name.size(), "fpga", " in [SignalData::_UpdataHashMap] Unmatch channel & name size.");
+    PARAM_CHECK(this->_channel_data.size() == this->_channel_name.size(), "fpga", " Unmatch channel & name size.");
     int data_channels = this->_channel_data.size();
     this->CHANNEL_NAME__TO__CHANNEL_INDEX.clear();
     for (int i = 0; i < data_channels; i++)
@@ -41,7 +41,7 @@ void vuprs::SignalData::_UpdataHashMap()
 void vuprs::SignalData::ToCSV(const std::string &output_file)
 {
     this->_UpdataHashMap();
-    PARAM_CHECK(!(this->_channel_data.empty() || this->_channel_name.empty()), "fpga", " in [SignalData::ToCSV] No channel data to export.");
+    PARAM_CHECK(!(this->_channel_data.empty() || this->_channel_name.empty()), "fpga", " No channel data to export.");
     std::string dir;
     vuprs::SplitFile(output_file, &dir, nullptr, nullptr);
     if (!vuprs::PathExist(dir))
@@ -49,7 +49,7 @@ void vuprs::SignalData::ToCSV(const std::string &output_file)
         vuprs::MakeDir(dir);
     }
     std::ofstream file(output_file);
-    RUNTIME_CHECK(file.is_open(), "fpga", " in [SignalData::ToCSV] Cannot open output file: " + output_file);
+    RUNTIME_CHECK(file.is_open(), "fpga", " Cannot open output file: " + output_file);
     uint64_t channel_number = this->_channel_data.size();
     /* First line: time, ch1, ch2, ..., chN */
     file << "time,";
@@ -84,7 +84,7 @@ void vuprs::SignalData::ToCSV(const std::string &output_file)
 
 bool vuprs::FPGACircularBuffer2Frames(vuprs::AlignedBufferDMA *buffer, vuprs::SignalData *adc_data, double fs, double v_scale, uint32_t point_pos_cbf)
 {
-    PARAM_CHECK(buffer->is_allocated(), "fpga", " in [vuprs::FPGACircularBuffer2Frames] Buffer is empty.");
+    PARAM_CHECK(buffer->is_allocated(), "fpga", " Buffer is empty.");
 
     const uint16_t *raw_buffer_data = buffer->as<const uint16_t>();
     ssize_t vector_size = static_cast<ssize_t>(buffer->size() / sizeof(uint16_t)), frame_parsed_size = 0;
@@ -103,7 +103,7 @@ bool vuprs::FPGACircularBuffer2Frames(vuprs::AlignedBufferDMA *buffer, vuprs::Si
             uint16_t header_h = raw_buffer_data[header_ptr + 1];
             uint16_t tailer_l = raw_buffer_data[tailer_ptr];
             uint16_t tailer_h = raw_buffer_data[tailer_ptr + 1];
-            RUNTIME_CHECK(IS_FRAME_HEADER(header_l, header_h) && IS_FRAME_TAILER(tailer_l, tailer_h), "fpga", " in [vuprs::FPGACircularBuffer2Frames] Error memory data.");
+            RUNTIME_CHECK(IS_FRAME_HEADER(header_l, header_h) && IS_FRAME_TAILER(tailer_l, tailer_h), "fpga", " Error memory data.");
             /* Receive Data */
             for (int ch = 0; ch < ADC_CHANNEL_NUMBER; ch++)
             {

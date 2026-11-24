@@ -38,7 +38,7 @@ bool vuprs::FPGAController::ConfigFPGAFromJson(const std::string &json_filename)
     std::ifstream f;
     /* open config json file */
     f.open(json_filename);
-    RUNTIME_CHECK(f.is_open(), "fpga", " in [FPGAController::ConfigFPGAFromJson] Cannot open file: " + json_filename);
+    RUNTIME_CHECK(f.is_open(), "fpga", " Cannot open file: " + json_filename);
     nlohmann::json json_data;
     try
     {
@@ -46,7 +46,7 @@ bool vuprs::FPGAController::ConfigFPGAFromJson(const std::string &json_filename)
     }
     catch (const std::exception &e)
     {
-        RUNTIME_CHECK(false, "fpga", " in [FPGAController::ConfigFPGAFromJson] Error occurred when parsing JSON file." + std::string(e.what()));
+        RUNTIME_CHECK(false, "fpga", " Error occurred when parsing JSON file." + std::string(e.what()));
     }
     bool config_status = true;
     try
@@ -70,16 +70,16 @@ bool vuprs::FPGAController::ConfigFPGAFromJson(const std::string &json_filename)
     }
     catch (const std::exception &e)
     {
-        RUNTIME_CHECK(false, "fpga", " in [FPGAController::ConfigFPGAFromJson] Error occurred in parsing: " + std::string(e.what()));
+        RUNTIME_CHECK(false, "fpga", " Error occurred in parsing: " + std::string(e.what()));
     }
-    RUNTIME_CHECK(config_status, "fpga", " in [FPGAController::ConfigFPGAFromJson] Config failed.");
+    RUNTIME_CHECK(config_status, "fpga", " Config failed.");
     this->config_done = true;
     return true;
 }
 
 void vuprs::FPGAController::GetOrCreateInterruptIOManagerIndex(const std::string &device_file, int *index)
 {
-    PARAM_CHECK(index != nullptr, "fpga", " in [FPGAController::GetOrCreateInterruptIOManagerIndex] Index is NULL.");
+    PARAM_CHECK(index != nullptr, "fpga", " Index is NULL.");
     int len;
     {
         std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
@@ -103,7 +103,7 @@ void vuprs::FPGAController::GetOrCreateInterruptIOManagerIndex(const std::string
 
 void vuprs::FPGAController::GetOrCreateNormalIOManagerIndex(const std::string &device_file, int *index, bool is_device)
 {
-    PARAM_CHECK(index != nullptr, "fpga", " in [FPGAController::GetOrCreateNormalIOManagerIndex] Index is NULL.");
+    PARAM_CHECK(index != nullptr, "fpga", " Index is NULL.");
     int len;
     {
         std::unique_lock<std::mutex> lock(this->mut); /* LOCK */

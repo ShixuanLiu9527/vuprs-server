@@ -70,7 +70,7 @@ bool vuprs::SystemLoggerConfig::InitFromJson(const std::string &filename)
     }
     catch (const std::exception &e)
     {
-        RUNTIME_CHECK(false, "system", " in [SystemLoggerConfig::InitFromJson] " + std::string(e.what()));
+        RUNTIME_CHECK(false, "system", " " + std::string(e.what()));
     }
     RUNTIME_CHECK(json_data.contains("hybrid-logger-dir"), "system", "Missing key: hybrid-logger-dir");
     RUNTIME_CHECK(json_data.contains("server-logger-dir"), "system", "Missing key: server-logger-dir");
@@ -92,7 +92,7 @@ bool vuprs::ServerCore::LoadServerConfigFromJson(const std::string &filename)
 {
     std::ifstream f;
     f.open(filename);
-    RUNTIME_CHECK(f.is_open(), "server", " in [ServerCore::LoadServerConfigFromJson] Cannot open file: " + filename);
+    RUNTIME_CHECK(f.is_open(), "server", " Cannot open file: " + filename);
     nlohmann::json json_data;
     try
     {
@@ -107,7 +107,7 @@ bool vuprs::ServerCore::LoadServerConfigFromJson(const std::string &filename)
         vuprs::__JsonStringParseINT<uint16_t>(&port, json_data, "port", true);
     else if (json_data.contains("initialize-port"))
         vuprs::__JsonStringParseINT<uint16_t>(&port, json_data, "initialize-port", true);
-    RUNTIME_CHECK(port > 0, "server", " in [ServerCore::LoadServerConfigFromJson] invalid port.");
+    RUNTIME_CHECK(port > 0, "server", " invalid port.");
     this->server_config_.port = port;
 
     uint32_t max_payload = static_cast<uint32_t>(this->server_config_.max_payload_bytes);
@@ -120,7 +120,7 @@ bool vuprs::ServerCore::LoadServerConfigFromJson(const std::string &filename)
     if (json_data.contains("control-queue-frames"))
         vuprs::__JsonStringParseINT<uint32_t>(&control_queue, json_data, "control-queue-frames", true);
     RUNTIME_CHECK(max_payload > 0 && data_queue > 0 && control_queue > 0,
-                  "server", " in [ServerCore::LoadServerConfigFromJson] invalid queue/payload limits.");
+                  "server", " invalid queue/payload limits.");
     this->server_config_.max_payload_bytes = max_payload;
     this->server_config_.data_queue_frames = data_queue;
     this->server_config_.control_queue_frames = control_queue;

@@ -75,6 +75,10 @@ namespace vuprs
         Eigen::Matrix<Eigen::dcomplex, -1, -1> pre_delay_exp_arg;                              /* Predelay exp matrix */
         double fs;                                                                             /* Current sampling frequency */
         int signal_points;                                                                     /* Current signal points */
+        double work_freq_lower = 0.0;                                                          /* Work band lower boundary (Hz), <= 0 means no lower bound */
+        double work_freq_upper = 0.0;                                                          /* Work band upper boundary (Hz), <= 0 means no upper bound */
+        int work_bin_lo = 0;                                                                   /* First in-band bin (inclusive, includes FIR transition band) */
+        int work_bin_hi = -1;                                                                  /* Last in-band bin (inclusive, includes FIR transition band) */
         std::vector<int> element_predelay_count;                                               /* Predelay count (size = M) */
         std::vector<double> element_predelay_time;                                             /* Predelay time = count * Ts (size = M) */
         std::vector<std::string> element_channel_name;                                         /* element channel name list (size = M) */
@@ -96,6 +100,11 @@ namespace vuprs
         virtual void PrepareCalculationCache(int freq_nums) = 0;
 
         void UpdatePredelayExpMatrix();
+
+        /**
+         * @brief Recompute the in-band bin range from the work band and the current frequency grid.
+         */
+        void UpdateWorkBinRange();
 
     public:
         WidebandBeamformerTemplate();
@@ -173,6 +182,17 @@ namespace vuprs
          * @brief Set covariance matrix fitting parameters.
          */
         void SetCovarianceMatrixFittingParam(double snaps_window_size = 100.0, double adjacent_freq_average_index = 0.8);
+
+        /**
+         * @brief Set the work frequency band.
+         *
+         * @note Bins outside the band (plus the FIR transition band) are skipped by the beam forming
+         * @note calculation because the FIR synthesis bandpass already zeroes them.
+         *
+         * @param lower lower boundary (Hz), <= 0 means no lower bound.
+         * @param upper upper boundary (Hz), <= 0 means no upper bound.
+         */
+        void SetWorkFrequencyRange(double lower, double upper);
 
         /**
          * @brief Reset covariance matrices.

@@ -94,7 +94,7 @@ bool vuprs::HybridBeamformer::InitHybridBeamformer(const std::string &fpga_confi
     }
     catch (const std::exception &e)
     {
-        RUNTIME_CHECK(false, "hybrid_bf", " in [HybridBeamformer::InitHybridBeamformer] Error occurred in initialization.");
+        RUNTIME_CHECK(false, "hybrid_bf", " Error occurred in initialization.");
     }
     this->hybrid_logger = vuprs::LogManager::getLogger("hybrid",
                                                        "log.txt",
@@ -230,7 +230,7 @@ bool vuprs::HybridBeamformer::ResetHardwareBeamformer()
 
 bool vuprs::HybridBeamformer::StartBeamformerWithConfiguration(const vuprs::HybridBeamformerConfig &config)
 {
-    PARAM_CHECK(this->ConfigDone(), "hybrid_bf", " in [HybridBeamformer::StartBeamformerWithConfiguration] Config not complete.");
+    PARAM_CHECK(this->ConfigDone(), "hybrid_bf", " Config not complete.");
     Eigen::Matrix<Eigen::dcomplex, -1, -1> fir_expected_frequency_response; /* Expected frequency response of FIR filter bank */
     std::vector<std::vector<double>> fir_coefficients;                      /* Coefficient of FIR filter bank */
     std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> _dma_descriptors;   /* SG descriptors for AXI DMA */
@@ -308,6 +308,7 @@ bool vuprs::HybridBeamformer::StartBeamformerWithConfiguration(const vuprs::Hybr
                                               &channel_name);
         /* - Set bandpass range */
         this->fir.SetFrequencyRange(config.bf_freq__lower, config.bf_freq__upper);
+        this->bf->SetWorkFrequencyRange(config.bf_freq__lower, config.bf_freq__upper);
         this->bf_freq__lower = config.bf_freq__lower; /* used by scan to filter out-of-band frequency bins */
         this->bf_freq__upper = config.bf_freq__upper;
         /* - Get zero FIR coefficients */
@@ -347,7 +348,7 @@ bool vuprs::HybridBeamformer::StartBeamformerWithConfiguration(const vuprs::Hybr
                                                              fir_len);
     /* - FPGA config step 5 - Start ADC */
     retval &= vuprs::FPGA_API__ADC__StartADC(&this->controller, config.fs);
-    RUNTIME_CHECK(retval, "hybrid_bf", " in [HybridBeamformer::StartBeamformerWithConfiguration] Cannot start beam former with config");
+    RUNTIME_CHECK(retval, "hybrid_bf", " Cannot start beam former with config");
     return retval;
 }
 
@@ -455,15 +456,13 @@ void vuprs::HybridBeamformer::THREAD__ScanPowerCalculation()
         {
             std::unique_lock<std::mutex> lock(this->mut_scan_wait); /* LOCK */
             this->scan_cv.wait(lock, [this, last_generation, last_options_generation, options_loaded]()
-                               {
-                                   return !this->system_run ||
-                                          (this->scan_enable &&
-                                           (!this->consumer_gate_ || this->consumer_gate_()) &&
-                                           (!options_loaded ||
-                                            this->scan_options_generation.load() != last_options_generation ||
-                                            !this->scan_options_initialized ||
-                                            this->scan_generation.load() != last_generation));
-                               });
+                               { return !this->system_run ||
+                                        (this->scan_enable &&
+                                         (!this->consumer_gate_ || this->consumer_gate_()) &&
+                                         (!options_loaded ||
+                                          this->scan_options_generation.load() != last_options_generation ||
+                                          !this->scan_options_initialized ||
+                                          this->scan_generation.load() != last_generation)); });
         }
         if (!this->system_run)
             break; /* Jump out */
@@ -755,7 +754,7 @@ void vuprs::HybridBeamformer::THREAD__ReadCircularBuffer()
                 }
                 else
                 {
-                    RUNTIME_CHECK(false, "hybrid_bf", " in [HybridBeamformer::THREAD__ReadCircularBuffer] Cannot read circular buffer.");
+                    RUNTIME_CHECK(false, "hybrid_bf", " Cannot read circular buffer.");
                 }
             }
             catch (const std::exception &e)
@@ -818,8 +817,10 @@ void vuprs::HybridBeamformer::THREAD__AlgorithmCalculation()
             this->bf->InputSignal(std::move(signal));
             /* Step 2: Update covariance matrix */
             this->bf->UpdateCovarianceMatrix();
-            /* Publish a covariance snapshot for the scan thread, so it never blocks on mut_alg. */
-            if (this->scan_enable)
+            /* Publish a covariance snapshot for the scan thread, so it never blocks on mut_alg.
+             * Skip it when nobody is consuming scan results (e.g. client disconnected). */
+            if (this->scan_enable &&
+                (!this->consumer_gate_ || this->consumer_gate_()))
             {
                 auto snapshot = std::make_shared<vuprs::ScanCovarianceSnapshot>();
                 std::lock_guard<std::mutex> snapshot_lock(this->mut_scan_snapshot); /* LOCK */
@@ -837,7 +838,7 @@ void vuprs::HybridBeamformer::THREAD__AlgorithmCalculation()
                 this->scan_cv.notify_all();
             }
             /* - Check calculate enabled */
-            RUNTIME_CHECK(this->bf->CalculateEnable(), "hybrid_bf", " in [HybridBeamformer::THREAD__AlgorithmCalculation] Beam forming algorithm cannot calculate.");
+            RUNTIME_CHECK(this->bf->CalculateEnable(), "hybrid_bf", " Beam forming algorithm cannot calculate.");
             /* Step 3: Calculate beamforming */
             this->bf->CalculateBeamforming();
             /* Step 4: Get FIR filter bank expected frequency response */

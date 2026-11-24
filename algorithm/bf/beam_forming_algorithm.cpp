@@ -1,3 +1,4 @@
+#include <cmath>
 #include "algorithm/bf/beam_forming_algorithm.h"
 #include "logger/check.h"
 
@@ -72,10 +73,6 @@ bool vuprs::SecantIteration1D(const vuprs::IterationConfig &config, double *resu
     }
     *result = 0.5 * (x0 + x1);
     return false;
-}
-
-bool vuprs::RobustSecantIteration1D(const vuprs::IterationConfig &config, double *result)
-{
 }
 
 bool vuprs::NewtonIteration1D(const vuprs::IterationConfig &config, double *result)
@@ -186,6 +183,18 @@ bool vuprs::BisectionIteration1D(const vuprs::IterationConfig &config, double *r
     double left = config.lower_region, right = config.upper_region, mid = 0.5 * (left + right);
     double fl = config.func(left), fr = config.func(right), fm = 0.0;
     int max_iteration = std::max(config.max_iteration, 10);
+    /* The function may be singular at an endpoint (e.g. lambda = -1 / max_eig in DCRCB).
+     * Nudge the endpoint inward so the bracketing test sees a finite value. */
+    if (!std::isfinite(fl))
+    {
+        left = std::nextafter(left, right);
+        fl = config.func(left);
+    }
+    if (!std::isfinite(fr))
+    {
+        right = std::nextafter(right, left);
+        fr = config.func(right);
+    }
     if (fl * fr > 0.0)
     {
         if (std::abs(fl) < config.jumpout)
@@ -198,7 +207,7 @@ bool vuprs::BisectionIteration1D(const vuprs::IterationConfig &config, double *r
             *result = right;
             return true;
         }
-        RUNTIME_CHECK(false, "bf", " in [vuprs::BisectionIteration1D] No zeros within the specified range.");
+        RUNTIME_CHECK(false, "bf", " No zeros within the specified range.");
     }
     *result = mid;
     for (int i = 0; i < max_iteration; i++)

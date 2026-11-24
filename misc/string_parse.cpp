@@ -134,14 +134,14 @@ std::string vuprs::Number2HexString(const uint64_t &num)
 
 void vuprs::__JsonParseString(std::string *target, const nlohmann::json &json, const std::string &item, bool required)
 {
-    PARAM_CHECK(target != nullptr, "misc", " in [__JsonParseString] Target cannot be NULL.");
+    PARAM_CHECK(target != nullptr, "misc", " Target cannot be NULL.");
     if (json.contains(item))
     {
         *target = json[item].get<std::string>();
     }
     else if (required)
     {
-        PARAM_CHECK(false, "misc", " in [__JsonParseString] Item: " + item + " not found.");
+        PARAM_CHECK(false, "misc", " Item: " + item + " not found.");
     }
 }
 

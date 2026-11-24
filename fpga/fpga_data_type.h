@@ -104,7 +104,7 @@ namespace vuprs
     void inline Q31__DOUBLE_TO_UINT32(const std::vector<double> &input_scaled, std::vector<uint32_t> *output)
     {
         uint64_t coefficient_size = input_scaled.size();
-        PARAM_CHECK(coefficient_size > 0, "fpga", " in " + std::string(__func__) + " Input FIR coefficient is empty.");
+        PARAM_CHECK(coefficient_size > 0, "fpga", " Input FIR coefficient is empty.");
         output->resize(coefficient_size);
         for (uint64_t i = 0; i < coefficient_size; i++)
         {
@@ -132,7 +132,7 @@ namespace vuprs
                           std::is_same_v<T_INPUT, std::vector<float>>,
                       "invalid type.");
         uint64_t data_number = input.size();
-        PARAM_CHECK(data_number > 0, "fpga", " in [Q31__DOUBLE_TO_UINT32] Input vector is empty.");
+        PARAM_CHECK(data_number > 0, "fpga", " Input vector is empty.");
         PARAM_CHECK(max_abs >= 0.0, "fpga", "max absolute value must >= 0.0");
         output->resize(data_number);
         if (std::abs(max_abs - 0.0) < FPGA_TYPE_EPS)
@@ -189,7 +189,7 @@ namespace vuprs
     void inline Q16__UINT32_TO_DOUBLE(const std::vector<uint32_t> &input, std::vector<double> *output)
     {
         uint64_t _size = input.size();
-        PARAM_CHECK(_size > 0, "fpga", " in [Q16__UINT32_TO_DOUBLE] Input FIR result is empty.");
+        PARAM_CHECK(_size > 0, "fpga", " Input FIR result is empty.");
         output->resize(_size);
         for (uint64_t i = 0; i < _size; i++)
         {

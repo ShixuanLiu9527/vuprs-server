@@ -58,7 +58,7 @@ std::string vuprs::AddPath(const std::string &base_path, const std::string &adde
 
 bool vuprs::MakeDir(const std::string &dir)
 {
-    PARAM_CHECK(!dir.empty(), "misc", " in [vuprs::MakeDir] dir empty.");
+    PARAM_CHECK(!dir.empty(), "misc", " dir empty.");
     std::string path;
     std::stringstream ss(dir);
     std::string segment;
@@ -74,7 +74,7 @@ bool vuprs::MakeDir(const std::string &dir)
         {
             RUNTIME_CHECK(::mkdir(path.c_str(), 0777) == 0 || errno == EEXIST,
                           "misc",
-                          " in [vuprs::MakeDir] failed to mkdir: " + path);
+                          " failed to mkdir: " + path);
         }
     }
     return true;

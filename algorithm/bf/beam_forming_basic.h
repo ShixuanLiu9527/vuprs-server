@@ -84,6 +84,7 @@ namespace vuprs
         double fs = 0.0;             /* sampling frequency for this signal, unit: Hz */
         double sampling_time = 0.0;  /* sampling time for this signal, unit: sec */
         int signal_point_counts = 0; /* sampling points for this signal */
+        double wave_velocity;        /* wave velocity of the last UpdateTimeDelay(), unit: m/s */
 
     public:
         BeamFormingArray();

@@ -83,7 +83,7 @@ namespace vuprs
         bool RegisterIO(uint32_t reg_addr, uint32_t *io_value, bool is_read)
         {
             /* Security Check */
-            PARAM_CHECK(this->is_io_manager_bind, "fpga", " in [FPGADeviceTemplate::RegisterIO] FPGA file manager is NULL.");
+            PARAM_CHECK(this->is_io_manager_bind, "fpga", " FPGA file manager is NULL.");
             std::shared_ptr<vuprs::FPGA_IOManagerForDevice> manager;
             {
                 std::unique_lock<std::mutex> lock(this->mut_dev); /* LOCK */
@@ -98,9 +98,9 @@ namespace vuprs
         {
             /* Security Check */
             int reg_num = mul_reg_selection.size();
-            PARAM_CHECK(this->is_io_manager_bind, "fpga", " in [FPGADeviceTemplate::RegisterIO] FPGA file manager is NULL.");
-            PARAM_CHECK(reg_num > 0, "fpga", " in [FPGADeviceTemplate::RegisterIO] No registers read or written.");
-            PARAM_CHECK(is_read || io_value->size() == reg_num, "fpga", " in [FPGADeviceTemplate::RegisterIO] mul_read_value.size() != register count to read.");
+            PARAM_CHECK(this->is_io_manager_bind, "fpga", " FPGA file manager is NULL.");
+            PARAM_CHECK(reg_num > 0, "fpga", " No registers read or written.");
+            PARAM_CHECK(is_read || io_value->size() == reg_num, "fpga", " mul_read_value.size() != register count to read.");
             std::shared_ptr<vuprs::FPGA_IOManagerForDevice> manager;
             {
                 std::unique_lock<std::mutex> lock(this->mut_dev); /* LOCK */
@@ -120,7 +120,7 @@ namespace vuprs
 
         bool EventIO(uint32_t *read_value)
         {
-            PARAM_CHECK(this->is_io_manager_bind_interrupt, "fpga", " in [FPGADeviceTemplate::EventIO] FPGA event file manager is NULL.");
+            PARAM_CHECK(this->is_io_manager_bind_interrupt, "fpga", " FPGA event file manager is NULL.");
             std::shared_ptr<vuprs::FPGA_IOManagerForInterrput> manager;
             *read_value = 0;
             {
@@ -162,7 +162,7 @@ namespace vuprs
         bool LoadMainInfoFromJsonObj(const nlohmann::json &obj)
         {
             /* Security Check */
-            PARAM_CHECK(obj.contains("register-offset"), "fpga", " in [FPGADeviceTemplate::LoadMainInfoFromJsonObj] register-offset not found.");
+            PARAM_CHECK(obj.contains("register-offset"), "fpga", " register-offset not found.");
             /* Operation */
             {
                 std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
@@ -312,7 +312,7 @@ namespace vuprs
         uint32_t GetRegisterAbsoluteAddress(REG_SEL_ENUM reg_selection)
         {
             /* Security Check */
-            PARAM_CHECK(this->config_done, "fpga", " in [FPGADeviceTemplate::GetRegisterAbsoluteAddress] Config not complete.");
+            PARAM_CHECK(this->config_done, "fpga", " Config not complete.");
             /* Operation */
             uint32_t reg_offset = 0;
             bool reg_found = false;
@@ -330,7 +330,7 @@ namespace vuprs
                     }
                 }
             }
-            PARAM_CHECK(reg_found, "fpga", " in [FPGADeviceTemplate::GetRegisterAbsoluteAddress] Invalid register selection.");
+            PARAM_CHECK(reg_found, "fpga", " Invalid register selection.");
             return reg_offset + this->bar_offset;
         }
 
@@ -360,7 +360,7 @@ namespace vuprs
          */
         bool ReadSingleRegister(uint32_t offset, uint32_t *read_value)
         {
-            PARAM_CHECK(offset % sizeof(uint32_t) == 0, "fpga", " in [FPGADeviceTemplate::ReadSingleRegister] Offset must aligned to 4 bytes.");
+            PARAM_CHECK(offset % sizeof(uint32_t) == 0, "fpga", " Offset must aligned to 4 bytes.");
             uint32_t reg_addr = offset + this->bar_offset;
             return this->RegisterIO(reg_addr, read_value, true);
         }
@@ -389,7 +389,7 @@ namespace vuprs
          */
         bool WriteSingleRegister(uint32_t offset, uint32_t write_value)
         {
-            PARAM_CHECK(offset % sizeof(uint32_t) == 0, "fpga", " in [FPGADeviceTemplate::WriteSingleRegister] Offset must aligned to 4 bytes.");
+            PARAM_CHECK(offset % sizeof(uint32_t) == 0, "fpga", " Offset must aligned to 4 bytes.");
             uint32_t reg_addr = offset + this->bar_offset;
             return this->RegisterIO(reg_addr, &write_value, false);
         }
@@ -420,7 +420,7 @@ namespace vuprs
          */
         bool ReadSingleRegisterBIT(uint32_t reg_addr, uint32_t bit, uint32_t *value)
         {
-            PARAM_CHECK(bit <= 31, "fpga", " in [FPGADeviceTemplate::ReadSingleRegisterBIT] Invalid Bit position (valid <= 31).");
+            PARAM_CHECK(bit <= 31, "fpga", " Invalid Bit position (valid <= 31).");
             bool operate_status = true;
             uint32_t r_val = 0;
             operate_status &= this->RegisterIO(reg_addr, &r_val, true); /* read */
@@ -439,7 +439,7 @@ namespace vuprs
          */
         bool WriteSingleRegisterBIT(REG_SEL_ENUM reg_selection, uint32_t bit, bool isSet)
         {
-            PARAM_CHECK(bit <= 31, "fpga", " in [FPGADeviceTemplate::WriteSingleRegisterBIT] Invalid Bit position (valid <= 31).");
+            PARAM_CHECK(bit <= 31, "fpga", " Invalid Bit position (valid <= 31).");
             std::lock_guard<std::mutex> lock(this->mut_reg);
             bool operate_status = true;
             uint32_t r_val = 0, w_val;
@@ -469,7 +469,7 @@ namespace vuprs
          */
         bool WaitForRegisterBIT(REG_SEL_ENUM reg_selection, uint32_t bit, uint32_t wait_for_value, uint32_t timeout_us = 1000)
         {
-            PARAM_CHECK(bit <= 31, "fpga", " in [FPGADeviceTemplate::WaitForRegisterBIT] Invalid Bit position (valid <= 31).");
+            PARAM_CHECK(bit <= 31, "fpga", " Invalid Bit position (valid <= 31).");
             uint32_t waitTime = 0;
             uint32_t r_val;
             uint32_t reg_offset = this->GetRegisterAbsoluteAddress(reg_selection);
@@ -508,7 +508,7 @@ namespace vuprs
          */
         bool ReadSingleRegisterBITRegion(REG_SEL_ENUM reg_selection, uint32_t lower, uint32_t upper, uint32_t *value)
         {
-            PARAM_CHECK(lower <= 31 && upper <= 31, "fpga", " in [FPGADeviceTemplate::ReadSingleRegisterBITRegion] Invalid Bit position (valid <= 31).");
+            PARAM_CHECK(lower <= 31 && upper <= 31, "fpga", " Invalid Bit position (valid <= 31).");
             if (lower == upper)
             {
                 return this->ReadSingleRegisterBIT(reg_selection, lower, value);
@@ -540,7 +540,7 @@ namespace vuprs
          */
         bool WriteSingleRegisterBITRegion(REG_SEL_ENUM reg_selection, uint32_t lower, uint32_t upper, uint32_t value)
         {
-            PARAM_CHECK(lower <= 31 && upper <= 31, "fpga", " in [FPGADeviceTemplate::WriteSingleRegisterBITRegion] Invalid Bit position (valid <= 31).");
+            PARAM_CHECK(lower <= 31 && upper <= 31, "fpga", " Invalid Bit position (valid <= 31).");
             if (lower == upper)
             {
                 return this->WriteSingleRegisterBIT(reg_selection, lower, (bool)(value & 0x01));
@@ -644,7 +644,7 @@ namespace vuprs
          */
         bool SetInterruptTimeout(uint32_t timeout_ms)
         {
-            PARAM_CHECK(this->is_io_manager_bind_interrupt, "fpga", " in [FPGADeviceTemplate::SetInterruptTimeout] FPGA event file manager is NULL.");
+            PARAM_CHECK(this->is_io_manager_bind_interrupt, "fpga", " FPGA event file manager is NULL.");
             std::shared_ptr<vuprs::FPGA_IOManagerForInterrput> manager;
             {
                 std::unique_lock<std::mutex> lock(this->mut_event); /* LOCK */
@@ -688,20 +688,20 @@ namespace vuprs
         bool BufferIO(uint32_t offset, vuprs::AlignedBufferDMA *buffer, uint64_t transfer_byte_size, bool is_read)
         {
             /* Security Check */
-            PARAM_CHECK(this->is_io_manager_bind, "fpga", " in [FPGAMemoryTemplate::BufferIO] FPGA file manager is NULL.");
-            PARAM_CHECK(transfer_byte_size <= __LINUX_DMA_MAX_TRANSFER_BYTES__, "fpga", " in [FPGAMemoryTemplate::BufferIO] Too big transfer size.");
-            PARAM_CHECK((transfer_byte_size + offset) <= static_cast<uint32_t>(this->max_capacity_kB * __KILOBYTES__ - 1), "fpga", " in [FPGAMemoryTemplate::BufferIO] Invalid transfer size (valid: <= " + std::to_string(this->max_capacity_kB * __KILOBYTES__ - offset) + ")");
+            PARAM_CHECK(this->is_io_manager_bind, "fpga", " FPGA file manager is NULL.");
+            PARAM_CHECK(transfer_byte_size <= __LINUX_DMA_MAX_TRANSFER_BYTES__, "fpga", " Too big transfer size.");
+            PARAM_CHECK((transfer_byte_size + offset) <= static_cast<uint32_t>(this->max_capacity_kB * __KILOBYTES__ - 1), "fpga", " Invalid transfer size (valid: <= " + std::to_string(this->max_capacity_kB * __KILOBYTES__ - offset) + ")");
             if (transfer_byte_size <= 0)
             {
                 return true;
             }
-            PARAM_CHECK(buffer != nullptr, "fpga", " in [FPGAMemoryTemplate::BufferIO] *Buffer is nullptr.");
+            PARAM_CHECK(buffer != nullptr, "fpga", " *Buffer is nullptr.");
             /* Operation */
             uint32_t target_offset = offset + this->fpga_address;
             if (is_read)
             {
                 RUNTIME_CHECK(buffer->ensure_capacity(transfer_byte_size),
-                              "fpga", " in [FPGAMemoryTemplate::BufferIO] Cannot allocate buffer.");
+                              "fpga", " Cannot allocate buffer.");
                 std::shared_ptr<vuprs::FPGA_IOManagerForMemory> c2h_manager;
                 {
                     std::unique_lock<std::mutex> lock(this->mut_c2h); /* LOCK */
@@ -723,9 +723,9 @@ namespace vuprs
         bool WordIO(uint32_t offset, uint32_t *io_value, bool is_read)
         {
             /* Security Check */
-            PARAM_CHECK(this->is_io_manager_bind, "fpga", " in [FPGAMemoryTemplate::WordIO] FPGA file manager is NULL.");
-            PARAM_CHECK(offset <= static_cast<uint32_t>(this->max_capacity_kB * __KILOBYTES__ - 1), "fpga", " in [FPGAMemoryTemplate::WordIO] Invalid offset (valid: <= " + std::to_string(this->max_capacity_kB * __KILOBYTES__ - 1) + ")");
-            PARAM_CHECK(io_value != nullptr, "fpga", " in [FPGAMemoryTemplate::WordIO] *read_value is nullptr.");
+            PARAM_CHECK(this->is_io_manager_bind, "fpga", " FPGA file manager is NULL.");
+            PARAM_CHECK(offset <= static_cast<uint32_t>(this->max_capacity_kB * __KILOBYTES__ - 1), "fpga", " Invalid offset (valid: <= " + std::to_string(this->max_capacity_kB * __KILOBYTES__ - 1) + ")");
+            PARAM_CHECK(io_value != nullptr, "fpga", " *read_value is nullptr.");
             /* Operation */
             uint32_t target_offset = offset + this->fpga_address;
             if (is_read)

@@ -85,9 +85,7 @@ void vuprs::FFTWManagerComplex::SetDFTDirection(bool forward)
     if (this->fft_forward != forward)
     {
         std::unique_lock<std::mutex> lock(this->fftw_mtx); /* LOCK */
-        PARAM_CHECK(this->fft_input != nullptr && this->fft_output != nullptr,
-                    "signal_processing",
-                    " in [FFTWManagerComplex::SetDFTDirection] fftw_input or fftw_output is NULL.");
+        PARAM_CHECK(this->fft_input != nullptr && this->fft_output != nullptr, "signal_processing", " fftw_input or fftw_output is NULL.");
         /* destroy */
         if (this->fft_plan != nullptr)
         {
@@ -100,9 +98,7 @@ void vuprs::FFTWManagerComplex::SetDFTDirection(bool forward)
                                           this->fft_output,
                                           forward ? FFTW_FORWARD : FFTW_BACKWARD,
                                           FFTW_ESTIMATE);
-        RUNTIME_CHECK(this->fft_plan != nullptr,
-                      "signal_processing",
-                      " in [FFTWManagerComplex::SetDFTDirection] fft_plan is NULL.");
+        RUNTIME_CHECK(this->fft_plan != nullptr, "signal_processing", " fft_plan is NULL.");
         this->fft_forward = forward;
     }
 }
@@ -133,14 +129,14 @@ void vuprs::FFTWManagerComplex::SetDFTPoints(uint64_t N)
         /* malloc */
         this->fft_input = reinterpret_cast<fftw_complex *>(fftw_malloc(sizeof(fftw_complex) * N));
         this->fft_output = reinterpret_cast<fftw_complex *>(fftw_malloc(sizeof(fftw_complex) * N));
-        RUNTIME_CHECK(this->fft_input != nullptr && this->fft_output != nullptr, "signal_processing", " in [FFTWManagerComplex::SetDFTPoints] Failed to allocate FFTW memory.");
+        RUNTIME_CHECK(this->fft_input != nullptr && this->fft_output != nullptr, "signal_processing", " Failed to allocate FFTW memory.");
         /* plan */
         this->fft_plan = fftw_plan_dft_1d(N,
                                           this->fft_input,
                                           this->fft_output,
                                           this->fft_forward ? FFTW_FORWARD : FFTW_BACKWARD,
                                           FFTW_ESTIMATE);
-        RUNTIME_CHECK(this->fft_plan != nullptr, "signal_processing", " in [FFTWManagerComplex::SetDFTPoints] Failed to allocate FFTW plan.");
+        RUNTIME_CHECK(this->fft_plan != nullptr, "signal_processing", " Failed to allocate FFTW plan.");
         this->fft_points = N;
     }
 }
@@ -153,7 +149,7 @@ void vuprs::FFTWManagerComplex::SetParameters(uint64_t points, bool forward)
 
 void vuprs::FFTWManagerComplex::DoDFT(const void *input, void *output)
 {
-    PARAM_CHECK(this->fft_plan != nullptr && this->fft_input != nullptr && this->fft_output != nullptr, "signal_processing", " in [FFTWManagerComplex::DoDFT] fft_plan or fft_input or fft_output is NULL.");
+    PARAM_CHECK(this->fft_plan != nullptr && this->fft_input != nullptr && this->fft_output != nullptr, "signal_processing", " fft_plan or fft_input or fft_output is NULL.");
     std::memcpy(this->fft_input,
                 input,
                 this->fft_points * sizeof(std::complex<double>));
@@ -168,7 +164,7 @@ void vuprs::FFT(const Eigen::Matrix<Eigen::dcomplex, -1, 1> &input_data,
                 bool inverse)
 {
     uint64_t data_size = input_data.rows();
-    PARAM_CHECK(data_size > 0, "signal_processing", " in [vuprs::FFT] The input data is empty.");
+    PARAM_CHECK(data_size > 0, "signal_processing", " The input data is empty.");
     fftw_complex *input, *output;
     fftw_plan plan;
     input = reinterpret_cast<fftw_complex *>(fftw_malloc(sizeof(fftw_complex) * data_size));
@@ -179,7 +175,7 @@ void vuprs::FFT(const Eigen::Matrix<Eigen::dcomplex, -1, 1> &input_data,
         fftw_free(output);
         RUNTIME_CHECK(false,
                       "signal_processing",
-                      " in [vuprs::FFT] Failed to allocate FFTW memory.");
+                      " Failed to allocate FFTW memory.");
     }
     plan = fftw_plan_dft_1d(data_size,
                             input,
@@ -190,7 +186,7 @@ void vuprs::FFT(const Eigen::Matrix<Eigen::dcomplex, -1, 1> &input_data,
     {
         fftw_free(input);
         fftw_free(output);
-        RUNTIME_CHECK(false, "signal_processing", " in [vuprs::FFT] Failed to allocate FFTW plan.");
+        RUNTIME_CHECK(false, "signal_processing", " Failed to allocate FFTW plan.");
     }
     try
     {
@@ -214,7 +210,7 @@ void vuprs::FFT(const Eigen::Matrix<Eigen::dcomplex, -1, 1> &input_data,
         fftw_destroy_plan(plan);
         fftw_free(input);
         fftw_free(output);
-        RUNTIME_CHECK(false, "signal_processing", " in [vuprs::FFT] Error occurred in FFT. (" + std::string(e.what()) + ")");
+        RUNTIME_CHECK(false, "signal_processing", " Error occurred in FFT. (" + std::string(e.what()) + ")");
     }
     fftw_destroy_plan(plan);
     fftw_free(input);
@@ -226,7 +222,7 @@ void vuprs::FFT(const std::vector<std::complex<double>> &input_data,
                 bool inverse)
 {
     uint64_t data_size = input_data.size();
-    PARAM_CHECK(data_size > 0, "signal_processing", " in [vuprs::FFT] The input data is empty.");
+    PARAM_CHECK(data_size > 0, "signal_processing", " The input data is empty.");
     fftw_complex *input, *output;
     fftw_plan plan;
     input = reinterpret_cast<fftw_complex *>(fftw_malloc(sizeof(fftw_complex) * data_size));
@@ -235,7 +231,7 @@ void vuprs::FFT(const std::vector<std::complex<double>> &input_data,
     {
         fftw_free(input);
         fftw_free(output);
-        RUNTIME_CHECK(false, "signal_processing", " in [vuprs::FFT] Failed to allocate FFTW memory.");
+        RUNTIME_CHECK(false, "signal_processing", " Failed to allocate FFTW memory.");
     }
     plan = fftw_plan_dft_1d(data_size,
                             input,
@@ -246,7 +242,7 @@ void vuprs::FFT(const std::vector<std::complex<double>> &input_data,
     {
         fftw_free(input);
         fftw_free(output);
-        RUNTIME_CHECK(false, "signal_processing", " in [vuprs::FFT] Failed to allocate FFTW plan.");
+        RUNTIME_CHECK(false, "signal_processing", " Failed to allocate FFTW plan.");
     }
     try
     {
@@ -273,7 +269,7 @@ void vuprs::FFT(const std::vector<std::complex<double>> &input_data,
         fftw_destroy_plan(plan);
         fftw_free(input);
         fftw_free(output);
-        RUNTIME_CHECK(false, "signal_processing", " in [vuprs::FFT] Error occurred in FFT. (" + std::string(e.what()) + ")");
+        RUNTIME_CHECK(false, "signal_processing", " Error occurred in FFT. (" + std::string(e.what()) + ")");
     }
     fftw_destroy_plan(plan);
     fftw_free(input);
@@ -288,7 +284,7 @@ void vuprs::CutTheFirstHalf(std::vector<std::complex<double>> *input_data)
 
 void vuprs::CutTheFirstHalf(Eigen::Matrix<Eigen::dcomplex, -1, 1> *input_data)
 {
-    PARAM_CHECK(input_data != nullptr, "signal_processing", " in [vuprs::CutTheFirstHalf] Input data is null.");
+    PARAM_CHECK(input_data != nullptr, "signal_processing", " Input data is null.");
     int size = input_data->rows();
     if (size <= 0)
         return;
@@ -417,7 +413,7 @@ Eigen::Matrix<double, -1, 1> vuprs::GetWindow(vuprs::WindowType type, int signal
     }
     default:
     {
-        PARAM_CHECK(false, "signal_processing", " in [vuprs::GetWindow] Invalid widnow type.");
+        PARAM_CHECK(false, "signal_processing", " Invalid widnow type.");
     }
     }
     return w;
