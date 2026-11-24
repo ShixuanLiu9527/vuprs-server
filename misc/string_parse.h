@@ -34,7 +34,7 @@ namespace vuprs
     template <typename T>
     void __JsonStringParseINT(T *target, const nlohmann::json &json, const std::string &item, bool required = true)
     {
-        PARAM_CHECK(target != nullptr, "system_tools", " in [__JsonStringParseINT] Target cannot be NULL.");
+        PARAM_CHECK(target != nullptr, "misc", " in [__JsonStringParseINT] Target cannot be NULL.");
         bool status = false;
         uint64_t value;
         if (json.contains(item))
@@ -43,18 +43,18 @@ namespace vuprs
             if (status)
                 *target = static_cast<T>(value);
             else if (required)
-                RUNTIME_CHECK(false, "system_tools", " in [__JsonStringParseINT] Cannot parse: " + item + " from json.");
+                RUNTIME_CHECK(false, "misc", " in [__JsonStringParseINT] Cannot parse: " + item + " from json.");
         }
         else if (required)
         {
-            PARAM_CHECK(false, "system_tools", " in [__JsonStringParseINT] Item: " + item + " not found.");
+            PARAM_CHECK(false, "misc", " in [__JsonStringParseINT] Item: " + item + " not found.");
         }
     }
 
     template <typename T>
     void __JsonStringParseFLOAT(T *target, const nlohmann::json &json, const std::string &item, bool required = true)
     {
-        PARAM_CHECK(target != nullptr, "system_tools", " in [__JsonStringParseFLOAT] Target cannot be NULL.");
+        PARAM_CHECK(target != nullptr, "misc", " in [__JsonStringParseFLOAT] Target cannot be NULL.");
         bool status = false;
         double value;
         if (json.contains(item))
@@ -63,11 +63,11 @@ namespace vuprs
             if (status)
                 *target = static_cast<T>(value);
             else if (required)
-                RUNTIME_CHECK(false, "system_tools", " in [__JsonStringParseFLOAT] Cannot parse: " + item + " from json.");
+                RUNTIME_CHECK(false, "misc", " in [__JsonStringParseFLOAT] Cannot parse: " + item + " from json.");
         }
         else if (required)
         {
-            PARAM_CHECK(false, "system_tools", " in [__JsonStringParseFLOAT] Item: " + item + " not found.");
+            PARAM_CHECK(false, "misc", " in [__JsonStringParseFLOAT] Item: " + item + " not found.");
         }
     }
 

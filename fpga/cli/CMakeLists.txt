@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(fpga_tool)
+project(fpga_cli)
 
 # Set C++ standard
 set(CMAKE_C_STANDARD 99)
@@ -9,7 +9,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Threads REQUIRED)
 
-get_filename_component(PROJECT_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/.. ABSOLUTE)
+get_filename_component(PROJECT_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../.. ABSOLUTE)
 
 if(CMAKE_CROSSCOMPILING)
     add_compile_options(-O3 -march=armv8-a)
@@ -20,21 +20,20 @@ endif()
 include_directories(
     ${PROJECT_ROOT}
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${PROJECT_ROOT}/3rdparty/
     ${PROJECT_ROOT}/3rdparty/eigen
     ${PROJECT_ROOT}/fpga
-    ${PROJECT_ROOT}/system_tools
+    ${PROJECT_ROOT}/misc
 )
 
-file(GLOB_RECURSE FPGA_TOOL_SRC "${CMAKE_CURRENT_SOURCE_DIR}/source/*.cpp")
+# Exclude this CLI's own sources (globbed in via fpga/*.cpp).
 file(GLOB_RECURSE FPGA_SRC "${PROJECT_ROOT}/fpga/*.cpp")
-file(GLOB_RECURSE SYS_TOOL_SRC "${PROJECT_ROOT}/system_tools/*.cpp")
+list(FILTER FPGA_SRC EXCLUDE REGEX "/cli/")
+file(GLOB_RECURSE MISC_SRC "${PROJECT_ROOT}/misc/*.cpp")
 
-message(STATUS "FPGA_TOOL_SRC: ${FPGA_TOOL_SRC}")
 message(STATUS "FPGA_SRC: ${FPGA_SRC}")
-message(STATUS "SYS_TOOL_SRC: ${SYS_TOOL_SRC}")
+message(STATUS "MISC_SRC: ${MISC_SRC}")
 
-add_executable(tool main.cpp ${FPGA_TOOL_SRC} ${FPGA_SRC} ${SYS_TOOL_SRC})
+add_executable(tool main.cpp fpga_tool.cpp ${FPGA_SRC} ${MISC_SRC})
 
 target_link_libraries(tool PRIVATE m Threads::Threads)

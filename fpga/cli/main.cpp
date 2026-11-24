@@ -1,4 +1,4 @@
-#include "fpga_tool/include/fpga_tool.h"
+#include "fpga/cli/fpga_tool.h"
 
 int main(int argc, char *argv[])
 {

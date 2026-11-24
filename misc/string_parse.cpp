@@ -1,4 +1,4 @@
-#include "system_tools/string_parse.h"
+#include "misc/string_parse.h"
 #include "logger/check.h"
 
 uint64_t vuprs::ParseHexFromString(const std::string &data_string, bool *status)
@@ -134,14 +134,14 @@ std::string vuprs::Number2HexString(const uint64_t &num)
 
 void vuprs::__JsonParseString(std::string *target, const nlohmann::json &json, const std::string &item, bool required)
 {
-    PARAM_CHECK(target != nullptr, "system_tools", " in [__JsonParseString] Target cannot be NULL.");
+    PARAM_CHECK(target != nullptr, "misc", " in [__JsonParseString] Target cannot be NULL.");
     if (json.contains(item))
     {
         *target = json[item].get<std::string>();
     }
     else if (required)
     {
-        PARAM_CHECK(false, "system_tools", " in [__JsonParseString] Item: " + item + " not found.");
+        PARAM_CHECK(false, "misc", " in [__JsonParseString] Item: " + item + " not found.");
     }
 }
 

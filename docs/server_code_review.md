@@ -179,7 +179,7 @@ this->scan_cv.wait(lock, [this]()
 - `config.h:11` — `#define ENABLE_INFERENCE true`
 - `server/linux_server.cpp:78-109` — `InitSystemConfigFiles()`
 - `hybrid/hybrid_bf.cpp:79-87` — `InitInference()`
-- `fault_detect/fault_detector.cpp:9-74` — `InitDetector()`
+- `algorithm/fault_detect/fault_detector.cpp:9-74` — `InitDetector()`
 
 **现象**
 
@@ -567,7 +567,7 @@ server.Stop();
 | `fpga/fpga_device.cpp:30-38` | `s2mm_transfer_register_length` 解析后未使用 | 用于校验 buffer size 是否超出 26-bit 长度 |
 | `server/linux_server.cpp:116-172` | 端口范围未校验；`initialize_port > maximum_port` 时直接无服务 | 启动时校验并给出错误 |
 | `main.cpp:8-21` | 命令行必须恰好 15 个参数，无 `--help`/usage | 增加 usage 和清晰错误信息 |
-| `system_tools/aligned_buffer.cpp:168-206` | `from_file()` 在短读/seek 失败时未 `release()`，存在泄漏到析构前 | 失败路径释放资源 |
+| `misc/aligned_buffer.cpp:168-206` | `from_file()` 在短读/seek 失败时未 `release()`，存在泄漏到析构前 | 失败路径释放资源 |
 | `server/socket_io_manager.cpp:18-52` | 发送失败时未区分 `EPIPE/ECONNRESET`，也未主动关闭会话 | 返回错误类型，通知会话层关闭 |
 | `CMakeLists.txt` | 没有 `-Wall -Wextra`、sanitizer、单元测试目标 | 增加编译告警、ASan/UBSan 和协议解析测试 |
 | `server/linux_server.cpp:78-109` | 推理初始化是全局启动必需条件 | 与 P0-5 一并改为可选 |

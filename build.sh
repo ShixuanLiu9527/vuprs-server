@@ -16,7 +16,7 @@ NC='\033[0m'  # No Color
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"  # Current dir
 BUILD_OUTPUT="${SCRIPT_DIR}/build"  # Build dir
 
-XDMA_SOURCE_DIR="${SCRIPT_DIR}/xdma_driver/xdma"
+XDMA_SOURCE_DIR="${SCRIPT_DIR}/pcie/xdma"
 XDMA_OUTPUT_DIR="${SCRIPT_DIR}/build/xdma"
 
 build_xdma()

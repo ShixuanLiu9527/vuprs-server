@@ -1,4 +1,4 @@
-#include "fpga_tool/include/fpga_tool.h"
+#include "fpga/cli/fpga_tool.h"
 #include "logger/check.h"
 
 void tool::_FPGA_TOOL_CommandParseResult_ToDefault(_FPGA_TOOL_CommandParseResult *result)

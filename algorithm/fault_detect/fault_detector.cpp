@@ -3,8 +3,8 @@
 #include "logger/check.h"
 #include "logger/log_manager.h"
 #include "3rdparty/nlohmann/json.hpp"
-#include "fault_detect/fault_detector.h"
-#include "system_tools/string_parse.h"
+#include "algorithm/fault_detect/fault_detector.h"
+#include "misc/string_parse.h"
 
 bool vuprs::FaultDetector::InitDetector(const std::string &model_config_json,
                                         const std::string &logger_dir)

@@ -26,20 +26,22 @@ root/
 ├── 3rdparty          # 第三方库: asio, eigen, fftw3, nlohmann-json, rknpu2 (RKNN Runtime), spdlog
 ├── algorithm         # 算法模块
 │   ├── bf            #   波束形成 (Beam Forming) 与 FIR 滤波
+│   ├── fault_detect  #   故障检测
 │   ├── inference     #   特征提取 / RKNN NPU 推理 / 后处理
 │   └── signal_processing  # 信号处理
 ├── cmake             # CMake 辅助文件 (交叉编译工具链等)
 ├── configs           # 项目配置文件 (7 个 JSON 模板)
 ├── docs              # 项目相关文档
-├── fault_detect      # 故障检测模块
 ├── fpga              # FPGA 通信与控制代码 (XDMA 设备封装、寄存器读写、数据转换)
-├── fpga_tool         # FPGA 调试工具代码
+│   └── cli           #   FPGA 调试工具 FPGA-Tool
 ├── hybrid            # 混合波束形成 (Hybrid Beam Forming) 模块
 ├── logger            # 系统日志管理 (spdlog 封装) 与参数检查
+├── misc              # 系统通用工具 (对齐缓冲、文件处理、字符串解析)
+├── pcie              # PCIe/XDMA 驱动源代码 (内核模块 xdma.ko)
 ├── scripts           # 板端运行脚本 (create_run_dir / run_server / config_eth0 / load_xdma_driver)
 ├── server            # TCP 服务器代码 (协议解析、会话管理、Socket IO)
-├── system_tools      # 系统通用工具 (对齐缓冲、文件处理、字符串解析)
-├── xdma_driver       # XDMA 驱动源代码 (内核模块 xdma.ko)
+│   ├── net           #   网络层 (Standalone Asio)
+│   └── test          #   网络层测试与 mock server
 ├── build.sh          # 一键构建脚本 (XDMA 驱动 + 服务器 + FPGA-Tool)
 ├── CMakeLists.txt    # 顶层 CMake 工程文件
 ├── config.h          # 全局配置宏 (调试开关、算法参数等)
@@ -101,8 +103,9 @@ sudo sh ./build.sh all  # 编译全部 (XDMA 驱动, Server 和 FPGA-Tool)
 ```bash
 build/
 ├── server                    # 服务器可执行文件
-├── fpga_tool/
-│   └── tool                  # FPGA Tool 工具
+├── fpga/
+│   └── cli/
+│       └── tool              # FPGA Tool 工具
 ├── xdma/
 │   └── xdma.ko               # XDMA 驱动
 └── 3rdparty/fftw3/           # FFTW 动态库
@@ -228,7 +231,7 @@ sudo sh ./scripts/load_xdma_driver.sh
 
 ### 网络层 / mock server
 
-服务端网络层位于 `server/net/`，使用 `3rdparty/asio` 中的 Standalone Asio；协议为单端口、定长帧、控制 JSON + 二进制数据推送。网络层与 mock server 不依赖 FPGA/RKNN，可以在主机上单独构建和测试：
+服务端网络层位于 `server/net/`，使用 `3rdparty/asio` 中的 Standalone Asio；协议为单端口、定长帧、控制 JSON + 二进制数据推送。网络层测试与 mock server 位于 `server/test/`，不依赖 FPGA/RKNN，可以在主机上单独构建和测试：
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release

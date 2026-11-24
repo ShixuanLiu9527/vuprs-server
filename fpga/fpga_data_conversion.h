@@ -7,8 +7,8 @@
 #include <complex>
 #include <unordered_map>
 #include <algorithm>
-#include "system_tools/aligned_buffer.h"
-#include "system_tools/file_processing.h"
+#include "misc/aligned_buffer.h"
+#include "misc/file_processing.h"
 #include "fpga/fpga_data_type.h"
 
 #define ADC_CHANNEL_NUMBER 16U

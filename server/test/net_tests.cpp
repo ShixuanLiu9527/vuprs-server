@@ -10,7 +10,7 @@
 #include "asio.hpp"
 #include "server/net/asio_server.h"
 #include "server/net/frame.h"
-#include "tools/mock_control_service.h"
+#include "server/test/mock_control_service.h"
 
 static int g_failures = 0;
 

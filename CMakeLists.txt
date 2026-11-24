@@ -19,7 +19,7 @@ endif()
 
 add_subdirectory(3rdparty/eigen)
 add_subdirectory(3rdparty/fftw3)
-add_subdirectory(fpga_tool)
+add_subdirectory(fpga/cli)
 
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -36,17 +36,19 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/algorithm/signal_processing
     ${CMAKE_CURRENT_SOURCE_DIR}/algorithm/inference
     ${CMAKE_CURRENT_SOURCE_DIR}/hybrid
-    ${CMAKE_CURRENT_SOURCE_DIR}/system_tools
+    ${CMAKE_CURRENT_SOURCE_DIR}/misc
 )
 
+# fpga/cli is a standalone executable, keep its sources out of the server target.
 file(GLOB_RECURSE FPGA_SRC "${CMAKE_CURRENT_SOURCE_DIR}/fpga/*.cpp")
-file(GLOB_RECURSE SYS_TOOL_SRC "${CMAKE_CURRENT_SOURCE_DIR}/system_tools/*.cpp")
+list(FILTER FPGA_SRC EXCLUDE REGEX "/cli/")
+file(GLOB_RECURSE MISC_SRC "${CMAKE_CURRENT_SOURCE_DIR}/misc/*.cpp")
 file(GLOB_RECURSE LOGGER_SRC "${CMAKE_CURRENT_SOURCE_DIR}/logger/*.cpp")
 file(GLOB_RECURSE ALGORITHM_SRC "${CMAKE_CURRENT_SOURCE_DIR}/algorithm/*.cpp")
 file(GLOB_RECURSE SERVER_SRC "${CMAKE_CURRENT_SOURCE_DIR}/server/*.cpp")
 list(FILTER SERVER_SRC EXCLUDE REGEX "/net/")
+list(FILTER SERVER_SRC EXCLUDE REGEX "/test/")
 file(GLOB_RECURSE HYBRID_BF_SRC "${CMAKE_CURRENT_SOURCE_DIR}/hybrid/*.cpp")
-file(GLOB_RECURSE FAULT_DETECT_SRC "${CMAKE_CURRENT_SOURCE_DIR}/fault_detect/*.cpp")
 
 # Standalone Asio-based network layer (host-buildable: no FPGA/RKNN dependency).
 file(GLOB_RECURSE NET_SRC "${CMAKE_CURRENT_SOURCE_DIR}/server/net/*.cpp")
@@ -67,14 +69,14 @@ endif()
 
 option(VUPRS_BUILD_NET_TOOLS "Build the Asio mock server and network tests" ON)
 if(VUPRS_BUILD_NET_TOOLS)
-    add_executable(vuprs_mock_server tools/mock_server.cpp)
+    add_executable(vuprs_mock_server server/test/mock_server.cpp)
     target_link_libraries(vuprs_mock_server PRIVATE vuprs_net)
     if(NOT MSVC)
         target_compile_options(vuprs_mock_server PRIVATE -Wall -Wextra)
     endif()
 
     enable_testing()
-    add_executable(vuprs_net_tests tests/net_tests.cpp)
+    add_executable(vuprs_net_tests server/test/net_tests.cpp)
     target_link_libraries(vuprs_net_tests PRIVATE vuprs_net)
     if(NOT MSVC)
         target_compile_options(vuprs_net_tests PRIVATE -Wall -Wextra)
@@ -84,12 +86,11 @@ endif()
 
 add_executable(server main.cpp
     ${FPGA_SRC}
-    ${SYS_TOOL_SRC}
+    ${MISC_SRC}
     ${LOGGER_SRC}
     ${ALGORITHM_SRC}
     ${SERVER_SRC}
-    ${HYBRID_BF_SRC}
-    ${FAULT_DETECT_SRC})
+    ${HYBRID_BF_SRC})
 if(NOT MSVC)
     target_compile_options(server PRIVATE -Wall -Wextra)
 endif()

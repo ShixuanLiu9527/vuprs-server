@@ -9,7 +9,7 @@
 #include <vector>
 #include "server/net/asio_server.h"
 #include "server/net/frame.h"
-#include "tools/mock_control_service.h"
+#include "server/test/mock_control_service.h"
 
 static std::atomic<bool> g_running{true};
 

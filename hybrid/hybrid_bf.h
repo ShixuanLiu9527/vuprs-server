@@ -11,7 +11,7 @@
 #include "algorithm/bf/fir.h"
 #include "hybrid/hybrid_bf_config.h"
 #include "fpga/fpga_api.h"
-#include "fault_detect/fault_detector.h"
+#include "algorithm/fault_detect/fault_detector.h"
 #include "logger/log_manager.h"
 
 namespace vuprs

@@ -2,8 +2,8 @@
 #define FPGA_MODULE_TEMPLATE_H
 
 #include "3rdparty/nlohmann/json.hpp"
-#include "system_tools/string_parse.h"
-#include "system_tools/aligned_buffer.h"
+#include "misc/string_parse.h"
+#include "misc/aligned_buffer.h"
 #include "fpga/fpga_io_manager.h"
 #include "logger/check.h"
 

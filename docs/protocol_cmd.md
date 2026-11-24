@@ -143,9 +143,9 @@ server/net/session.h/.cpp          # 单连接读写、优先级写队列、JSON
 server/net/frame_publisher.h/.cpp  # DSP/扫描线程 -> Session 的线程安全桥
 server/net/asio_server.h/.cpp      # 单端口 acceptor、io_context、生命周期
 server/server_core.h/.cpp          # 算法/配置/命令执行，发布 BF/扫描帧
-tools/mock_control_service.h       # mock 控制服务
-tools/mock_server.cpp              # 无板卡 mock server
-tests/net_tests.cpp                # 帧编解码 + loopback 控制/数据测试
+server/test/mock_control_service.h  # mock 控制服务
+server/test/mock_server.cpp         # 无板卡 mock server
+server/test/net_tests.cpp           # 帧编解码 + loopback 控制/数据测试
 ```
 
 Asio: `3rdparty/asio`，Standalone Asio 1.30.2，Boost Software License。

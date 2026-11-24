@@ -1,4 +1,4 @@
-#include "system_tools/aligned_buffer.h"
+#include "misc/aligned_buffer.h"
 #include "logger/check.h"
 
 /* --------------------------------------------------------------------------------------------------------------- */
@@ -120,7 +120,7 @@ bool vuprs::AlignedBuffer::to_file(const std::string &filename, const uint64_t &
     {
         return false;
     }
-    PARAM_CHECK(!filename.empty(), "system_tools", " in [AlignedBuffer::to_file] Empty filename.");
+    PARAM_CHECK(!filename.empty(), "misc", " in [AlignedBuffer::to_file] Empty filename.");
     int file_fd = -1;
     ssize_t current_write_bytes = 0, seek_position = -1;
     uint64_t target_write_bytes = (write_bytes == 0) ? this->byte_size : std::min(this->byte_size, write_bytes);
@@ -167,7 +167,7 @@ bool vuprs::AlignedBuffer::from_file(const std::string &filename)
 
 bool vuprs::AlignedBuffer::from_file(const std::string &filename, const uint64_t &file_offset, uint64_t loadBytes)
 {
-    PARAM_CHECK(!filename.empty(), "system_tools", " in [AlignedBuffer::from_file] Empty filename.");
+    PARAM_CHECK(!filename.empty(), "misc", " in [AlignedBuffer::from_file] Empty filename.");
     if (loadBytes == 0)
     {
         return false;
