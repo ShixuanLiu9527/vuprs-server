@@ -59,24 +59,20 @@ void vuprs::HybridBeamformer::SetScanCallback(std::function<void(ScanResult &&)>
     this->scan_callback_ = std::move(callback);
 }
 
+void vuprs::HybridBeamformer::SetConsumerGate(std::function<bool()> gate)
+{
+    this->consumer_gate_ = std::move(gate);
+}
+
 double vuprs::HybridBeamformer::HardwareSamplingFrequency()
 {
-    std::lock_guard<std::mutex> lock(this->mut_alg); /* LOCK */
-    return this->hardware_fs;
+    return this->hardware_fs.load();
 }
 
 void vuprs::HybridBeamformer::ScanSwitch(bool enable)
 {
     this->scan_enable = enable;
-    if (enable)
-    {
-        {
-            std::lock_guard<std::mutex> lock(this->mut_scan_result); /* LOCK */
-            this->scan_result_queue.clear();
-            this->new_scan_points_input = false;
-        }
-        this->scan_cv.notify_all();
-    }
+    this->scan_cv.notify_all();
 }
 
 bool vuprs::HybridBeamformer::ScanSwitch() const
@@ -168,11 +164,6 @@ bool vuprs::HybridBeamformer::ScanOptions(const ScanningConfig &config, double w
     }
     if (changed)
     {
-        {
-            std::lock_guard<std::mutex> lock(this->mut_scan_result); /* LOCK */
-            this->scan_result_queue.clear();
-            this->new_scan_points_input = false;
-        }
         ++this->scan_options_generation;
         this->scan_options_changed = true;
         this->scan_cv.notify_all();
@@ -218,7 +209,6 @@ bool vuprs::HybridBeamformer::CheckConfigValid(const vuprs::HybridBeamformerConf
     _CHECK_AND_RETURN("dma buffer size/count invalid or total exceeds DDR capacity")
     /* Data queues */
     retval &= (config.queue__circular_buffer_queue_size_max > 0);
-    retval &= (config.queue__result_queue_size_max > 0);
     _CHECK_AND_RETURN("queue size must be > 0")
     return retval;
 #undef _CHECK_AND_RETURN
@@ -265,7 +255,6 @@ bool vuprs::HybridBeamformer::StartBeamformerWithConfiguration(const vuprs::Hybr
     }
     /* Max queue size */
     this->circular_buffer_queue_size_max = config.queue__circular_buffer_queue_size_max;
-    this->result_queue_size_max = config.queue__result_queue_size_max;
     /* Step 1: Generate descriptors */
     {
         std::lock_guard<std::mutex> lock(this->mut); /* LOCK */
@@ -301,7 +290,7 @@ bool vuprs::HybridBeamformer::StartBeamformerWithConfiguration(const vuprs::Hybr
         std::lock_guard<std::mutex> lock(this->mut_alg); /* LOCK */
         /* - Hardware sampling frequency */
         this->hardware_fs = this->controller.dev__adc_controller.SCI2FS(SCI);
-        HYBRID_LOG(V_DEBUG) << "Hardware fs = " + std::to_string(this->hardware_fs) + " Hz.";
+        HYBRID_LOG(V_DEBUG) << "Hardware fs = " + std::to_string(this->hardware_fs.load()) + " Hz.";
         /* - Reset algorithm obj */
         this->bf->ResetCovarianceMatrices();
         /* - Set covariance matrix fitting parameters */
@@ -312,7 +301,7 @@ bool vuprs::HybridBeamformer::StartBeamformerWithConfiguration(const vuprs::Hybr
                                      config.bf_wave_velocity);
         /* - Get predelay */
         this->bf->UpdateAndGetElementPredelay(this->fir.FIRLength(),
-                                              this->hardware_fs,
+                                              this->hardware_fs.load(),
                                               true,
                                               &predelay_count,
                                               &predelay_time,
@@ -330,10 +319,10 @@ bool vuprs::HybridBeamformer::StartBeamformerWithConfiguration(const vuprs::Hybr
     {
         std::lock_guard<std::mutex> lock(this->mut_npu); /* LOCK */
         if (this->inference_ready &&
-            !this->fault_detector.ValidateInputSignalLength(config.dma__buffer_points, this->hardware_fs))
+            !this->fault_detector.ValidateInputSignalLength(config.dma__buffer_points, this->hardware_fs.load()))
         {
             HYBRID_LOG(V_WARN) << "DMA buffer (" << config.dma__buffer_points << " samples) is shorter than one inference frame at fs = "
-                               << this->hardware_fs << " Hz. Fault inference will never start.";
+                               << this->hardware_fs.load() << " Hz. Fault inference will never start.";
         }
     }
 #endif
@@ -373,7 +362,7 @@ bool vuprs::HybridBeamformer::ReDirect(double alt, double az, double wave_veloci
         this->bf->SetTargetDirection(alt, az, wave_velocity);
         /* Get predelay */
         this->bf->UpdateAndGetElementPredelay(this->fir.FIRLength(),
-                                              this->hardware_fs,
+                                              this->hardware_fs.load(),
                                               true,
                                               &predelay_count,
                                               &predelay_time,
@@ -422,12 +411,20 @@ bool vuprs::HybridBeamformer::stop()
             f.join();
         }
     }
-    this->scan_snapshot_valid = false;
     {
-        std::lock_guard<std::mutex> lock(this->mut_scan_result); /* LOCK */
-        this->scan_result_queue.clear();
-        this->new_scan_points_input = false;
+        std::lock_guard<std::mutex> lock(this->mut_scan_snapshot); /* LOCK */
+        this->scan_snapshot.reset();
     }
+    {
+        std::lock_guard<std::mutex> lock(this->mut_queue); /* LOCK */
+        this->array_signal_queue.clear();
+    }
+    this->circular_buffer_irq = false;
+    this->dma_descriptor_irq = false;
+    this->scan_options_changed = false;
+    this->scan_options_initialized = false;
+    this->dma_current_desc = 0xFFFFFFFF;
+    this->threads.clear();
     try
     {
         return this->ResetHardwareBeamformer();
@@ -441,100 +438,27 @@ bool vuprs::HybridBeamformer::stop()
 
 /* ------------------------------------------ Thread Control ----------------------------------------- */
 
-bool vuprs::HybridBeamformer::HasResult() const
-{
-    return this->new_result_data_input;
-}
-
-bool vuprs::HybridBeamformer::ReadResult(BeamformerResultMeta *meta)
-{
-    bool read_success = false;
-    if (this->new_result_data_input)
-    {
-        {
-            std::lock_guard<std::mutex> lock(this->mut_dma); /* LOCK */
-            if (!this->result_queue.empty())
-            {
-                *meta = this->result_queue.front();
-                this->result_queue.pop_front();
-                read_success = true;
-            }
-            this->new_result_data_input = !this->result_queue.empty();
-        }
-    }
-    return read_success;
-}
-
-bool vuprs::HybridBeamformer::HasArraySignal() const
-{
-    return this->new_array_signal_input;
-}
-
-bool vuprs::HybridBeamformer::ReadArraySignal(vuprs::SignalData *signalData)
-{
-    bool read_success = false;
-    if (this->new_array_signal_input)
-    {
-        {
-            std::lock_guard<std::mutex> lock(this->mut_output_arraySignal); /* LOCK */
-            if (!this->output_array_signal_queue.empty())
-            {
-                *signalData = this->output_array_signal_queue.front();
-                this->output_array_signal_queue.pop_front();
-                read_success = true;
-            }
-            this->new_array_signal_input = !this->output_array_signal_queue.empty();
-        }
-    }
-    return read_success;
-}
-
-bool vuprs::HybridBeamformer::HasScanPower() const
-{
-    return this->new_scan_points_input;
-}
-
-bool vuprs::HybridBeamformer::ReadScanPower(std::vector<uint16_t> *scanPower, double *max_power_db, double *min_power_db)
-{
-    bool read_success = false;
-    if (this->new_scan_points_input)
-    {
-        {
-            std::lock_guard<std::mutex> lock(this->mut_scan_result); /* LOCK */
-            if (!this->scan_result_queue.empty())
-            {
-                *scanPower = this->scan_result_queue.front().scan_result;
-                *max_power_db = this->scan_result_queue.front().max_power_db;
-                *min_power_db = this->scan_result_queue.front().min_power_db;
-                this->scan_result_queue.pop_front();
-                read_success = true;
-            }
-            this->new_scan_points_input = !this->scan_result_queue.empty();
-        }
-    }
-    return read_success;
-}
-
 void vuprs::HybridBeamformer::THREAD__ScanPowerCalculation()
 {
     vuprs::ScanResult scan_result;
-    vuprs::ScanCovarianceSnapshot cov_snapshot;
+    std::shared_ptr<const vuprs::ScanCovarianceSnapshot> cov_snapshot;
     std::vector<double> alt, az, _scan_result;
     double wave_velocity = 0.0, power_range = 0.0, alt_min = 0.0;
     int points_in_hemisphere = 0;
     size_t points_count = 0;
     uint16_t normalized_power = 0;
-    uint64_t last_generation = 0, last_options_generation = 0, options_generation = 0;
+    uint64_t last_generation = 0, last_options_generation = 0, options_generation = 0, snapshot_generation = 0;
     bool calculate_status = false;
     bool options_loaded = false;
     while (this->system_run)
     {
         {
-            std::unique_lock<std::mutex> lock(this->mut_scan_result); /* LOCK */
+            std::unique_lock<std::mutex> lock(this->mut_scan_wait); /* LOCK */
             this->scan_cv.wait(lock, [this, last_generation, last_options_generation, options_loaded]()
                                {
                                    return !this->system_run ||
                                           (this->scan_enable &&
+                                           (!this->consumer_gate_ || this->consumer_gate_()) &&
                                            (!options_loaded ||
                                             this->scan_options_generation.load() != last_options_generation ||
                                             !this->scan_options_initialized ||
@@ -565,12 +489,13 @@ void vuprs::HybridBeamformer::THREAD__ScanPowerCalculation()
         /* Use the covariance snapshot captured by the algorithm thread. */
         {
             std::lock_guard<std::mutex> lock(this->mut_scan_snapshot); /* LOCK */
-            if (!this->scan_snapshot_valid)
+            if (!this->scan_snapshot)
             {
                 last_generation = this->scan_generation.load();
                 continue;
             }
             cov_snapshot = this->scan_snapshot;
+            snapshot_generation = this->scan_generation.load();
         }
         /* Calculate scan power (lock-free, uses the consistent snapshot) */
         try
@@ -583,14 +508,14 @@ void vuprs::HybridBeamformer::THREAD__ScanPowerCalculation()
                                                               wave_velocity,
                                                               regenerate,
                                                               true,
-                                                              cov_snapshot);
+                                                              *cov_snapshot);
         }
         catch (const std::exception &e)
         {
             std::cout << "Error in [HybridBeamformer::THREAD__ScanPowerCalculation] " << e.what() << std::endl;
             calculate_status = false;
         }
-        last_generation = this->scan_generation.load();
+        last_generation = snapshot_generation;
         if (!calculate_status)
             continue; /* If calculation failed, skip this loop */
         if (regenerate && this->scan_options_generation.load() == options_generation)
@@ -614,7 +539,7 @@ void vuprs::HybridBeamformer::THREAD__ScanPowerCalculation()
         }
         scan_result.points_in_hemisphere = points_in_hemisphere;
         scan_result.alt_min = alt_min;
-        /* Deliver to the optional consumer, otherwise keep the legacy queue. */
+        /* Deliver to the registered consumer (none: drop the frame). */
         if (this->scan_callback_)
         {
             try
@@ -625,16 +550,6 @@ void vuprs::HybridBeamformer::THREAD__ScanPowerCalculation()
             {
                 /* Never let a consumer take down the scan thread. */
             }
-        }
-        else
-        {
-            std::lock_guard<std::mutex> lock(this->mut_scan_result); /* LOCK */
-            this->scan_result_queue.push_back(scan_result);
-            if (this->scan_result_queue.size() > this->result_queue_size_max)
-            {
-                this->scan_result_queue.pop_front(); /* Pop the oldest data to avoid overflow */
-            }
-            this->new_scan_points_input = true;
         }
     }
 }
@@ -691,12 +606,12 @@ void vuprs::HybridBeamformer::THREAD__ReadResult()
         std::lock_guard<std::mutex> lock(this->mut); /* LOCK */
         _ref_descriptors = this->dma_descriptors;
     }
-    {
-        std::lock_guard<std::mutex> lock(this->mut_alg); /* LOCK */
-        _hardware_fs = this->hardware_fs;
-    }
+    _hardware_fs = this->hardware_fs.load();
     auto process_descriptor = [&](const vuprs::AXI_DMA_ScatterGatherDescriptor &desc)
     {
+        /* Skip the whole frame (DDR read + inference) when no consumer is attached. */
+        if (this->consumer_gate_ && !this->consumer_gate_())
+            return;
         try
         {
             /* Read completed buffer from DDR */
@@ -746,20 +661,10 @@ void vuprs::HybridBeamformer::THREAD__ReadResult()
             if (debug_file_group >= DEBUG_DATA_GROUP_COUNT)
                 debug_file_group = 0;
 #endif
-            /* Deliver to the optional consumer, otherwise keep the legacy queue. */
+            /* Deliver to the registered consumer (none: drop the frame). */
             if (this->result_callback_)
             {
                 this->result_callback_(std::move(result_meta));
-            }
-            else
-            {
-                std::lock_guard<std::mutex> lock(this->mut_dma); /* LOCK */
-                this->result_queue.push_back(result_meta);
-                if (this->result_queue.size() > this->result_queue_size_max)
-                {
-                    this->result_queue.pop_front(); /* Pop the oldest data to avoid overflow */
-                }
-                this->new_result_data_input = true;
             }
         }
         catch (const std::exception &e)
@@ -814,7 +719,6 @@ void vuprs::HybridBeamformer::THREAD__ReadResult()
 void vuprs::HybridBeamformer::THREAD__ReadCircularBuffer()
 {
     uint32_t r_val = 0;
-    vuprs::SignalData multi_channel_signal; /* signal data (from circular buffer) */
     while (this->system_run)
     {
         /* Check refreshed */
@@ -835,11 +739,12 @@ void vuprs::HybridBeamformer::THREAD__ReadCircularBuffer()
             /* Read circular buffer */
             try
             {
+                vuprs::SignalData multi_channel_signal; /* signal data (from circular buffer) */
                 if (vuprs::FPGA_API__CBUF__ReadCircularBuffer(&this->controller, &multi_channel_signal))
                 {
                     {
-                        std::lock_guard<std::mutex> lock(this->mut_alg); /* LOCK */
-                        this->array_signal_queue.push_back(multi_channel_signal);
+                        std::lock_guard<std::mutex> lock(this->mut_queue); /* LOCK */
+                        this->array_signal_queue.push_back(std::move(multi_channel_signal));
                         if (this->array_signal_queue.size() > this->circular_buffer_queue_size_max)
                         {
                             this->array_signal_queue.pop_front(); /* Pop the oldest data to avoid overflow */
@@ -847,15 +752,6 @@ void vuprs::HybridBeamformer::THREAD__ReadCircularBuffer()
                     }
                     this->circular_buffer_irq = true;
                     algorithm_cv.notify_all();
-                    {
-                        std::lock_guard<std::mutex> lock(this->mut_output_arraySignal); /* LOCK */
-                        this->output_array_signal_queue.push_back(multi_channel_signal);
-                        if (this->output_array_signal_queue.size() > this->circular_buffer_queue_size_max)
-                        {
-                            this->output_array_signal_queue.pop_front(); /* Pop the oldest data to avoid overflow */
-                        }
-                    }
-                    this->new_array_signal_input = true;
                 }
                 else
                 {
@@ -887,7 +783,7 @@ void vuprs::HybridBeamformer::THREAD__AlgorithmCalculation()
     {
         /* Sleep here to wait interrupt */
         {
-            std::unique_lock<std::mutex> lock(this->mut_alg); /* LOCK */
+            std::unique_lock<std::mutex> lock(this->mut_queue); /* LOCK */
             this->algorithm_cv.wait(lock, [this]()
                                     { return this->circular_buffer_irq || !this->system_run; });
         }
@@ -904,30 +800,39 @@ void vuprs::HybridBeamformer::THREAD__AlgorithmCalculation()
         /* Do algorithm calculation */
         try
         {
+            {
+                std::lock_guard<std::mutex> lock(this->mut_queue); /* LOCK */
+                if (this->array_signal_queue.empty())
+                    continue;
+                /* Read signal data from queue (moves the channel buffers) */
+                signal = std::move(this->array_signal_queue.front());
+                this->array_signal_queue.pop_front();
+            }
+#if DEBUG
+            signal.ToCSV(std::string(DEBUG_FILES_ROOT_DIR) + "/" +
+                         std::string(DEBUG_FILES_DIR) + "-" + std::to_string(debug_file_group) + "/" +
+                         std::string(CIRCULAR_BUFFER_DEBUG_FILENAME));
+#endif
             std::lock_guard<std::mutex> lock(this->mut_alg); /* LOCK */
-            if (this->array_signal_queue.empty())
-                continue;
-            /* Read signal data from queue */
-            signal = this->array_signal_queue.front();
-            this->array_signal_queue.pop_front();
-            /* Step 1: Push data to Beam forming algorithm */
-            this->bf->InputSignal(signal);
+            /* Step 1: Push data to Beam forming algorithm (channel buffers are moved in) */
+            this->bf->InputSignal(std::move(signal));
             /* Step 2: Update covariance matrix */
             this->bf->UpdateCovarianceMatrix();
-            /* Cache a covariance snapshot for the scan thread, so it never blocks on mut_alg. */
+            /* Publish a covariance snapshot for the scan thread, so it never blocks on mut_alg. */
             if (this->scan_enable)
             {
+                auto snapshot = std::make_shared<vuprs::ScanCovarianceSnapshot>();
                 std::lock_guard<std::mutex> snapshot_lock(this->mut_scan_snapshot); /* LOCK */
-                if (this->bf->SnapshotScanCovariance(&this->scan_snapshot,
+                if (this->bf->SnapshotScanCovariance(snapshot.get(),
                                                      this->bf_freq__lower,
                                                      this->bf_freq__upper))
                 {
-                    this->scan_snapshot_valid = true;
+                    this->scan_snapshot = std::move(snapshot);
                     ++this->scan_generation;
                 }
                 else
                 {
-                    this->scan_snapshot_valid = false;
+                    this->scan_snapshot.reset();
                 }
                 this->scan_cv.notify_all();
             }
@@ -942,7 +847,7 @@ void vuprs::HybridBeamformer::THREAD__AlgorithmCalculation()
             /* Step 5: Convert frequency response to FIR coefficients */
             this->fir.SolveCoeffUseExpectedFrequencyResponse(fir_expected_frequency_response,
                                                              channel_name,
-                                                             this->hardware_fs);
+                                                             this->hardware_fs.load());
             this->fir.GetFIRBankCoefficient(&fir_coefficients);
         }
         catch (const std::exception &e)
@@ -951,9 +856,6 @@ void vuprs::HybridBeamformer::THREAD__AlgorithmCalculation()
             continue;
         }
 #if DEBUG
-        signal.ToCSV(std::string(DEBUG_FILES_ROOT_DIR) + "/" +
-                     std::string(DEBUG_FILES_DIR) + "-" + std::to_string(debug_file_group) + "/" +
-                     std::string(CIRCULAR_BUFFER_DEBUG_FILENAME));
         printf("[debug] max FIR coefficient = %.8f\n", this->fir.MaxAbsoluteFIRCoefficient());
         debug_file_group++;
         if (debug_file_group >= DEBUG_DATA_GROUP_COUNT)

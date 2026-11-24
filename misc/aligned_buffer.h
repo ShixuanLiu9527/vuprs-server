@@ -90,6 +90,19 @@ namespace vuprs
         virtual bool malloc(uint64_t byte_size);
 
         /**
+         * @brief Ensure the buffer can hold at least byte_size bytes.
+         *
+         * @note Reuses the existing allocation when its capacity is sufficient,
+         * @note so periodic DMA reads do not free/malloc on every call.
+         *
+         * @param byte_size required size in bytes.
+         *
+         * @retval true: buffer ready.
+         * @retval false: allocation failed.
+         */
+        bool ensure_capacity(uint64_t byte_size);
+
+        /**
          * @brief Indicates whether the memory has been allocated.
          *
          * @retval true, the memory has been allocated.

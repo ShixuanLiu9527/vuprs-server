@@ -68,10 +68,10 @@ int vuprs::WidebandBeamformerTemplate::ElementCount() const
     return this->array.size();
 }
 
-void vuprs::WidebandBeamformerTemplate::InputSignal(const vuprs::SignalData &signal)
+void vuprs::WidebandBeamformerTemplate::InputSignal(vuprs::SignalData &&signal)
 {
     RUNTIME_CHECK(this->ConfigDone(), "bf", "Config not complete");
-    this->array.InputElementSignal(signal);
+    this->array.InputElementSignal(std::move(signal));
     this->is_signal_empty = false;
     if (signal.signal_points != this->signal_points && std::abs(signal.fs - this->fs) > 1e-5)
     {

@@ -55,8 +55,8 @@ bool vuprs::FPGA_API__CBUF__ReadCircularBuffer(vuprs::FPGAController *controller
     uint32_t r_val, w_val, CBF;
     bool operate_status = true;
 
-    /* STEP 1: Clear buffer */
-    vuprs::AlignedBufferDMA buffer;
+    /* STEP 1: Clear buffer (thread-local so repeated reads reuse the allocation) */
+    static thread_local vuprs::AlignedBufferDMA buffer;
     /* STEP 2: Freeze */
     operate_status &= controller->dev__circular_buffer.WriteSingleRegisterBIT(vuprs::Circular_Buffer__Registers::CBUF_FREEZE, 0, true);
     /* STEP 3: Wait for freezed */

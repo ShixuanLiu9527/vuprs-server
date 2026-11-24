@@ -134,21 +134,14 @@ namespace vuprs
         bool contains(const std::string &channel_name) const;
 
         /**
-         * @brief Get channel data.
+         * @brief Move one channel out of this object (zero-copy hand-off).
          *
          * @param channel_name channel name.
-         * @param data output data.
+         * @param data output data (swapped with the internal channel buffer).
          *
          * @throw std::runtime_error
          */
-        void GetChannelData(const std::string &channel_name, std::vector<std::complex<double>> *data) const;
-
-        /**
-         * @brief Delete channel data.
-         *
-         * @param channel_name channel name.
-         */
-        void DeleteChannelData(const std::string &channel_name);
+        void TakeChannelData(const std::string &channel_name, std::vector<std::complex<double>> *data);
 
         /**
          * @brief Save all data to CSV file.
@@ -196,22 +189,6 @@ namespace vuprs
                                    double fs,
                                    double v_scale,
                                    uint32_t point_pos_cbf);
-
-    /**
-     * @brief Convert memory data to signed float.
-     *
-     * @note 1st: uint32_t to signed, 2nd: signed to float.
-     *
-     * @param buffer Input aligned DMA buffer.
-     * @param beamforming_result Output beam forming result.
-     * @param fs sampling frequency.
-     *
-     * @retval true: success.
-     * @retval false: failed.
-     */
-    bool FPGAMemoryBuffer2Frames(vuprs::AlignedBufferDMA *buffer,
-                                 std::vector<double> *beamforming_result,
-                                 double fs);
 }
 
 #endif

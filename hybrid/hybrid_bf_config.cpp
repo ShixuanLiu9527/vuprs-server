@@ -15,7 +15,6 @@ void vuprs::HybridBeamformerConfig::SetDefault()
     this->dma__buffer_points = 8192;                  /* Sampling points for each AXI DMA buffer */
     this->dma__buffer_count = 20;                     /* AXI DMA descriptor buffer count */
     this->queue__circular_buffer_queue_size_max = 10; /* [internal param] depth of multi-channel data queue */
-    this->queue__result_queue_size_max = 10;          /* [internal param] depth of result data queue */
 }
 
 bool vuprs::HybridBeamformerConfig::FromJson(const std::string &json_filename)
@@ -101,12 +100,6 @@ bool vuprs::HybridBeamformerConfig::FromJson(const std::string &json_filename)
                                               json_data["queue__circular_buffer_queue_size_max"], "value", true);
         this->mask.m_queue__circular_buffer_queue_size_max = true;
     }
-    if (json_data.contains("queue__result_queue_size_max"))
-    {
-        vuprs::__JsonStringParseINT<uint32_t>(&this->queue__result_queue_size_max,
-                                              json_data["queue__result_queue_size_max"], "value", true);
-        this->mask.m_queue__result_queue_size_max = true;
-    }
     return true;
 }
 
@@ -123,7 +116,6 @@ void vuprs::HybridBeamformerConfigMask::Reset(bool val)
     this->m_dma__buffer_points = val;
     this->m_dma__buffer_count = val;
     this->m_queue__circular_buffer_queue_size_max = val;
-    this->m_queue__result_queue_size_max = val;
 }
 
 void vuprs::ScanningConfigMask::Reset(bool val)

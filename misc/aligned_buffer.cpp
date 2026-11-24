@@ -46,6 +46,16 @@ bool vuprs::AlignedBuffer::malloc(uint64_t byte_size)
     return true;
 }
 
+bool vuprs::AlignedBuffer::ensure_capacity(uint64_t byte_size)
+{
+    if (this->allocated != nullptr && this->byte_capacity >= byte_size)
+    {
+        this->set_bytesize(byte_size);
+        return true;
+    }
+    return this->malloc(byte_size);
+}
+
 vuprs::AlignedBuffer::AlignedBuffer(uint64_t byte_size)
 {
     if (!this->malloc(byte_size))

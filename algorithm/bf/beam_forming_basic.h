@@ -114,9 +114,9 @@ namespace vuprs
          * @note index = 0: latest data;
          * @note index = data points: newest data.
          *
-         * @param adc_data adc data
+         * @param adc_data adc data (channel buffers are moved out)
          */
-        void InputElementSignal(const vuprs::SignalData &adc_data);
+        void InputElementSignal(vuprs::SignalData &&adc_data);
 
         /**
          * @brief Calculate steering vector.

@@ -26,7 +26,6 @@ namespace vuprs
         bool m_dma__buffer_points;                    /* Mask of [dma__buffer_points] */
         bool m_dma__buffer_count;                     /* Mask of [dma__buffer_count] */
         bool m_queue__circular_buffer_queue_size_max; /* Mask of [queue__circular_buffer_queue_size_max] */
-        bool m_queue__result_queue_size_max;          /* Mask of [queue__result_queue_size_max] */
 
         HybridBeamformerConfigMask() { this->Reset(false); }
 
@@ -57,7 +56,6 @@ namespace vuprs
         uint32_t dma__buffer_points;                    /* Sampling points for each AXI DMA buffer */
         uint32_t dma__buffer_count;                     /* [internal param] AXI DMA descriptor buffer count */
         uint32_t queue__circular_buffer_queue_size_max; /* [internal param] MAX size of circular buffer data queue */
-        uint32_t queue__result_queue_size_max;          /* [internal param] MAX size of result data queue */
         vuprs::HybridBeamformerConfigMask mask;
 
         HybridBeamformerConfig() { this->SetDefault(); }
@@ -83,7 +81,6 @@ namespace vuprs
             this->dma__buffer_points = other.mask.m_dma__buffer_points ? other.dma__buffer_points : this->dma__buffer_points;
             this->dma__buffer_count = other.mask.m_dma__buffer_count ? other.dma__buffer_count : this->dma__buffer_count;
             this->queue__circular_buffer_queue_size_max = other.mask.m_queue__circular_buffer_queue_size_max ? other.queue__circular_buffer_queue_size_max : this->queue__circular_buffer_queue_size_max;
-            this->queue__result_queue_size_max = other.mask.m_queue__result_queue_size_max ? other.queue__result_queue_size_max : this->queue__result_queue_size_max;
         }
 
         /**

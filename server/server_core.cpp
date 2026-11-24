@@ -163,6 +163,8 @@ void vuprs::ServerCore::InitSystemConfigFiles(const vuprs::SystemConfigFiles &co
                                             { this->OnBfResult(std::move(meta)); });
         this->beamformer_.SetScanCallback([this](ScanResult &&result)
                                           { this->OnScanResult(std::move(result)); });
+        this->beamformer_.SetConsumerGate([this]()
+                                          { return this->publisher_ && this->publisher_->HasSession(); });
         this->config_done_ = true;
     }
     catch (const std::exception &e)

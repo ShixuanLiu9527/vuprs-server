@@ -119,8 +119,9 @@ namespace vuprs
          * @brief Input signal.
          *
          * @note Will not update covariance matrix.
+         * @note Takes ownership of the channel buffers (zero-copy).
          */
-        void InputSignal(const vuprs::SignalData &signal);
+        void InputSignal(vuprs::SignalData &&signal);
 
         /* STEP 3: UPDATE COVARIANCE MATRIX */
 

@@ -19,11 +19,12 @@ bool vuprs::SignalData::contains(const std::string &channel_name) const
     }
 }
 
-void vuprs::SignalData::GetChannelData(const std::string &channel_name, std::vector<std::complex<double>> *data) const
+void vuprs::SignalData::TakeChannelData(const std::string &channel_name, std::vector<std::complex<double>> *data)
 {
     auto it = this->CHANNEL_NAME__TO__CHANNEL_INDEX.find(channel_name);
-    PARAM_CHECK(it != this->CHANNEL_NAME__TO__CHANNEL_INDEX.end(), "fpga", " in [SignalData::GetChannelData] Invalid channel name: " + channel_name);
-    data->assign(this->_channel_data[it->second].begin(), this->_channel_data[it->second].end());
+    PARAM_CHECK(it != this->CHANNEL_NAME__TO__CHANNEL_INDEX.end(), "fpga", " in [SignalData::TakeChannelData] Invalid channel name: " + channel_name);
+    PARAM_CHECK(data != nullptr, "fpga", " in [SignalData::TakeChannelData] Data cannot be NULL.");
+    data->swap(this->_channel_data[it->second]);
 }
 
 void vuprs::SignalData::_UpdataHashMap()
@@ -35,11 +36,6 @@ void vuprs::SignalData::_UpdataHashMap()
     {
         this->CHANNEL_NAME__TO__CHANNEL_INDEX.insert(std::make_pair(this->_channel_name[i], i));
     }
-}
-
-void vuprs::SignalData::DeleteChannelData(const std::string &channel_name)
-{
-    this->CHANNEL_NAME__TO__CHANNEL_INDEX.erase(channel_name);
 }
 
 void vuprs::SignalData::ToCSV(const std::string &output_file)
@@ -90,8 +86,8 @@ bool vuprs::FPGACircularBuffer2Frames(vuprs::AlignedBufferDMA *buffer, vuprs::Si
 {
     PARAM_CHECK(buffer->is_allocated(), "fpga", " in [vuprs::FPGACircularBuffer2Frames] Buffer is empty.");
 
-    std::vector<uint16_t> raw_buffer_data_vector = buffer->to_vector<uint16_t>();
-    ssize_t vector_size = raw_buffer_data_vector.size(), frame_parsed_size = 0;
+    const uint16_t *raw_buffer_data = buffer->as<const uint16_t>();
+    ssize_t vector_size = static_cast<ssize_t>(buffer->size() / sizeof(uint16_t)), frame_parsed_size = 0;
     uint32_t header_ptr = 0, tailer_ptr = ADC_FRAME_HALF_WORD_SIZE - 2;
     adc_data->_channel_data.clear();
     adc_data->_channel_data.resize(ADC_CHANNEL_NUMBER);
@@ -103,17 +99,17 @@ bool vuprs::FPGACircularBuffer2Frames(vuprs::AlignedBufferDMA *buffer, vuprs::Si
     {
         if ((header_ptr + 1) < vector_size && (tailer_ptr + 1) < vector_size)
         {
-            uint16_t header_l = raw_buffer_data_vector[header_ptr];
-            uint16_t header_h = raw_buffer_data_vector[header_ptr + 1];
-            uint16_t tailer_l = raw_buffer_data_vector[tailer_ptr];
-            uint16_t tailer_h = raw_buffer_data_vector[tailer_ptr + 1];
+            uint16_t header_l = raw_buffer_data[header_ptr];
+            uint16_t header_h = raw_buffer_data[header_ptr + 1];
+            uint16_t tailer_l = raw_buffer_data[tailer_ptr];
+            uint16_t tailer_h = raw_buffer_data[tailer_ptr + 1];
             RUNTIME_CHECK(IS_FRAME_HEADER(header_l, header_h) && IS_FRAME_TAILER(tailer_l, tailer_h), "fpga", " in [vuprs::FPGACircularBuffer2Frames] Error memory data.");
             /* Receive Data */
             for (int ch = 0; ch < ADC_CHANNEL_NUMBER; ch++)
             {
                 adc_data->_channel_data[ch].emplace_back(
                     std::complex<double>(
-                        vuprs::Q15__ADC_UINT16_TO_DOUBLE(raw_buffer_data_vector[header_ptr + ch + 2],
+                        vuprs::Q15__ADC_UINT16_TO_DOUBLE(raw_buffer_data[header_ptr + ch + 2],
                                                          v_scale),
                         0.0));
             }
@@ -135,16 +131,3 @@ bool vuprs::FPGACircularBuffer2Frames(vuprs::AlignedBufferDMA *buffer, vuprs::Si
     return true;
 }
 
-bool vuprs::FPGAMemoryBuffer2Frames(vuprs::AlignedBufferDMA *buffer, std::vector<double> *beamforming_result, double fs)
-{
-    PARAM_CHECK(buffer->is_allocated(), "fpga", " in [vuprs::FPGAMemoryBuffer2Frames] Buffer is empty.");
-    std::vector<uint32_t> raw_buffer_data_vector = buffer->to_vector<uint32_t>();
-    ssize_t vector_size = raw_buffer_data_vector.size();
-    beamforming_result->clear();
-    beamforming_result->reserve(vector_size);
-    for (int i = 0; i < vector_size; i++)
-    {
-        beamforming_result->push_back(vuprs::Q16__UINT32_TO_DOUBLE(raw_buffer_data_vector[i])); /* Q16.16 */
-    }
-    return true;
-}

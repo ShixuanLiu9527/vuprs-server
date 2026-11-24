@@ -2,7 +2,7 @@
 #define HYBRID_BEAMFORMGING__H
 
 #include <mutex>
-#include <queue>
+#include <memory>
 #include <deque>
 #include <atomic>
 #include <condition_variable>
@@ -42,7 +42,7 @@ namespace vuprs
      * @note Step 2: Call InitCollaborationBeamformer() to initialize FPGA controller and algorithm.
      * @note Step 3: Call BindBeamformer() to bind beam forming algorithm (optional, if not called, default algorithm DCRCB will be used).
      * @note Step 4: Call RUN() to start beam former.
-     * @note Step 5: Call ReadResultFromQueue() to read result from queue.
+     * @note Step 5: Register SetResultCallback() / SetScanCallback() before RUN().
      * @note Step 6: Call STOP() to stop & reset beam former.
      */
     class HybridBeamformer
@@ -81,26 +81,21 @@ namespace vuprs
         std::vector<double> scan_alt, scan_az;           /* controlled by mut_scan_opt */
         int scan_points_in_hemisphere;                   /* controlled by mut_scan_opt */
         double scan_wave_velocity, scan_alt_min;         /* controlled by mut_scan_opt */
-        std::atomic<bool> new_scan_points_input{false};  /* scan points changed flag */
         std::atomic<uint64_t> scan_generation{0};        /* incremented when a new covariance snapshot is ready */
         std::atomic<uint64_t> scan_options_generation{0}; /* incremented when points/alt_min/wave velocity change */
         std::mutex mut_scan_snapshot;                    /* protects scan_snapshot */
-        vuprs::ScanCovarianceSnapshot scan_snapshot;     /* cached covariance snapshot for scan */
-        std::atomic<bool> scan_snapshot_valid{false};    /* scan_snapshot is usable */
-        std::mutex mut_scan_result;                      /* Scan result mutex lock */
-        std::condition_variable scan_cv;                 /* Scan condition var, controlled by mut_scan */
-        std::deque<vuprs::ScanResult> scan_result_queue; /* Scan result, controlled by mut_scan_result */
+        std::shared_ptr<const vuprs::ScanCovarianceSnapshot> scan_snapshot; /* cached covariance snapshot for scan */
+        std::mutex mut_scan_wait;                        /* Scan wait mutex [controlled by scan_cv] */
+        std::condition_variable scan_cv;                 /* Scan condition var, controlled by mut_scan_wait */
 
         /* Circular buffer interrupt */
-        std::mutex mut_alg;                                      /* Algorithm mutex lock */
-        std::condition_variable algorithm_cv;                    /* Algorithm interrupt condition var, [controlled by mut_alg] */
-        std::deque<vuprs::SignalData> array_signal_queue;        /* Array signal queue, [controlled by mut_alg] */
-        std::atomic<bool> new_array_signal_input{false};         /* new array signal input flag */
-        std::mutex mut_output_arraySignal;                       /* Output array signal mutex lock */
-        std::deque<vuprs::SignalData> output_array_signal_queue; /* Output array signal queue, controlled by mut_output_arraySignal */
+        std::mutex mut_queue;                                    /* Array signal queue mutex */
+        std::condition_variable algorithm_cv;                    /* Algorithm interrupt condition var, [controlled by mut_queue] */
+        std::deque<vuprs::SignalData> array_signal_queue;        /* Array signal queue, [controlled by mut_queue] */
+        std::mutex mut_alg;                                      /* Algorithm mutex lock (bf/fir/hardware_fs) */
         vuprs::FIRCalculator fir;                                /* FIR algorithm, [controlled by mut_alg] (can be only used in THREAD__AlgorithmCalculation) */
         std::unique_ptr<vuprs::WidebandBeamformerTemplate> bf;   /* Beam forming algorithm, [controlled by mut_alg] (can be only used in THREAD__AlgorithmCalculation) */
-        double hardware_fs;                                      /* Hardware sampling frequency, calculate by SCI register, [controlled by mut_alg] */
+        std::atomic<double> hardware_fs{0.0};                    /* Hardware sampling frequency, calculate by SCI register */
         double bf_freq__lower;                                   /* Bandpass lower boundary (Hz), set at start, read-only afterwards */
         double bf_freq__upper;                                   /* Bandpass upper boundary (Hz), set at start, read-only afterwards */
 
@@ -108,8 +103,6 @@ namespace vuprs
         std::atomic<uint32_t> dma_current_desc{0xFFFFFFFF}; /* current descriptor address, initialized to an invalid value */
         std::mutex mut_dma;                                 /* DMA Interrupt mutex lock */
         std::condition_variable dma_interrupt_cv;           /* DMA Interrupt condition var, [controlled by mut_dma] */
-        std::atomic<bool> new_result_data_input{false};     /* assign to outside */
-        std::deque<BeamformerResultMeta> result_queue;      /* Result queue, [controlled by mut_dma] */
 
         /* Atomics */
         std::atomic<bool> system_run{false};                  /* system run enable */
@@ -118,7 +111,6 @@ namespace vuprs
         std::atomic<int> interrupt_wait_time_us{0};           /* = descriptor_update_cycle_us / 10 */
         std::atomic<int> circular_buffer_wait_time_us{0};     /* = descriptor_update_cycle_us / 5 */
         std::atomic<uint32_t> circular_buffer_queue_size_max; /* MAX size of circular buffer queue */
-        std::atomic<uint32_t> result_queue_size_max;          /* MAX size of result queue */
         std::atomic<bool> scan_enable{false};                 /* Scan enable flag */
         std::atomic<bool> scan_options_changed{false};        /* Scan options changed flag */
         std::atomic<bool> scan_options_initialized{false};    /* Scan options initialized flag */
@@ -126,6 +118,7 @@ namespace vuprs
         /* Optional consumers; set before run() and left unchanged while running. */
         std::function<void(BeamformerResultMeta &&)> result_callback_;
         std::function<void(ScanResult &&)> scan_callback_;
+        std::function<bool()> consumer_gate_; /* optional: skip a frame when false */
 
         /* Threads */
 
@@ -138,30 +131,30 @@ namespace vuprs
         void THREAD__ListenDMAInterrupt();
 
         /**
-         * @brief After interrupted, read data from FPGA DDR to queue.
+         * @brief After interrupted, read data from FPGA DDR and deliver it to the result callback.
          *
          * @note STEP 1: Wait AXI DMA interrupt.
          * @note STEP 2: Read DDR to buffer.
-         * @note STEP 3: Push data to beamformingResultQueue
+         * @note STEP 3: Push data to the result callback.
          * @note Control mutex lock: mut_dma.
          */
         void THREAD__ReadResult();
 
         /**
-         * @brief Read circular buffer and push data to queue.
+         * @brief Read circular buffer and push data to the array signal queue.
          *
          * @note If interrupt detected, circular_buffer_irq <-- true.
-         * @note Control mutex lock: mut_alg.
+         * @note Control mutex lock: mut_queue.
          */
         void THREAD__ReadCircularBuffer();
 
         /**
-         * @brief Get data from queue and do beam forming calculate and push to queue.
+         * @brief Pop the array signal queue, do beam forming, and issue FIR coefficients.
          */
         void THREAD__AlgorithmCalculation();
 
         /**
-         * @brief Get data from output array signal queue and do scan power calculation.
+         * @brief Get the covariance snapshot and do scan power calculation.
          */
         void THREAD__ScanPowerCalculation();
 
@@ -210,6 +203,14 @@ namespace vuprs
          */
         void SetResultCallback(std::function<void(BeamformerResultMeta &&)> callback);
         void SetScanCallback(std::function<void(ScanResult &&)> callback);
+
+        /**
+         * @brief Set an optional gate checked on the DSP/scan threads before doing work.
+         *
+         * @note Return false to skip a frame entirely (e.g. no network client).
+         * @note Call before run(); must be non-blocking.
+         */
+        void SetConsumerGate(std::function<bool()> gate);
 
         bool InferenceReady() const { return this->inference_ready.load(); }
         double HardwareSamplingFrequency();
@@ -303,84 +304,6 @@ namespace vuprs
          * @brief Check config valid.
          */
         bool CheckScanningConfigValid(const ScanningConfig &config, std::string *info) const;
-
-        /* ------ Part 3: Data Input/Output ------ */
-
-        /* - Part 3.1: Beamforming result data Input/Output - */
-
-        /**
-         * @brief Indicate new result data input.
-         *
-         * @note Tread safety.
-         *
-         * @retval true: new result data input;
-         * @retval false: no new result data input.
-         */
-        bool HasResult() const;
-
-        /**
-         * @brief Read result from result queue.
-         *
-         * @note Tread safety.
-         *
-         * @param meta beamformer result.
-         *
-         * @retval true: success.
-         * @retval false: failed.
-         */
-        bool ReadResult(BeamformerResultMeta *meta);
-
-        /* - Part 3.2: Array signal data Input/Output - */
-
-        /**
-         * @brief Indicate new array signal input.
-         *
-         * @note Tread safety.
-         *
-         * @retval true: new array signal input;
-         * @retval false: no new array signal input.
-         */
-        bool HasArraySignal() const;
-
-        /**
-         * @brief Read array signal from output array signal queue.
-         *
-         * @note Tread safety.
-         *
-         * @param signalData pointer to SignalData struct to store the array signal.
-         *
-         * @retval true: success.
-         * @retval false: failed.
-         */
-        bool ReadArraySignal(vuprs::SignalData *signalData);
-
-        /* - Part 3.3: Scan power data Input/Output - */
-
-        /**
-         * @brief Indicate new scan points input.
-         *
-         * @note Tread safety.
-         *
-         * @retval true: new scan points input;
-         * @retval false: no new scan points input.
-         */
-        bool HasScanPower() const;
-
-        /**
-         * @brief Read scan power from scan power queue.
-         *
-         * @note Tread safety.
-         *
-         * @param scanPower pointer to vector to store the scan power (in dB).
-         * @param max_power_db pointer to maximum power value in dB.
-         * @param min_power_db pointer to minimum power value in dB.
-         *
-         * @retval true: success.
-         * @retval false: failed.
-         */
-        bool ReadScanPower(std::vector<uint16_t> *scanPower,
-                           double *max_power_db,
-                           double *min_power_db);
 
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };

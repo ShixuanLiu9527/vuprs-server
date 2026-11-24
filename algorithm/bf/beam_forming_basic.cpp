@@ -141,7 +141,7 @@ void vuprs::BeamFormingArray::UpdateTimeDelay(double target_alt, double target_a
     }
 }
 
-void vuprs::BeamFormingArray::InputElementSignal(const vuprs::SignalData &adc_data)
+void vuprs::BeamFormingArray::InputElementSignal(vuprs::SignalData &&adc_data)
 {
     RUNTIME_CHECK(this->element_array.size() > 0, "bf", "Cannot input signal to an empty array.");
 
@@ -153,7 +153,7 @@ void vuprs::BeamFormingArray::InputElementSignal(const vuprs::SignalData &adc_da
     {
         if (adc_data.contains(this->element_array[i].adc_channel))
         {
-            adc_data.GetChannelData(this->element_array[i].adc_channel, &this->element_array[i].element_signal_time_domain);
+            adc_data.TakeChannelData(this->element_array[i].adc_channel, &this->element_array[i].element_signal_time_domain);
             this->element_array[i].fs = adc_data.fs;
             this->element_array[i].sampling_time = adc_data.sampling_time;
         }

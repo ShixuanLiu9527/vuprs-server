@@ -49,9 +49,5 @@
     "queue__circular_buffer_queue_size_max": {
         "value": "10",
         "description": "MAX size of circular buffer data queue"
-    },
-    "queue__result_queue_size_max": {
-        "value": "10",
-        "description": "MAX size of result data queue"
     }
 }

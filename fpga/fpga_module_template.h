@@ -700,7 +700,8 @@ namespace vuprs
             uint32_t target_offset = offset + this->fpga_address;
             if (is_read)
             {
-                buffer->malloc(transfer_byte_size);
+                RUNTIME_CHECK(buffer->ensure_capacity(transfer_byte_size),
+                              "fpga", " in [FPGAMemoryTemplate::BufferIO] Cannot allocate buffer.");
                 std::shared_ptr<vuprs::FPGA_IOManagerForMemory> c2h_manager;
                 {
                     std::unique_lock<std::mutex> lock(this->mut_c2h); /* LOCK */
