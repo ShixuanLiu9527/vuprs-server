@@ -1,3 +1,14 @@
 .vscode/
 run_dir/
-build/
+build*/
+
+# pcie/xdma 构建产物 (兜底, 正常构建后产物会移到 build/xdma/ 下)
+pcie/xdma/*.o
+pcie/xdma/*.ko
+pcie/xdma/*.mod
+pcie/xdma/*.mod.c
+pcie/xdma/*.mod.o
+pcie/xdma/.*.cmd
+pcie/xdma/modules.order
+pcie/xdma/Module.symvers
+pcie/xdma/.tmp_versions/

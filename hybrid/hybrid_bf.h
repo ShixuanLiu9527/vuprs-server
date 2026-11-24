@@ -22,7 +22,7 @@ namespace vuprs
         std::vector<uint32_t> inference_result; /* inference result from NPU (Q31) */
         int inference_result_identity;          /* inference result class identity */
         bool inference_valid;
-        BeamformerResultMeta() : inference_valid(false), inference_result_identity(-1) {}
+        BeamformerResultMeta() : inference_result_identity(-1), inference_valid(false) {}
     };
 
     /**

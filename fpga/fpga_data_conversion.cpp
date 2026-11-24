@@ -91,7 +91,7 @@ bool vuprs::FPGACircularBuffer2Frames(vuprs::AlignedBufferDMA *buffer, vuprs::Si
     uint32_t header_ptr = 0, tailer_ptr = ADC_FRAME_HALF_WORD_SIZE - 2;
     adc_data->_channel_data.clear();
     adc_data->_channel_data.resize(ADC_CHANNEL_NUMBER);
-    for (int i = 0; i < ADC_CHANNEL_NUMBER; i++)
+    for (uint32_t i = 0; i < ADC_CHANNEL_NUMBER; i++)
     {
         adc_data->_channel_data[i].reserve(vector_size / ADC_FRAME_HALF_WORD_SIZE + 1);
     }
@@ -105,7 +105,7 @@ bool vuprs::FPGACircularBuffer2Frames(vuprs::AlignedBufferDMA *buffer, vuprs::Si
             uint16_t tailer_h = raw_buffer_data[tailer_ptr + 1];
             RUNTIME_CHECK(IS_FRAME_HEADER(header_l, header_h) && IS_FRAME_TAILER(tailer_l, tailer_h), "fpga", " Error memory data.");
             /* Receive Data */
-            for (int ch = 0; ch < ADC_CHANNEL_NUMBER; ch++)
+            for (uint32_t ch = 0; ch < ADC_CHANNEL_NUMBER; ch++)
             {
                 adc_data->_channel_data[ch].emplace_back(
                     std::complex<double>(
@@ -119,7 +119,7 @@ bool vuprs::FPGACircularBuffer2Frames(vuprs::AlignedBufferDMA *buffer, vuprs::Si
         tailer_ptr += ADC_FRAME_HALF_WORD_SIZE;
     }
 
-    for (int ch = 0; ch < ADC_CHANNEL_NUMBER; ch++)
+    for (uint32_t ch = 0; ch < ADC_CHANNEL_NUMBER; ch++)
     {
         vuprs::RotateCircularBuffer<std::complex<double>>(&adc_data->_channel_data[ch], point_pos_cbf);
     }

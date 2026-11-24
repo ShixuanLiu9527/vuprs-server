@@ -148,18 +148,19 @@ namespace vuprs
         void InputFrameSignal(const Eigen::Matrix<double, -1, 1> &frame_signal, double fs);
 
     public:
-        SignalExtractor() : frames(0),
-                            dims(0),
-                            N(0),
-                            circular_ptr(0),
-                            total_frames_processed(0),
-                            first_alloc(true),
+        SignalExtractor() : first_alloc(true),
                             flushed(false),
                             signal_average_set(false),
+                            signal_average(0.0),
+                            frame_time_ms(0.0),
                             f_l(0.0),
                             f_u(0.0),
-                            frame_time_ms(0.0),
-                            signal_average(0.0) {};
+                            N(0),
+                            pool_size(0),
+                            frames(0),
+                            dims(0),
+                            circular_ptr(0),
+                            total_frames_processed(0) {};
         ~SignalExtractor() = default;
 
         SignalExtractor(const SignalExtractor &other) = delete;

@@ -122,8 +122,6 @@ void vuprs::Beamformer_MVDR::CalculateBeamformingForOneFreq(int freq_index)
     /* Read */
     ps[freq_index] = this->steering_vectors.col(freq_index);
     R[freq_index] = this->estimate_cov_matrix[freq_index];
-    double fs = this->signal_frequency_list(freq_index);
-    int M = this->array.size();
     /* Compute */
     invR[freq_index] = R[freq_index].inverse();
     invR_ps[freq_index] = invR[freq_index] * ps[freq_index];

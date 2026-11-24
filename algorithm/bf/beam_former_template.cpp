@@ -105,19 +105,19 @@ void vuprs::WidebandBeamformerTemplate::UpdateCovarianceMatrix()
     RUNTIME_CHECK(!this->is_signal_empty, "bf", "Signal is empty.");
     this->array.GetArraySignalMatrix(&this->snap_signal_matrix_freq_domain, nullptr, true); /* Get array signal */
     int data_points = this->snap_signal_matrix_freq_domain.cols();
-    if (this->estimate_cov_matrix.size() <= 0)
+    if (this->estimate_cov_matrix.empty())
     {
         this->estimate_cov_matrix.resize(data_points);
     }
-    else if (this->estimate_cov_matrix.size() != data_points)
+    else if (this->estimate_cov_matrix.size() != static_cast<size_t>(data_points))
     {
         RUNTIME_CHECK(false, "bf", "Data points in snapshot != latest");
     }
-    if (this->mean_cov_matrix.size() <= 0)
+    if (this->mean_cov_matrix.empty())
     {
         this->mean_cov_matrix.resize(data_points);
     }
-    else if (this->mean_cov_matrix.size() != data_points)
+    else if (this->mean_cov_matrix.size() != static_cast<size_t>(data_points))
     {
         RUNTIME_CHECK(false, "bf", "Data points in snapshot != latest");
     }

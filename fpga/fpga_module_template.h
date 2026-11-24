@@ -100,7 +100,7 @@ namespace vuprs
             int reg_num = mul_reg_selection.size();
             PARAM_CHECK(this->is_io_manager_bind, "fpga", " FPGA file manager is NULL.");
             PARAM_CHECK(reg_num > 0, "fpga", " No registers read or written.");
-            PARAM_CHECK(is_read || io_value->size() == reg_num, "fpga", " mul_read_value.size() != register count to read.");
+            PARAM_CHECK(is_read || io_value->size() == static_cast<size_t>(reg_num), "fpga", " mul_read_value.size() != register count to read.");
             std::shared_ptr<vuprs::FPGA_IOManagerForDevice> manager;
             {
                 std::unique_lock<std::mutex> lock(this->mut_dev); /* LOCK */

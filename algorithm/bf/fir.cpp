@@ -53,14 +53,14 @@ bool vuprs::FIRCalculator::SolveCoeffUseExpectedFrequencyResponse(const Eigen::M
     int M = response.rows();          /* M */
     int N_2_plus_1 = response.cols(); /* N/2+1 */
     int N = (N_2_plus_1 - 1) * 2;     /* N */
-    PARAM_CHECK(N >= this->fir_length, "bf", " Too little response for solving.");
+    PARAM_CHECK(N >= static_cast<int>(this->fir_length), "bf", " Too little response for solving.");
     this->fir_coefficient.resize(M);
     for (auto &val : this->fir_coefficient)
         val.resize(this->fir_length);
     this->max_abs_coefficient = 0.0;
     std::vector<std::future<void>> futures;
     futures.reserve(M);
-    if (this->fft_managers.size() != M)
+    if (this->fft_managers.size() != static_cast<size_t>(M))
     {
         this->fft_managers.resize(M);
     }
