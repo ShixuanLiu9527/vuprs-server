@@ -9,7 +9,7 @@
 
 ## 系统简介
 
-`VUPRS Server` 是车下故障声学定位与识别系统的服务器端软件, 运行于 `RK3568` (ARM64) 平台, 与板载 `XC7A100T` (Artix-7) `FPGA` 通过 `XDMA` 进行高速数据交互, 完成声学信号的采集、波束形成、故障检测与识别, 并通过以太网 `TCP` 服务器对外提供命令与数据服务.
+`VUPRS Server` 是车下故障声学定位与识别系统的服务器端软件, 运行于 `RK3568` (ARM64) 平台, 与板载 `XC7A100T` (Artix-7) `FPGA` 通过 `XDMA` 进行高速数据交互, 完成声学信号的采集, 波束形成, 故障检测与识别, 并通过以太网 `TCP` 服务器对外提供命令与数据服务.
 
 主要功能:
 
@@ -32,19 +32,19 @@ root/
 ├── cmake             # CMake 辅助文件 (交叉编译工具链等)
 ├── configs           # 项目配置文件 (7 个 JSON 模板)
 ├── docs              # 项目相关文档
-├── fpga              # FPGA 通信与控制代码 (XDMA 设备封装、寄存器读写、数据转换)
+├── fpga              # FPGA 通信与控制代码 (XDMA 设备封装, 寄存器读写, 数据转换)
 │   └── cli           #   FPGA 调试工具 FPGA-Tool
 ├── hybrid            # 混合波束形成 (Hybrid Beam Forming) 模块
 ├── logger            # 系统日志管理 (spdlog 封装) 与参数检查
-├── misc              # 系统通用工具 (对齐缓冲、文件处理、字符串解析)
+├── misc              # 系统通用工具 (对齐缓冲, 文件处理, 字符串解析)
 ├── pcie              # PCIe/XDMA 驱动源代码 (内核模块 xdma.ko)
 ├── scripts           # 板端运行脚本 (create_run_dir / run_server / config_eth0 / load_xdma_driver)
-├── server            # TCP 服务器代码 (协议解析、会话管理、Socket IO)
+├── server            # TCP 服务器代码 (协议解析, 会话管理, Socket IO)
 │   ├── net           #   网络层 (Standalone Asio)
 │   └── test          #   网络层测试与 mock server
 ├── build.sh          # 一键构建脚本 (XDMA 驱动 + 服务器 + FPGA-Tool)
 ├── CMakeLists.txt    # 顶层 CMake 工程文件
-├── config.h          # 全局配置宏 (调试开关、算法参数等)
+├── config.h          # 全局配置宏 (调试开关, 算法参数等)
 └── main.cpp          # 服务器入口
 ```
 
@@ -53,7 +53,7 @@ root/
 - `Linux` (开发机: x86_64; 目标板: RK3568, `aarch64`);
 - `CMake` >= 3.10, 支持 `C++17` 的交叉编译器 (如 `gcc-linaro-7.5.0` aarch64 工具链);
 - 目标板内核源码及其构建环境 (编译 `XDMA` 驱动用);
-- `3rdparty` 中已内置 `asio`、`eigen`、`fftw3`、`nlohmann-json`、`rknpu2`、`spdlog`, 无需额外安装.
+- `3rdparty` 中已内置 `asio`, `eigen`, `fftw3`, `nlohmann-json`, `rknpu2`, `spdlog`, 无需额外安装.
 
 ## 构建
 
@@ -90,7 +90,7 @@ sudo sh ./build.sh all  # 编译全部 (XDMA 驱动, Server 和 FPGA-Tool)
 
 | 命令 | 说明 |
 | :--- | :--- |
-| `sh ./build.sh all` | 编译 XDMA 驱动、Server 和 FPGA-Tool |
+| `sh ./build.sh all` | 编译 XDMA 驱动, Server 和 FPGA-Tool |
 | `sh ./build.sh xdma` | 仅编译 XDMA 驱动 |
 | `sh ./build.sh server` | 仅编译 Server 和 FPGA-Tool |
 | `sh ./build.sh clean-all` | 清理所有编译产物 |
@@ -202,12 +202,12 @@ sudo sh ./run_server.sh
 
 | 配置文件 | 说明 |
 | :--- | :--- |
-| `fpga_config.json` | FPGA 侧各模块配置 (总线地址、DMA、寄存器偏移等), 用于 ARM 端与 FPGA 通信 |
-| `server_config.json` | 服务器端口、最大帧负载、数据/控制队列长度 |
-| `array_config.json` | 麦克风阵列配置 (阵元坐标、ADC 通道), 通过修改该文件可适配不同的麦克风阵列 |
+| `fpga_config.json` | FPGA 侧各模块配置 (总线地址, DMA, 寄存器偏移等), 用于 ARM 端与 FPGA 通信 |
+| `server_config.json` | 服务器端口, 最大帧负载, 数据/控制队列长度 |
+| `array_config.json` | 麦克风阵列配置 (阵元坐标, ADC 通道), 通过修改该文件可适配不同的麦克风阵列 |
 | `fir_config.json` | FIR 滤波器模块参数配置 |
-| `rknn_config.json` | RKNN 模型推理配置 (分析频率范围、帧时长、模型路径) |
-| `hybrid_default_config.json` | 混合波束形成默认参数 (采样率、波束指向、声速等) |
+| `rknn_config.json` | RKNN 模型推理配置 (分析频率范围, 帧时长, 模型路径) |
+| `hybrid_default_config.json` | 混合波束形成默认参数 (采样率, 波束指向, 声速等) |
 | `logger_config.json` | 系统日志输出目录配置 |
 
 ## FPGA 读写调试工具 FPGA-Tool
@@ -227,11 +227,9 @@ sudo sh ./scripts/load_xdma_driver.sh
 
 [网络通信协议](./docs/protocol_cmd.md)
 
-[服务器代码审查记录](./docs/server_code_review.md)
-
 ### 网络层 / mock server
 
-服务端网络层位于 `server/net/`，使用 `3rdparty/asio` 中的 Standalone Asio；协议为单端口、定长帧、控制 JSON + 二进制数据推送。网络层测试与 mock server 位于 `server/test/`，不依赖 FPGA/RKNN，可以在主机上单独构建和测试：
+服务端网络层位于 `server/net/`, 使用 `3rdparty/asio` 中的 Standalone Asio; 协议为单端口, 定长帧, 控制 JSON + 二进制数据推送. 网络层测试与 mock server 位于 `server/test/`, 不依赖 FPGA/RKNN, 可以在主机上单独构建和测试:
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
