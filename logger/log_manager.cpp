@@ -43,7 +43,7 @@ std::shared_ptr<spdlog::logger> vuprs::LogManager::getLogger(const std::string &
                                             __LOGGER_FILE_MAX_SIZE__,
                                             __LOGGER_FILE_MAX_FILES__);
     }
-#if DEBUG
+#if VUPRS_DEBUG
     logger->set_level(spdlog::level::debug);
     logger->flush_on(spdlog::level::debug);
 #else

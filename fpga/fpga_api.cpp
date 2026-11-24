@@ -136,7 +136,7 @@ bool vuprs::FPGA_API__FIR__SetCoefficients(vuprs::FPGAController *controller,
 {
     PARAM_CHECK(controller->ConfigDone(), "fpga", " FPGA Controller not configured in advance.");
     PARAM_CHECK(!coefficients->empty(), "fpga", " Coefficients empty.");
-#if DEBUG
+#if VUPRS_DEBUG
     static int debug_file_group = 0;
 #endif
     uint64_t banks = coefficients->size();
@@ -171,7 +171,7 @@ bool vuprs::FPGA_API__FIR__SetCoefficients(vuprs::FPGAController *controller,
     }
     /* Data to buffer */
     buffer.from_vector<uint32_t>(coefficients_to_write);
-#if DEBUG
+#if VUPRS_DEBUG
     vuprs::SaveToCSV(*coefficients, std::string(DEBUG_FILES_ROOT_DIR) + "/" +
                                         std::string(DEBUG_FILES_DIR) + "-" + std::to_string(debug_file_group) + "/" +
                                         std::string(FIR_COEF_DEBUG_FILENAME));

@@ -304,7 +304,7 @@ bool vuprs::HybridBeamformer::StartBeamformerWithConfiguration(const vuprs::Hybr
     this->circular_buffer_wait_time_us = descriptor_update_cycle_us / 20;
     HYBRID_LOG(V_DEBUG) << "DMA interrupt cycle time = " + std::to_string(this->interrupt_wait_time_us) + " us";
     HYBRID_LOG(V_DEBUG) << "Circular buffer interrupt cycle time = " + std::to_string(this->circular_buffer_wait_time_us) + " us";
-#if DEBUG
+#if VUPRS_DEBUG
     printf("DMA descriptor update cycle: %d us\n", descriptor_update_cycle_us);
     printf("DMA interrupt wait time: %d us\n", this->interrupt_wait_time_us.load());
     printf("Circular buffer interrupt wait time: %d us\n", this->circular_buffer_wait_time_us.load());
@@ -599,7 +599,7 @@ void vuprs::HybridBeamformer::THREAD__ListenDMAInterrupt()
                 this->dma_current_desc.store(r_val);
                 if (!is_first_change)
                 {
-#if DEBUG
+#if VUPRS_DEBUG
                     printf("[debug] DMA interrupt detected, current desc = 0x%X\n", r_val);
 #endif
                     this->dma_descriptor_irq = true;
@@ -630,7 +630,7 @@ void vuprs::HybridBeamformer::THREAD__ReadResult()
     bool has_interrupt;
     int last_read_index = -1;
     double _hardware_fs;
-#if DEBUG
+#if VUPRS_DEBUG
     int debug_file_group = 0;
 #endif
     {
@@ -657,7 +657,7 @@ void vuprs::HybridBeamformer::THREAD__ReadResult()
             vuprs::BeamformerResultMeta result_meta;
             /* Convert buffer to vector */
             result_meta.signal = buffer.to_vector<uint32_t>();
-#if ENABLE_INFERENCE || DEBUG
+#if ENABLE_INFERENCE || VUPRS_DEBUG
             /* Convert to double */
             vuprs::Q16__UINT32_TO_DOUBLE(result_meta.signal, &result_d);
 #endif
@@ -681,7 +681,7 @@ void vuprs::HybridBeamformer::THREAD__ReadResult()
                 }
             }
 #endif
-#if DEBUG
+#if VUPRS_DEBUG
             buffer.to_file(std::string(DEBUG_FILES_ROOT_DIR) + "/" +
                            std::string(DEBUG_FILES_DIR) + "-" + std::to_string(debug_file_group) + "/" +
                            std::string(FIR_RESULT_BIN_DEBUG_FILENAME));
@@ -757,7 +757,7 @@ void vuprs::HybridBeamformer::THREAD__ReadCircularBuffer()
         try
         {
             this->controller.dev__circular_buffer.ReadSingleRegisterBIT(vuprs::Circular_Buffer__Registers::CBUF_RS, 1, &r_val);
-#if DEBUG
+#if VUPRS_DEBUG
             printf("[debug] circular buffer CBUF_RS[1] = %d\n", r_val);
 #endif
         }
@@ -807,7 +807,7 @@ void vuprs::HybridBeamformer::THREAD__AlgorithmCalculation()
     Eigen::Matrix<Eigen::dcomplex, -1, -1> fir_expected_frequency_response; /* Expected frequency response of FIR filter bank */
     std::vector<std::vector<double>> fir_coefficients;                      /* Coefficient of FIR filter bank, [channel][point] */
     std::vector<std::string> channel_name;                                  /* Channel name */
-#if DEBUG
+#if VUPRS_DEBUG
     int debug_file_group = 0;
 #endif
     while (this->system_run)
@@ -839,7 +839,7 @@ void vuprs::HybridBeamformer::THREAD__AlgorithmCalculation()
                 signal = std::move(this->array_signal_queue.front());
                 this->array_signal_queue.pop_front();
             }
-#if DEBUG
+#if VUPRS_DEBUG
             signal.ToCSV(std::string(DEBUG_FILES_ROOT_DIR) + "/" +
                          std::string(DEBUG_FILES_DIR) + "-" + std::to_string(debug_file_group) + "/" +
                          std::string(CIRCULAR_BUFFER_DEBUG_FILENAME));
@@ -888,7 +888,7 @@ void vuprs::HybridBeamformer::THREAD__AlgorithmCalculation()
             std::cout << "Error in [HybridBeamformer::THREAD__AlgorithmCalculation] " << e.what() << std::endl;
             continue;
         }
-#if DEBUG
+#if VUPRS_DEBUG
         printf("[debug] max FIR coefficient = %.8f\n", this->fir.MaxAbsoluteFIRCoefficient());
         debug_file_group++;
         if (debug_file_group >= DEBUG_DATA_GROUP_COUNT)

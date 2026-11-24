@@ -17,7 +17,7 @@
 /**
  * @brief Enable custom debug information.
  */
-#define DEBUG false
+#define VUPRS_DEBUG false
 
 /**
  * @defgroup Debug files.

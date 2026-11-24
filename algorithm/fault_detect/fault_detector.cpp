@@ -46,7 +46,7 @@ bool vuprs::FaultDetector::InitDetector(const std::string &model_config_json,
     RUNTIME_CHECK(inputs[0].n_dims == 4, "inference", "Not a 4D-input model.");
     RUNTIME_CHECK(inputs[0].dims[0] == 1, "inference", "Input batch must be 1.");
     RUNTIME_CHECK(inputs[0].dims[3] == 1, "inference", "Input channel must be 1.");
-#if DEBUG
+#if VUPRS_DEBUG
     printf("Input tensor layout: [%d, %d, %d, %d]\n", inputs[0].dims[0],
            inputs[0].dims[1],
            inputs[0].dims[2],
@@ -143,7 +143,7 @@ void vuprs::FaultDetector::GetResult(Eigen::Matrix<double, -1, 1> *res, int *ide
     {
         res->maxCoeff(identity);
     }
-#if DEBUG
+#if VUPRS_DEBUG
     std::cout << "NPU Inference time comsuming: " << this->model.GetInferenceRuntime() << " us" << std::endl;
 #endif
 }

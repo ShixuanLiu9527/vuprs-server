@@ -100,10 +100,10 @@ namespace vuprs
 #define V_INFO vuprs::LogLevel::_V_INFO   /* Log level: info */
 #define V_DEBUG vuprs::LogLevel::_V_DEBUG /* Log level: debug */
 #define V_TRACE vuprs::LogLevel::_V_TRACE /* Log level: trace */
-#if DEBUG
+#if VUPRS_DEBUG
 #define _LOG(logger, level) vuprs::LogStream(logger, level)
 #define _LOG_BY_NAME(logger, level) vuprs::LogStream(vuprs::LogManager::getLogger(logger), level)
-#else /* DEBUG = false: compile out V_DEBUG / V_TRACE level logs entirely */
+#else /* VUPRS_DEBUG = false: compile out V_DEBUG / V_TRACE level logs entirely */
 #define _LOG(logger, level)                 \
     if ((level) > vuprs::LogLevel::_V_INFO) \
     {                                       \
