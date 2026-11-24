@@ -112,7 +112,7 @@ bool vuprs::FPGA_IOManagerForDevice::MemoryUnmap()
 {
     if (this->is_mmapped && this->mmap_base != MAP_FAILED)
     {
-        int result = ::munmap(this->mmap_base, __XDMA_AXI_LITE_MMAP_SIZE__);
+        ::munmap(this->mmap_base, __XDMA_AXI_LITE_MMAP_SIZE__);
         this->is_mmapped = false;
         this->mmap_base = nullptr;
         return true;

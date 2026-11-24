@@ -191,7 +191,7 @@ void vuprs::BeamFormingArray::GetArraySignalMatrix(Eigen::Matrix<Eigen::dcomplex
     {
         std::vector<std::future<void>> futures;
         futures.reserve(element_size);
-        for (int i = 0; i < element_size; i++)
+        for (uint64_t i = 0; i < element_size; i++)
         {
             futures.emplace_back(this->thread_pool->enqueue(
                 [this, i, &signal_matrix]()
@@ -330,12 +330,12 @@ bool vuprs::SaveToCSV(const Eigen::Matrix<double, -1, 1> &data, const std::strin
 {
     std::vector<double> _data;
     vuprs::eigenVector2stdVector<double>(data, &_data);
-    vuprs::SaveToCSV(_data, filename);
+    return vuprs::SaveToCSV(_data, filename);
 }
 
 bool vuprs::SaveToCSV_complex(const Eigen::Matrix<Eigen::dcomplex, -1, 1> &data, const std::string &filename)
 {
     std::vector<std::complex<double>> _data;
     vuprs::eigenVector2stdVector<std::complex<double>>(data, &_data);
-    vuprs::SaveToCSV_complex(_data, filename);
+    return vuprs::SaveToCSV_complex(_data, filename);
 }

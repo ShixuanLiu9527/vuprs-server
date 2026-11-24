@@ -10,7 +10,7 @@ bool vuprs::FPGA_API__ADC__StartADC(vuprs::FPGAController *controller, double fs
 {
     PARAM_CHECK(controller->ConfigDone(), "fpga", "FPGA Controller not configured in advance.");
 
-    uint32_t r_val, w_val;
+    uint32_t w_val;
     bool operate_status = true;
 
     /* STEP 1: Reset ADC */
@@ -52,7 +52,7 @@ bool vuprs::FPGA_API__CBUF__ReadCircularBuffer(vuprs::FPGAController *controller
     PARAM_CHECK(controller->ConfigDone(), "fpga", "FPGA Controller not configured in advance.");
     RUNTIME_CHECK(controller->dev__circular_buffer.Refreshed(), "fpga", "Circular buffer not refreshed.");
 
-    uint32_t r_val, w_val, CBF;
+    uint32_t r_val, CBF;
     bool operate_status = true;
 
     /* STEP 1: Clear buffer (thread-local so repeated reads reuse the allocation) */
@@ -95,7 +95,6 @@ bool vuprs::FPGA_API__PDLY__SetPredelay(vuprs::FPGAController *controller,
     PARAM_CHECK(channel_name.size() == channel_predelay.size(), "fpga", " Channel name list & channel predelay list not the same size.");
     PARAM_CHECK(channel_predelay.size() == ADC_CHANNEL_NUMBER, "fpga", " Invalid channel predelay size.");
 
-    uint32_t r_val, w_val;
     std::vector<uint16_t> predelay_ordered(ADC_CHANNEL_NUMBER);
     std::vector<uint32_t> predelay_to_write(ADC_CHANNEL_NUMBER / 2);
     const std::vector<vuprs::PreDelay_Unit__Registers> registers_to_write = {
@@ -108,13 +107,13 @@ bool vuprs::FPGA_API__PDLY__SetPredelay(vuprs::FPGAController *controller,
         vuprs::PreDelay_Unit__Registers::PREDLY_CH13_CH14,
         vuprs::PreDelay_Unit__Registers::PREDLY_CH15_CH16,
     };
-    for (int i = 0; i < ADC_CHANNEL_NUMBER; i++)
+    for (uint32_t i = 0; i < ADC_CHANNEL_NUMBER; i++)
     {
         int pos = vuprs::FindValueInVec<std::string>(channel_name, ADC_CHANNEL_ADDR_MAP[i]);
         PARAM_CHECK(pos >= 0, "fpga", " Missing channel: " + ADC_CHANNEL_ADDR_MAP[i]);
         predelay_ordered[i] = static_cast<uint16_t>(channel_predelay[pos]);
     }
-    for (int i = 0; i < ADC_CHANNEL_NUMBER / 2; i++)
+    for (uint32_t i = 0; i < ADC_CHANNEL_NUMBER / 2; i++)
     {
         predelay_to_write[i] = UINT16_SPLI_TO_UINT32(predelay_ordered[2 * i], predelay_ordered[2 * i + 1]);
     }
@@ -151,7 +150,7 @@ bool vuprs::FPGA_API__FIR__SetCoefficients(vuprs::FPGAController *controller,
         }
         else
         {
-            PARAM_CHECK((*coefficients)[i].size() == check_coefficients_count, "fpga", " Inconsistent length of coefficients.");
+            PARAM_CHECK((*coefficients)[i].size() == static_cast<size_t>(check_coefficients_count), "fpga", " Inconsistent length of coefficients.");
         }
     }
     uint32_t r_val;
@@ -212,7 +211,7 @@ bool vuprs::FPGA_API__FIR__SetLengthAndCoefficients(vuprs::FPGAController *contr
         }
         else
         {
-            PARAM_CHECK((*coefficients)[i].size() == check_coefficients_count, "fpga", " Inconsistent length of coefficients.");
+            PARAM_CHECK((*coefficients)[i].size() == static_cast<size_t>(check_coefficients_count), "fpga", " Inconsistent length of coefficients.");
         }
     }
     PARAM_CHECK(len == static_cast<uint32_t>(check_coefficients_count), "fpga", " len(FIR) != len(coef[0])");
@@ -292,7 +291,7 @@ bool vuprs::FPGA_API__DMA__StartScatterGatherDMA_S2MM(vuprs::FPGAController *con
     PARAM_CHECK(descriptorSize > 0, "fpga", " Descriptor is empty.");
     PARAM_CHECK(!(is_cyclic_mode && descriptors[descriptorSize - 1].NXTDESC != descriptors[0].ALIGNMENT_0_CURRENT_ADDR), "fpga", " Invalid cyclic DMA descriptor.");
 
-    uint32_t r_val, w_val;
+    uint32_t w_val;
     bool operate_status = true;
     /* Clear buffer & reset DMA */
     vuprs::AlignedBufferDMA buffer;

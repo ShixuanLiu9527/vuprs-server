@@ -35,7 +35,7 @@ void vuprs::MelFilterBank::SetFilterParameters(double f_l,
         const double freq_per_bin = fs / (double)N;
         const int max_bin = N / 2;
         /* Generate mel filter bank */
-        for (int i = 0; i < K; ++i)
+        for (uint32_t i = 0; i < K; ++i)
         {
             double lower = vuprs::mel2f(interval_m * i + f_l_m);
             double center = vuprs::mel2f(interval_m * (i + 1));
@@ -70,9 +70,9 @@ void vuprs::MelFilterBank::SetFilterParameters(double f_l,
     if (dct_matrix_alloc_flag)
     {
         this->dct_matrix.resize(L + 1, K);
-        for (int i = 0; i < L + 1; ++i)
+        for (uint32_t i = 0; i < L + 1; ++i)
         {
-            for (int j = 0; j < K; ++j)
+            for (uint32_t j = 0; j < K; ++j)
             {
                 this->dct_matrix(i, j) = std::cos(PI * (double)i * ((double)j + 0.5) / K);
             }

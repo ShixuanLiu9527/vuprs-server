@@ -34,12 +34,16 @@ build_xdma()
     make all ARCH="${XDMA__ARCH}" CROSS_COMPILE="${XDMA__CROSS_COMPILE}" BUILDSYSTEM_DIR="${XDMA__KERNEL_DIR}"
 
     if [ ! -f "${XDMA_SOURCE_DIR}/xdma.ko" ]; then
-        echo -e "${RED}file not found: ${file}${NC}"
+        echo -e "${RED}file not found: ${XDMA_SOURCE_DIR}/xdma.ko${NC}"
         echo -e "${RED}Build XDMA Driver FAILED${NC}"
         exit 1
     fi
 
-    cp "${XDMA_SOURCE_DIR}/xdma.ko" "${XDMA_OUTPUT_DIR}/xdma.ko" 2>/dev/null || echo "xdma.ko not found"
+    # 将构建产物统一移动到 build/xdma/ 下,保持源码目录干净
+    mv -f xdma.ko "${XDMA_OUTPUT_DIR}/xdma.ko" || exit 1
+    mv -f *.o *.mod *.mod.c *.mod.o .*.cmd modules.order Module.symvers "${XDMA_OUTPUT_DIR}/" 2>/dev/null
+    rm -rf "${XDMA_OUTPUT_DIR}/.tmp_versions"
+    mv -f .tmp_versions "${XDMA_OUTPUT_DIR}/" 2>/dev/null
     echo -e "${GREEN}Build XDMA Driver DONE${NC}"
 }
 
@@ -57,6 +61,7 @@ clean_xdma()
     echo -e "${BLUE}Cleaning...${NC}"
     cd "${XDMA_SOURCE_DIR}" || exit 1
     make clean ARCH="${XDMA__ARCH}" CROSS_COMPILE="${XDMA__CROSS_COMPILE}" BUILDSYSTEM_DIR="${XDMA__KERNEL_DIR}"
+    rm -rf "${XDMA_OUTPUT_DIR}"
 }
 
 clean_server()
