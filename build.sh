@@ -56,6 +56,15 @@ build_server()
     echo -e "${GREEN}Build Server & Tool DONE${NC}"
 }
 
+copy_board_scripts()
+{
+    echo -e "${BLUE}Copy board scripts to vuprs root...${NC}"
+    cp -f "${SCRIPT_DIR}/scripts/net_config.sh" "${SCRIPT_DIR}/net_config.sh" || exit 1
+    cp -f "${SCRIPT_DIR}/scripts/mount_xdma.sh" "${SCRIPT_DIR}/mount_xdma.sh" || exit 1
+    chmod +x "${SCRIPT_DIR}/net_config.sh" "${SCRIPT_DIR}/mount_xdma.sh"
+    echo -e "${GREEN}Copy board scripts DONE${NC}"
+}
+
 clean_xdma()
 {
     echo -e "${BLUE}Cleaning...${NC}"
@@ -103,17 +112,20 @@ case "$1" in
         build_xdma
         build_server
         deploy_run_dir
+        copy_board_scripts
         echo -e "${GREEN}You can find the output in ./build${NC}"
         ;;
 
     xdma)
         build_xdma
+        copy_board_scripts
         echo -e "${GREEN}You can find the output in ./build${NC}"
         ;;
 
     server)
         build_server
         deploy_run_dir
+        copy_board_scripts
         echo -e "${GREEN}You can find the output in ./build${NC}"
         ;;
     

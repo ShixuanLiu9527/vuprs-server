@@ -1,8 +1,8 @@
 .vscode/
 vuprs/
 build*/
-
-# pcie/xdma 构建产物 (兜底, 正常构建后产物会移到 build/xdma/ 下)
+/net_config.sh
+/mount_xdma.sh
 pcie/xdma/*.o
 pcie/xdma/*.ko
 pcie/xdma/*.mod

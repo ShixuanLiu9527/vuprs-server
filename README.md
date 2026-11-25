@@ -38,7 +38,7 @@ root/
 ├── logger            # 系统日志管理 (spdlog 封装) 与参数检查
 ├── misc              # 系统通用工具 (对齐缓冲, 文件处理, 字符串解析)
 ├── pcie              # PCIe/XDMA 驱动源代码 (内核模块 xdma.ko)
-├── scripts           # 板端运行脚本 (create_run_dir / run_server / config_eth0 / load_xdma_driver)
+├── scripts           # 板端运行脚本 (create_run_dir / run_server / net_config / mount_xdma)
 ├── server            # TCP 服务器代码 (协议解析, 会话管理, Socket IO)
 │   ├── net           #   网络层 (Standalone Asio)
 │   └── test          #   网络层测试与 mock server
@@ -167,7 +167,7 @@ LOGGER_CONFIG="./configs/logger_config.json"
 
 ### Step 3: 配置以太网静态 IP 地址
 
-在 `scripts/config_eth0.sh` 中设置以太网静态 IP (首次配置后脚本会将原配置备份为 `/etc/network/interfaces.bak_vuprs`):
+在 `scripts/net_config.sh` 中设置以太网静态 IP (首次配置后脚本会将原配置备份为 `/etc/network/interfaces.bak_vuprs`):
 
 ```shell
 INTERFACE="eth0"
@@ -177,12 +177,12 @@ GATEWAY="192.168.1.1"
 DNS="114.114.114.114"
 ```
 
-[查看 `config_eth0.sh`](./scripts/config_eth0.sh)
+[查看 `net_config.sh`](./scripts/net_config.sh)
 
-完成后, 在板端运行脚本文件:
+`build.sh` 会将 `net_config.sh` 和 `mount_xdma.sh` 拷贝到项目根目录. 完成后, 在板端运行脚本文件:
 
 ```bash
-sudo sh ./config_eth0.sh
+sudo sh ./net_config.sh
 ```
 
 ### Step 4: 启动服务器
@@ -214,13 +214,13 @@ sudo sh ./run_server.sh
 
 为了方便调试, 设计了 `FPGA-Tool` 终端调试工具, 可以通过终端读写 FPGA 中的寄存器和内存.
 
-使用前请先通过脚本 `load_xdma_driver.sh` 挂载 `xdma` 驱动 (挂载前请检查脚本同级目录下是否有驱动文件 `xdma.ko`):
+使用前请先通过脚本 `mount_xdma.sh` 挂载 `xdma` 驱动 (脚本会自动在自身目录、`build/xdma/` 和当前目录中查找 `xdma.ko`):
 
 ```bash
-sudo sh ./scripts/load_xdma_driver.sh
+sudo sh ./mount_xdma.sh
 ```
 
-[查看 `load_xdma_driver.sh`](./scripts/load_xdma_driver.sh)
+[查看 `mount_xdma.sh`](./scripts/mount_xdma.sh)
 [FPGA-Tool 使用手册](./docs/ug-fpga-tool.md)
 
 ## 网络通信协议
