@@ -24,8 +24,7 @@ namespace vuprs
     class WidebandBeamformerTemplate
     {
     private:
-        std::unique_ptr<ThreadPool> thread_pool;
-        std::unique_ptr<ThreadPool> thread_pool_scan;
+        std::shared_ptr<ThreadPool> thread_pool; /* Owned fallback; replaced by SetThreadPool() */
         double covariance_snap_window_size;
         double adjacent_freq_average_index;
         double adjacent_freq_average_index_1;
@@ -85,6 +84,9 @@ namespace vuprs
         vuprs::AlignedEigenVector<Eigen::Matrix<Eigen::dcomplex, -1, -1>> mean_cov_matrix;     /* Size: N / 2 + 1, cov_matrix[i] is the mean cov matrix in band [i] */
         vuprs::AlignedEigenVector<Eigen::Matrix<Eigen::dcomplex, -1, -1>> estimate_cov_matrix; /* Size: N / 2 + 1, cov_matrix[i] is the mean cov matrix in band [i] */
         std::vector<Eigen::Matrix<Eigen::dcomplex, -1, -1>> covariance_update_scratch;         /* Size: n_chunks, one M x M scratch per worker chunk (UpdateCovarianceMatrix), algorithm thread only */
+        std::vector<Eigen::Matrix<double, 1, -1>> scan_partial_power;                          /* Reused per-chunk partial sums (ScanForPositionPower), scan thread only */
+        Eigen::Matrix<double, 1, -1> scan_total_power;                                         /* Reused total power accumulator (ScanForPositionPower), scan thread only */
+        std::vector<Eigen::Matrix<Eigen::dcomplex, -1, -1>> scan_rw_scratch;                   /* Reused R * W temp per chunk (ScanForPositionPower), scan thread only */
 
         /**
          * @brief Calculate beamforming for one frequency.
@@ -94,8 +96,9 @@ namespace vuprs
          * @note                          result weight vector = result_weight_vectors.col(i);
          *
          * @param freq_index frequency index
+         * @param chunk_id parallel chunk id (unique per worker task), used to index per-worker caches
          */
-        virtual void CalculateBeamformingForOneFreq(int freq_index) = 0;
+        virtual void CalculateBeamformingForOneFreq(int freq_index, int chunk_id = -1) = 0;
 
         virtual void PrepareCalculationCache(int freq_nums) = 0;
 
@@ -121,6 +124,15 @@ namespace vuprs
          * @param array_config_json_filename JSON file name.
          */
         bool ConfigArrayFromJson(const std::string &array_config_json_filename);
+
+        /**
+         * @brief Replace the internal thread pool with a shared one.
+         *
+         * @note All internal parallel work (covariance update, beam forming, scan power
+         * @note calculation and the array FFT) uses this pool.
+         * @note Must not be called while beam forming tasks are running.
+         */
+        void SetThreadPool(std::shared_ptr<ThreadPool> pool);
 
         /* STEP 2: INPUT SIGNAL */
 

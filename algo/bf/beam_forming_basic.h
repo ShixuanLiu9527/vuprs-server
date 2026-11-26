@@ -77,7 +77,7 @@ namespace vuprs
     class BeamFormingArray
     {
     private:
-        std::unique_ptr<vuprs::ThreadPool> thread_pool;
+        std::shared_ptr<vuprs::ThreadPool> thread_pool; /* Owned fallback; replaced by SetThreadPool() */
         double max_element_position_error;
         Eigen::Matrix<Eigen::dcomplex, -1, 1> time_delay_vector;
         vuprs::AlignedEigenVector<vuprs::BeamFormingElement> element_array;
@@ -97,6 +97,13 @@ namespace vuprs
          * @throw std::runtime_error when error occurs.
          */
         bool LoadArrayFromJson(const std::string &filename);
+
+        /**
+         * @brief Replace the internal thread pool with a shared one.
+         *
+         * @note Used for the per-element FFT work. Must not be called while FFT tasks are running.
+         */
+        void SetThreadPool(std::shared_ptr<vuprs::ThreadPool> pool);
 
         /**
          * @brief Calculate time delay for this array.

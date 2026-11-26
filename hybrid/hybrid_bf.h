@@ -81,7 +81,7 @@ namespace vuprs
         std::vector<double> scan_alt, scan_az;           /* controlled by mut_scan_opt */
         int scan_points_in_hemisphere;                   /* controlled by mut_scan_opt */
         double scan_wave_velocity, scan_alt_min;         /* controlled by mut_scan_opt */
-        std::atomic<uint64_t> scan_generation{0};        /* incremented when a new covariance snapshot is ready */
+        std::atomic<uint64_t> scan_generation{0};        /* incremented when a new covariance snapshot is ready (at most SCAN_MAX_RATE_HZ per second) */
         std::atomic<uint64_t> scan_options_generation{0}; /* incremented when points/alt_min/wave velocity change */
         std::mutex mut_scan_snapshot;                    /* protects scan_snapshot */
         std::shared_ptr<const vuprs::ScanCovarianceSnapshot> scan_snapshot; /* cached covariance snapshot for scan */
@@ -95,6 +95,7 @@ namespace vuprs
         std::mutex mut_alg;                                      /* Algorithm mutex lock (bf/fir/hardware_fs) */
         vuprs::FIRCalculator fir;                                /* FIR algorithm, [controlled by mut_alg] (can be only used in THREAD__AlgorithmCalculation) */
         std::unique_ptr<vuprs::WidebandBeamformerTemplate> bf;   /* Beam forming algorithm, [controlled by mut_alg] (can be only used in THREAD__AlgorithmCalculation) */
+        std::shared_ptr<vuprs::ThreadPool> shared_thread_pool;   /* One pool for all bf/scan/fir/array parallel work, so workers never exceed the core count */
         std::atomic<double> hardware_fs{0.0};                    /* Hardware sampling frequency, calculate by SCI register */
         double bf_freq__lower;                                   /* Bandpass lower boundary (Hz), set at start, read-only afterwards */
         double bf_freq__upper;                                   /* Bandpass upper boundary (Hz), set at start, read-only afterwards */

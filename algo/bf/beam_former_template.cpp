@@ -5,9 +5,15 @@
 
 vuprs::WidebandBeamformerTemplate::WidebandBeamformerTemplate()
 {
-    this->thread_pool = std::make_unique<vuprs::ThreadPool>(std::thread::hardware_concurrency());
-    this->thread_pool_scan = std::make_unique<vuprs::ThreadPool>(std::thread::hardware_concurrency());
+    this->thread_pool = std::make_shared<vuprs::ThreadPool>(std::thread::hardware_concurrency());
     this->ResetAll();
+}
+
+void vuprs::WidebandBeamformerTemplate::SetThreadPool(std::shared_ptr<ThreadPool> pool)
+{
+    RUNTIME_CHECK(pool != nullptr, "bf", "Thread pool cannot be NULL");
+    this->thread_pool = std::move(pool);
+    this->array.SetThreadPool(this->thread_pool);
 }
 
 vuprs::WidebandBeamformerTemplate::~WidebandBeamformerTemplate()
@@ -428,7 +434,12 @@ bool vuprs::WidebandBeamformerTemplate::ScanForPositionPower(std::vector<double>
     int M = this->array.size();                                                       /* Element counts */
     int k = alt.size();                                                               /* Scan points counts */
     int f_count = snapshot.covariance.size();                                         /* In-band frequency counts */
-    Eigen::Matrix<double, 1, -1> total_power = Eigen::Matrix<double, 1, -1>::Zero(k); /* Total power for each scan position */
+    /* Reuse per-call accumulators (single scan caller at a time). */
+    Eigen::Matrix<double, 1, -1> &total_power = this->scan_total_power;               /* Total power for each scan position */
+    if (total_power.cols() != k)
+        total_power = Eigen::Matrix<double, 1, -1>::Zero(k);
+    else
+        total_power.setZero();
     if (f_count > 0)
     {
         /* STEP 1: (Re)generate scan time delay & weight cache when needed.
@@ -468,13 +479,22 @@ bool vuprs::WidebandBeamformerTemplate::ScanForPositionPower(std::vector<double>
         /* STEP 2: Chunked parallel power calculation.
          * power(f, s) = w.H * R * w = Re( sum_m conj(W{m, s}) * (R * W){m, s} ) / M^2,
          * which needs no eigenvalue decomposition (B in R = B * B.H was a pure factorisation).
-         * Each chunk accumulates locally, then a single reduction is done after all tasks finish. */
+         * Each chunk accumulates into a reused buffer, then a single reduction is done
+         * after all tasks finish. All buffers are members, so no per-call allocations. */
         int n_chunks = std::min(std::max(1, static_cast<int>(std::thread::hardware_concurrency())), f_count);
         int chunk_size = (f_count + n_chunks - 1) / n_chunks;
-        std::vector<Eigen::Matrix<double, 1, -1>> partials(n_chunks);
+        if (static_cast<int>(this->scan_partial_power.size()) != n_chunks)
+            this->scan_partial_power.resize(n_chunks);
+        if (static_cast<int>(this->scan_rw_scratch.size()) != n_chunks)
+            this->scan_rw_scratch.resize(n_chunks);
         for (int c = 0; c < n_chunks; c++)
         {
-            partials[c] = Eigen::Matrix<double, 1, -1>::Zero(k);
+            if (this->scan_partial_power[c].cols() != k)
+                this->scan_partial_power[c] = Eigen::Matrix<double, 1, -1>::Zero(k);
+            else
+                this->scan_partial_power[c].setZero();
+            if (this->scan_rw_scratch[c].rows() != M || this->scan_rw_scratch[c].cols() != k)
+                this->scan_rw_scratch[c].resize(M, k);
         }
         std::vector<std::future<void>> futures;
         futures.reserve(n_chunks);
@@ -486,24 +506,24 @@ bool vuprs::WidebandBeamformerTemplate::ScanForPositionPower(std::vector<double>
             {
                 break;
             }
-            futures.emplace_back(this->thread_pool_scan->enqueue(
-                [this, c, k, start, end, &partials, &snapshot]()
+            futures.emplace_back(this->thread_pool->enqueue(
+                [this, c, start, end, &snapshot]()
                 {
-                    Eigen::Matrix<double, 1, -1> acc = Eigen::Matrix<double, 1, -1>::Zero(k);
+                    Eigen::Matrix<double, 1, -1> &acc = this->scan_partial_power[c];
+                    Eigen::Matrix<Eigen::dcomplex, -1, -1> &RW = this->scan_rw_scratch[c];
                     for (int i = start; i < end; i++)
                     {
                         const Eigen::Matrix<Eigen::dcomplex, -1, -1> &R = snapshot.covariance[i];
                         const Eigen::Matrix<Eigen::dcomplex, -1, -1> &W = this->scan_weight_cache[i];
-                        Eigen::Matrix<Eigen::dcomplex, -1, -1> RW = R * W;
+                        RW.noalias() = R * W;
                         acc += (W.array().conjugate() * RW.array()).colwise().sum().real().matrix();
                     }
-                    partials[c] = acc;
                 }));
         }
         for (auto &f : futures)
             f.get();
         for (int c = 0; c < n_chunks; c++)
-            total_power += partials[c];
+            total_power += this->scan_partial_power[c];
         total_power /= (double)M * (double)M; /* CBF scan weight: w = ps / M, so power = ps.H * R * ps / M^2 */
     }
     /* Convert to result */
@@ -571,13 +591,13 @@ void vuprs::WidebandBeamformerTemplate::CalculateBeamforming()
         if (start_idx >= end_idx)
             break;
         futures.emplace_back(this->thread_pool->enqueue(
-            [this, start_idx, end_idx, M]()
+            [this, start_idx, end_idx, M, chunk_idx]()
             {
                 for (int global_idx = start_idx; global_idx < end_idx; global_idx++)
                 {
                     try
                     {
-                        this->CalculateBeamformingForOneFreq(global_idx);
+                        this->CalculateBeamformingForOneFreq(global_idx, chunk_idx);
                     }
                     catch (...)
                     {

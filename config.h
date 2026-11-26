@@ -59,6 +59,7 @@
 #define MAX_SCANNING_POINTS_IN_HALF 10000   /* Upper bound to avoid unreasonable scan grid memory/time */
 #define MIN_SCANNING_ALTITUDE_DEG 10.0      /* Exclusive lower bound of scanning altitude (deg) */
 #define DEFAULT_SCANNING_ALTITUDE_MIN 15.0  /* Minium altitude angle for scanning */
+#define SCAN_MAX_RATE_HZ 20                 /* Max scan update rate (snapshot capture + power map), Hz */
 /**
  * @}
  */

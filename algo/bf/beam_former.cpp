@@ -13,7 +13,7 @@ vuprs::Beamformer_DCRCB::~Beamformer_DCRCB()
 {
 }
 
-void vuprs::Beamformer_DCRCB::CalculateBeamformingForOneFreq(int freq_index)
+void vuprs::Beamformer_DCRCB::CalculateBeamformingForOneFreq(int freq_index, int chunk_id)
 {
     /* Read */
     Eigen::Ref<Eigen::Matrix<Eigen::dcomplex, -1, 1>> ps = this->steering_vectors.col(freq_index);
@@ -26,8 +26,16 @@ void vuprs::Beamformer_DCRCB::CalculateBeamformingForOneFreq(int freq_index)
     double rho = (double)M / (denominator * denominator); /* M / (M - e0 / 2)^2 */
     double sqrt_M_rho = std::sqrt((double)M * rho);       /* sqrt(M * rho) */
 
-    /* STEP 1: Eigenvalue decomposition for covariance matrix R */
-    vuprs::EigenvalueDecomposition(R, &gamma[freq_index], &U[freq_index]);
+    /* STEP 1: Eigenvalue decomposition for covariance matrix R.
+     * R is Hermitian by construction (outer products + symmetric frequency smoothing),
+     * so no symmetrization is needed. Reuse the per-chunk solver to avoid per-bin
+     * allocations (one solver per worker chunk, never shared by two tasks). */
+    RUNTIME_CHECK(chunk_id >= 0, "bf", " Invalid chunk id.");
+    Eigen::SelfAdjointEigenSolver<Eigen::MatrixXcd> &solver = this->eig_solver_cache[chunk_id];
+    solver.compute(R);
+    RUNTIME_CHECK(solver.info() == Eigen::Success, "bf", "Failed to solving eigenvalues");
+    gamma[freq_index] = solver.eigenvalues();
+    U[freq_index] = solver.eigenvectors();
     U_H[freq_index] = U[freq_index].adjoint();
     const Eigen::Matrix<double, -1, 1> &g = gamma[freq_index];
     double min_eig = g.minCoeff();
@@ -98,8 +106,9 @@ vuprs::Beamformer_CBF::~Beamformer_CBF()
 {
 }
 
-void vuprs::Beamformer_CBF::CalculateBeamformingForOneFreq(int freq_index)
+void vuprs::Beamformer_CBF::CalculateBeamformingForOneFreq(int freq_index, int chunk_id)
 {
+    (void)chunk_id; /* CBF has no per-worker cache */
     Eigen::Matrix<Eigen::dcomplex, -1, 1> ps = this->steering_vectors.col(freq_index); /* ps */
     double M = this->array.size();                                                     /* M */
     this->result_weight_vectors.col(freq_index) = ps / M;
@@ -117,8 +126,9 @@ vuprs::Beamformer_MVDR::~Beamformer_MVDR()
 {
 }
 
-void vuprs::Beamformer_MVDR::CalculateBeamformingForOneFreq(int freq_index)
+void vuprs::Beamformer_MVDR::CalculateBeamformingForOneFreq(int freq_index, int chunk_id)
 {
+    (void)chunk_id; /* MVDR has no per-worker cache */
     /* Read */
     ps[freq_index] = this->steering_vectors.col(freq_index);
     R[freq_index] = this->estimate_cov_matrix[freq_index];
