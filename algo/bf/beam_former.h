@@ -1,7 +1,7 @@
 #ifndef BEAM_FORMER_H
 #define BEAM_FORMER_H
 
-#include "algorithm/bf/beam_former_template.h"
+#include "algo/bf/beam_former_template.h"
 
 namespace vuprs
 {

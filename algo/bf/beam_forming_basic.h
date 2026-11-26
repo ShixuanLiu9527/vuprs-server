@@ -12,9 +12,9 @@
 #include "3rdparty/nlohmann/json.hpp"
 #include "misc/string_parse.h"
 #include "fpga/fpga_data_conversion.h"
-#include "algorithm/signal_processing/signal_processing.h"
-#include "algorithm/bf/beam_forming_algorithm.h"
-#include "algorithm/bf/aligned_eigen_vector.h"
+#include "algo/dsp/dsp.h"
+#include "algo/bf/beam_forming_algorithm.h"
+#include "algo/bf/aligned_eigen_vector.h"
 
 #define VUPRS_EPS_1 1e-5
 

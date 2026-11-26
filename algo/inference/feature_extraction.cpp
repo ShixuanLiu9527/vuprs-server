@@ -1,5 +1,5 @@
 #include <algorithm>
-#include "algorithm/inference/feature_extraction.h"
+#include "algo/inference/feature_extraction.h"
 #include "logger/check.h"
 
 void vuprs::MelFilterBank::SetFilterParameters(double f_l,

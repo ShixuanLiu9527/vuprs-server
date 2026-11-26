@@ -1,6 +1,6 @@
 #include "logger/check.h"
 #include "misc/file_processing.h"
-#include "algorithm/inference/launch_npu.h"
+#include "algo/inference/launch_npu.h"
 
 vuprs::RknnModel::RknnModel(const std::string &model_path) : ctx_(0), io_num_{0, 0}
 {

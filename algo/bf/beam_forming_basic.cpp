@@ -1,6 +1,6 @@
 #include "config.h"
 #include "misc/file_processing.h"
-#include "algorithm/bf/beam_forming_basic.h"
+#include "algo/bf/beam_forming_basic.h"
 #include "logger/check.h"
 
 /* --------------------------------------------------------------------------------------------------------------- */

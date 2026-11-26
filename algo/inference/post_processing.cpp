@@ -1,4 +1,4 @@
-#include "algorithm/inference/post_processing.h"
+#include "algo/inference/post_processing.h"
 
 Eigen::Matrix<double, -1, 1> vuprs::softmax(const Eigen::Matrix<double, -1, 1> &vec)
 {

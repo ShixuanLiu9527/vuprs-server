@@ -1,5 +1,5 @@
-#ifndef SIGNAL_PROCESSING_H
-#define SIGNAL_PROCESSING_H
+#ifndef VUPRS_DSP_H
+#define VUPRS_DSP_H
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -71,7 +71,7 @@ namespace vuprs
             std_vector->clear();
             return;
         }
-        PARAM_CHECK(eigen_vector.cols() == 1, "signal_processing", " Invalid shape of eigen (expected: Nx1)");
+        PARAM_CHECK(eigen_vector.cols() == 1, "dsp", " Invalid shape of eigen (expected: Nx1)");
         std_vector->assign(eigen_vector.data(), eigen_vector.data() + eigen_vector.size());
     }
 
@@ -86,7 +86,7 @@ namespace vuprs
             std_vector->clear();
             return;
         }
-        PARAM_CHECK(eigen_row.rows() == 1, "signal_processing", " Invalid shape of eigen (expected: 1xN)");
+        PARAM_CHECK(eigen_row.rows() == 1, "dsp", " Invalid shape of eigen (expected: 1xN)");
 
         std_vector->assign(eigen_row.data(), eigen_row.data() + eigen_row.size());
     }
@@ -248,7 +248,7 @@ namespace vuprs
     template <typename T>
     Eigen::Matrix<T, -1, 1> AddWindow(const Eigen::Matrix<T, -1, 1> &signal, vuprs::WindowType type = vuprs::WindowType::SIG_WINDOW__HAMMING)
     {
-        PARAM_CHECK(signal.size() > 0, "signal_processing", " Empty signal for window.");
+        PARAM_CHECK(signal.size() > 0, "dsp", " Empty signal for window.");
         return signal.cwiseProduct(vuprs::GetWindow(type, signal.rows()));
     }
 

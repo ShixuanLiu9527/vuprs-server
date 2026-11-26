@@ -2,8 +2,8 @@
 #define BEAM_FORMER_TEMPLATE_H
 
 #include <mutex>
-#include "algorithm/bf/beam_forming_basic.h"
-#include "algorithm/bf/beam_forming_algorithm.h"
+#include "algo/bf/beam_forming_basic.h"
+#include "algo/bf/beam_forming_algorithm.h"
 
 namespace vuprs
 {

@@ -1,4 +1,4 @@
-#include "algorithm/bf/fir.h"
+#include "algo/bf/fir.h"
 #include "logger/check.h"
 
 vuprs::FIRCalculator::FIRCalculator()

@@ -4,9 +4,9 @@
 #include <string>
 #include <vector>
 #include <memory>
-#include "algorithm/inference/feature_extraction.h"
-#include "algorithm/inference/launch_npu.h"
-#include "algorithm/inference/post_processing.h"
+#include "algo/inference/feature_extraction.h"
+#include "algo/inference/launch_npu.h"
+#include "algo/inference/post_processing.h"
 #include "logger/log_manager.h"
 
 namespace vuprs

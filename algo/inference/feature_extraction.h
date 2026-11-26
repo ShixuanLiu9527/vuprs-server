@@ -5,7 +5,7 @@
 #include <deque>
 #include <Eigen/Dense>
 #include <vector>
-#include "algorithm/signal_processing/signal_processing.h"
+#include "algo/dsp/dsp.h"
 #include "logger/check.h"
 
 namespace vuprs

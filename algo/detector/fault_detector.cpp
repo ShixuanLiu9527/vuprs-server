@@ -3,7 +3,7 @@
 #include "logger/check.h"
 #include "logger/log_manager.h"
 #include "3rdparty/nlohmann/json.hpp"
-#include "algorithm/fault_detect/fault_detector.h"
+#include "algo/detector/fault_detector.h"
 #include "misc/string_parse.h"
 
 bool vuprs::FaultDetector::InitDetector(const std::string &model_config_json,
@@ -22,13 +22,13 @@ bool vuprs::FaultDetector::InitDetector(const std::string &model_config_json,
         RUNTIME_CHECK(false, "bf", " Failed to load array data from: " + model_config_json);
     }
     /* Read parameters from Json (frequency range is bound to certain model) */
-    RUNTIME_CHECK(json_data.contains("frequency-range"), "fault_detect", "Missing key [frequency-range] in model config.");
-    RUNTIME_CHECK(json_data["frequency-range"].contains("from"), "fault_detect", "Missing key [from] in model config.");
-    RUNTIME_CHECK(json_data["frequency-range"].contains("to"), "fault_detect", "Missing key [to] in model config.");
-    RUNTIME_CHECK(json_data.contains("rknn-model"), "fault_detect", "Missing key [rknn-model] in model config.");
-    RUNTIME_CHECK(json_data["rknn-model"].contains("path"), "fault_detect", "Missing key [path] in model config.");
-    RUNTIME_CHECK(json_data.contains("frame-time-ms"), "fault_detect", "Missing key [rknn-model] in model config.");
-    RUNTIME_CHECK(json_data["frame-time-ms"].contains("time-ms"), "fault_detect", "Missing key [path] in model config.");
+    RUNTIME_CHECK(json_data.contains("frequency-range"), "detector", "Missing key [frequency-range] in model config.");
+    RUNTIME_CHECK(json_data["frequency-range"].contains("from"), "detector", "Missing key [from] in model config.");
+    RUNTIME_CHECK(json_data["frequency-range"].contains("to"), "detector", "Missing key [to] in model config.");
+    RUNTIME_CHECK(json_data.contains("rknn-model"), "detector", "Missing key [rknn-model] in model config.");
+    RUNTIME_CHECK(json_data["rknn-model"].contains("path"), "detector", "Missing key [path] in model config.");
+    RUNTIME_CHECK(json_data.contains("frame-time-ms"), "detector", "Missing key [rknn-model] in model config.");
+    RUNTIME_CHECK(json_data["frame-time-ms"].contains("time-ms"), "detector", "Missing key [path] in model config.");
     std::string s_f_l = json_data["frequency-range"]["from"];
     std::string s_f_h = json_data["frequency-range"]["to"];
     std::string s_frame_time_ms = json_data["frame-time-ms"]["time-ms"];

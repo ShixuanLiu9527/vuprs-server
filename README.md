@@ -24,11 +24,11 @@
 ```bash
 root/
 ├── 3rdparty          # 第三方库: asio, eigen, fftw3, nlohmann-json, rknpu2 (RKNN Runtime), spdlog
-├── algorithm         # 算法模块
+├── algo              # 算法模块
 │   ├── bf            #   波束形成 (Beam Forming) 与 FIR 滤波
-│   ├── fault_detect  #   故障检测
+│   ├── detector      #   故障检测
 │   ├── inference     #   特征提取 / RKNN NPU 推理 / 后处理
-│   └── signal_processing  # 信号处理
+│   └── dsp           # DSP 信号处理
 ├── cmake             # CMake 辅助文件 (交叉编译工具链等)
 ├── configs           # 项目配置文件 (7 个 JSON 模板)
 ├── docs              # 项目相关文档
