@@ -16,8 +16,9 @@ namespace vuprs
         vuprs::AlignedEigenVector<Eigen::Matrix<Eigen::dcomplex, -1, 1>> ps_hat;                  /* (M - e0 / 2) * [((R.-1 + lambda * I).-1) * ps] / [ps.H * ((R.-1 + lambda * I).-1) * ps] */
         vuprs::AlignedEigenVector<Eigen::Matrix<Eigen::dcomplex, -1, 1>> invR_ps_hat;             /* R.-1 * ps.hat */
         vuprs::AlignedEigenVector<Eigen::Matrix<Eigen::dcomplex, -1, 1>> w;                       /* result weight = (R.-1 * ps_hat) / (ps_hat.H * R.-1 * ps_hat) */
+        std::vector<Eigen::SelfAdjointEigenSolver<Eigen::MatrixXcd>> eig_solver_cache;            /* One preallocated solver per worker chunk */
     protected:
-        void CalculateBeamformingForOneFreq(int freq_index) override;
+        void CalculateBeamformingForOneFreq(int freq_index, int chunk_id = -1) override;
         void PrepareCalculationCache(int freq_nums) override
         {
             this->gamma.resize(freq_nums);
@@ -28,6 +29,9 @@ namespace vuprs
             this->ps_hat.resize(freq_nums);
             this->invR_ps_hat.resize(freq_nums);
             this->w.resize(freq_nums);
+            /* Solver cache: one solver per worker chunk (max = thread count). */
+            if (this->eig_solver_cache.size() != std::thread::hardware_concurrency())
+                this->eig_solver_cache.resize(std::max(1u, std::thread::hardware_concurrency()));
         }
 
     public:
@@ -42,7 +46,7 @@ namespace vuprs
         vuprs::AlignedEigenVector<Eigen::Matrix<Eigen::dcomplex, -1, 1>> ps; /* steering vector ps */
 
     protected:
-        void CalculateBeamformingForOneFreq(int freq_index) override;
+        void CalculateBeamformingForOneFreq(int freq_index, int chunk_id = -1) override;
         void PrepareCalculationCache(int freq_nums) override
         {
             this->ps.resize(freq_nums);
@@ -64,7 +68,7 @@ namespace vuprs
         vuprs::AlignedEigenVector<Eigen::Matrix<Eigen::dcomplex, -1, 1>> w;       /* result weight = (R.-1 * ps) / (ps.H * R.-1 * ps) */
 
     protected:
-        void CalculateBeamformingForOneFreq(int freq_index) override;
+        void CalculateBeamformingForOneFreq(int freq_index, int chunk_id = -1) override;
         void PrepareCalculationCache(int freq_nums) override
         {
             this->ps.resize(freq_nums);

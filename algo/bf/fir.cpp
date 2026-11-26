@@ -8,7 +8,13 @@ vuprs::FIRCalculator::FIRCalculator()
     this->freq_range_u = 1000000.0;
     this->last_signal_points = 0;
     this->config_done = false;
-    this->thread_pool = std::make_unique<vuprs::ThreadPool>(std::thread::hardware_concurrency());
+    this->thread_pool = std::make_shared<vuprs::ThreadPool>(std::thread::hardware_concurrency());
+}
+
+void vuprs::FIRCalculator::SetThreadPool(std::shared_ptr<vuprs::ThreadPool> pool)
+{
+    RUNTIME_CHECK(pool != nullptr, "bf", "Thread pool cannot be NULL");
+    this->thread_pool = std::move(pool);
 }
 
 vuprs::FIRCalculator::~FIRCalculator()

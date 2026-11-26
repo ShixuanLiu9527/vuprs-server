@@ -15,7 +15,7 @@ namespace vuprs
         uint32_t last_signal_points; /* last N */
         double freq_range_l, freq_range_u;
         std::vector<vuprs::FFTWManagerComplex> fft_managers; /* FFT manager */
-        std::unique_ptr<vuprs::ThreadPool> thread_pool;
+        std::shared_ptr<vuprs::ThreadPool> thread_pool; /* Owned fallback; replaced by SetThreadPool() */
         std::vector<std::vector<double>> fir_coefficient;
         double max_abs_coefficient = 0.0;
 
@@ -28,6 +28,13 @@ namespace vuprs
          * @brief Configure FIR filter bank from JSON file.
          */
         bool ConfigFIRFromJsonFile(const std::string &json_filename);
+
+        /**
+         * @brief Replace the internal thread pool with a shared one.
+         *
+         * @note Used for the per-channel IFFT work. Must not be called while IFFT tasks are running.
+         */
+        void SetThreadPool(std::shared_ptr<vuprs::ThreadPool> pool);
 
         /**
          * @brief Set interest region for frequency.

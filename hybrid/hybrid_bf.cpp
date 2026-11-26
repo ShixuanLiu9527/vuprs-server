@@ -1,3 +1,4 @@
+#include <chrono>
 #include <cmath>
 #include "config.h"
 #include "hybrid/hybrid_bf.h"
@@ -39,6 +40,10 @@ bool vuprs::HybridBeamformer::BindBeamformer(std::unique_ptr<vuprs::WidebandBeam
 {
     if (beamformer != nullptr)
     {
+        if (this->shared_thread_pool)
+        {
+            beamformer->SetThreadPool(this->shared_thread_pool);
+        }
         this->bf = std::move(beamformer);
     }
     return beamformer != nullptr;
@@ -125,6 +130,11 @@ bool vuprs::HybridBeamformer::InitHybridBeamformer(const std::string &fpga_confi
                                                        "log.txt",
                                                        log_dir);
     HYBRID_LOG(V_DEBUG) << "Successfully init logger: hybrid";
+    /* Share one thread pool across beam forming (covariance/DCRCB), scan power, array FFT and
+     * FIR IFFT, so the number of pool workers never exceeds the core count. */
+    this->shared_thread_pool = std::make_shared<vuprs::ThreadPool>(std::thread::hardware_concurrency());
+    this->bf->SetThreadPool(this->shared_thread_pool);
+    this->fir.SetThreadPool(this->shared_thread_pool);
     this->config_done = operate_status;
     return operate_status;
 }
@@ -807,6 +817,8 @@ void vuprs::HybridBeamformer::THREAD__AlgorithmCalculation()
     Eigen::Matrix<Eigen::dcomplex, -1, -1> fir_expected_frequency_response; /* Expected frequency response of FIR filter bank */
     std::vector<std::vector<double>> fir_coefficients;                      /* Coefficient of FIR filter bank, [channel][point] */
     std::vector<std::string> channel_name;                                  /* Channel name */
+    /* Scan snapshot throttle: epoch means "capture immediately on next opportunity". */
+    std::chrono::steady_clock::time_point last_scan_snapshot_time{};
 #if VUPRS_DEBUG
     int debug_file_group = 0;
 #endif
@@ -850,24 +862,36 @@ void vuprs::HybridBeamformer::THREAD__AlgorithmCalculation()
             /* Step 2: Update covariance matrix */
             this->bf->UpdateCovarianceMatrix();
             /* Publish a covariance snapshot for the scan thread, so it never blocks on mut_alg.
-             * Skip it when nobody is consuming scan results (e.g. client disconnected). */
+             * Skip it when nobody is consuming scan results (e.g. client disconnected).
+             * Throttle: capture at most SCAN_MAX_RATE_HZ times per second, so the scan power
+             * calculation (driven by scan_generation) is capped at the same rate. */
             if (this->scan_enable &&
                 (!this->consumer_gate_ || this->consumer_gate_()))
             {
-                auto snapshot = std::make_shared<vuprs::ScanCovarianceSnapshot>();
-                std::lock_guard<std::mutex> snapshot_lock(this->mut_scan_snapshot); /* LOCK */
-                if (this->bf->SnapshotScanCovariance(snapshot.get(),
-                                                     this->bf_freq__lower,
-                                                     this->bf_freq__upper))
+                const auto now = std::chrono::steady_clock::now();
+                if (last_scan_snapshot_time == std::chrono::steady_clock::time_point{} ||
+                    now - last_scan_snapshot_time >= std::chrono::microseconds(1000000 / SCAN_MAX_RATE_HZ))
                 {
-                    this->scan_snapshot = std::move(snapshot);
-                    ++this->scan_generation;
+                    last_scan_snapshot_time = now;
+                    auto snapshot = std::make_shared<vuprs::ScanCovarianceSnapshot>();
+                    std::lock_guard<std::mutex> snapshot_lock(this->mut_scan_snapshot); /* LOCK */
+                    if (this->bf->SnapshotScanCovariance(snapshot.get(),
+                                                         this->bf_freq__lower,
+                                                         this->bf_freq__upper))
+                    {
+                        this->scan_snapshot = std::move(snapshot);
+                        ++this->scan_generation;
+                    }
+                    else
+                    {
+                        this->scan_snapshot.reset();
+                    }
+                    this->scan_cv.notify_all();
                 }
-                else
-                {
-                    this->scan_snapshot.reset();
-                }
-                this->scan_cv.notify_all();
+            }
+            else
+            {
+                last_scan_snapshot_time = {}; /* Scan off: next enable captures immediately. */
             }
             /* - Check calculate enabled */
             RUNTIME_CHECK(this->bf->CalculateEnable(), "hybrid_bf", " Beam forming algorithm cannot calculate.");

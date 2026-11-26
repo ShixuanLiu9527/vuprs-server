@@ -58,7 +58,13 @@ vuprs::BeamFormingArray::BeamFormingArray()
     this->signal_point_counts = 0;
     this->max_element_position_error = 0.0;
     this->wave_velocity = DEFAULT_WAVE_VELOCITY;
-    this->thread_pool = std::make_unique<vuprs::ThreadPool>(std::thread::hardware_concurrency());
+    this->thread_pool = std::make_shared<vuprs::ThreadPool>(std::thread::hardware_concurrency());
+}
+
+void vuprs::BeamFormingArray::SetThreadPool(std::shared_ptr<vuprs::ThreadPool> pool)
+{
+    RUNTIME_CHECK(pool != nullptr, "bf", "Thread pool cannot be NULL");
+    this->thread_pool = std::move(pool);
 }
 
 vuprs::BeamFormingArray::~BeamFormingArray()
