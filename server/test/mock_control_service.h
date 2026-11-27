@@ -26,6 +26,8 @@ namespace vuprs
                     result.params["protocol_version"] = "1";
                     result.params["server_version"] = "mock-1";
                     result.params["capabilities"] = nlohmann::json::object({{"bf", "1"}, {"scan", "1"}, {"inference", "0"}});
+                    result.params["inference_tensor_length"] = "0";
+                    result.params["inference_format"] = "q31";
                     result.params["limits"] = nlohmann::json::object({
                         {"min_fs", "10.0"},
                         {"max_fs", "120000.0"},
@@ -200,6 +202,8 @@ namespace vuprs
                     result.params["scan_points"] = std::to_string(this->scan_points_.load());
                     result.params["scan_alt_min"] = std::to_string(this->scan_alt_min_.load());
                     result.params["inference_ready"] = "0";
+                    result.params["inference_tensor_length"] = "0";
+                    result.params["inference_format"] = "q31";
                     result.params["protocol_version"] = "1";
                     return result;
                 }

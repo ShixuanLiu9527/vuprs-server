@@ -55,6 +55,7 @@ namespace
         case vuprs::net::MessageType::CONTROL_RESPONSE:
         case vuprs::net::MessageType::BF_DATA:
         case vuprs::net::MessageType::SCAN_DATA:
+        case vuprs::net::MessageType::INFERENCE_DATA:
             return true;
         default:
             return false;
@@ -88,6 +89,8 @@ std::string vuprs::net::MessageTypeName(MessageType type)
         return "bf_data";
     case MessageType::SCAN_DATA:
         return "scan_data";
+    case MessageType::INFERENCE_DATA:
+        return "inference_data";
     default:
         return "unknown";
     }
@@ -151,11 +154,18 @@ std::array<uint8_t, vuprs::net::DATA_HEADER_SIZE> vuprs::net::EncodeBfDataHeader
     PutU32(out.data() + 0, header.sample_rate_millihz);
     PutU32(out.data() + 4, header.sample_count);
     PutU32(out.data() + 8, header.sample_format);
-    PutU32(out.data() + 12, static_cast<uint32_t>(header.inference_identity));
-    PutU32(out.data() + 16, header.inference_valid);
-    PutU32(out.data() + 20, header.reserved[0]);
-    PutU32(out.data() + 24, header.reserved[1]);
-    PutU32(out.data() + 28, header.reserved[2]);
+    for (int i = 0; i < 5; i++)
+        PutU32(out.data() + 12 + 4 * i, header.reserved[i]);
+    return out;
+}
+
+std::array<uint8_t, vuprs::net::DATA_HEADER_SIZE> vuprs::net::EncodeInferenceDataHeader(const InferenceDataHeader &header)
+{
+    std::array<uint8_t, DATA_HEADER_SIZE> out{};
+    PutU32(out.data() + 0, header.tensor_length);
+    PutU32(out.data() + 4, header.data_format);
+    for (int i = 0; i < 6; i++)
+        PutU32(out.data() + 8 + 4 * i, header.reserved[i]);
     return out;
 }
 
@@ -183,14 +193,30 @@ bool vuprs::net::DecodeBfDataHeader(const uint8_t *data, size_t bytes, BfDataHea
     header->sample_rate_millihz = GetU32(data + 0);
     header->sample_count = GetU32(data + 4);
     header->sample_format = GetU32(data + 8);
-    header->inference_identity = static_cast<int32_t>(GetU32(data + 12));
-    header->inference_valid = GetU32(data + 16);
-    header->reserved[0] = GetU32(data + 20);
-    header->reserved[1] = GetU32(data + 24);
-    header->reserved[2] = GetU32(data + 28);
+    for (int i = 0; i < 5; i++)
+        header->reserved[i] = GetU32(data + 12 + 4 * i);
     if (header->sample_format != static_cast<uint32_t>(SampleFormat::INT32_Q16_16))
     {
         SetError(error, "unsupported BF sample format");
+        return false;
+    }
+    return true;
+}
+
+bool vuprs::net::DecodeInferenceDataHeader(const uint8_t *data, size_t bytes, InferenceDataHeader *header, std::string *error)
+{
+    if (data == nullptr || header == nullptr || bytes < DATA_HEADER_SIZE)
+    {
+        SetError(error, "short inference data header");
+        return false;
+    }
+    header->tensor_length = GetU32(data + 0);
+    header->data_format = GetU32(data + 4);
+    for (int i = 0; i < 6; i++)
+        header->reserved[i] = GetU32(data + 8 + 4 * i);
+    if (header->data_format != static_cast<uint32_t>(InferenceFormat::INT32_Q31))
+    {
+        SetError(error, "unsupported inference format");
         return false;
     }
     return true;
@@ -268,6 +294,25 @@ vuprs::net::OutFrame vuprs::net::MakeScanFrame(const ScanDataHeader &data_header
     frame.header = EncodeFrameHeader(header);
     frame.data_header = EncodeScanDataHeader(data_header);
     frame.scan_values = std::move(values);
+    frame.payload_bytes = header.payload_bytes;
+    return frame;
+}
+
+vuprs::net::OutFrame vuprs::net::MakeInferenceFrame(const InferenceDataHeader &data_header,
+                                                    std::shared_ptr<const std::vector<uint32_t>> tensor,
+                                                    uint64_t sequence,
+                                                    uint64_t timestamp_ns)
+{
+    OutFrame frame;
+    const size_t tensor_length = tensor ? tensor->size() : 0;
+    FrameHeader header;
+    header.type = MessageType::INFERENCE_DATA;
+    header.sequence = sequence;
+    header.timestamp_ns = timestamp_ns;
+    header.payload_bytes = static_cast<uint32_t>(DATA_HEADER_SIZE + tensor_length * sizeof(uint32_t));
+    frame.header = EncodeFrameHeader(header);
+    frame.data_header = EncodeInferenceDataHeader(data_header);
+    frame.inference_values = std::move(tensor);
     frame.payload_bytes = header.payload_bytes;
     return frame;
 }

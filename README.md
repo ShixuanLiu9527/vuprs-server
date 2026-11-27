@@ -214,7 +214,7 @@ sudo sh ./run_server.sh
 
 为了方便调试, 设计了 `FPGA-Tool` 终端调试工具, 可以通过终端读写 FPGA 中的寄存器和内存.
 
-使用前请先通过脚本 `mount_xdma.sh` 挂载 `xdma` 驱动 (脚本会自动在自身目录、`build/xdma/` 和当前目录中查找 `xdma.ko`):
+使用前请先通过脚本 `mount_xdma.sh` 挂载 `xdma` 驱动 (脚本会自动在自身目录, `build/xdma/` 和当前目录中查找 `xdma.ko`):
 
 ```bash
 sudo sh ./mount_xdma.sh
@@ -229,7 +229,7 @@ sudo sh ./mount_xdma.sh
 
 ### 网络层 / mock server
 
-服务端网络层位于 `server/net/`, 使用 `3rdparty/asio` 中的 Standalone Asio; 协议为单端口, 定长帧, 控制 JSON + 二进制数据推送. 网络层测试与 mock server 位于 `server/test/`, 不依赖 FPGA/RKNN, 可以在主机上单独构建和测试:
+服务端网络层位于 `server/net/`, 使用 `3rdparty/asio` 中的 Standalone Asio; 协议为单端口, 定长帧, 控制 JSON + 二进制 BF/扫描/推理数据推送. 网络层测试与 mock server 位于 `server/test/`, 不依赖 FPGA/RKNN, 可以在主机上单独构建和测试:
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release

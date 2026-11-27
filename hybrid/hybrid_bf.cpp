@@ -71,6 +71,11 @@ void vuprs::HybridBeamformer::SetScanCallback(std::function<void(ScanResult &&)>
     this->scan_callback_ = std::move(callback);
 }
 
+void vuprs::HybridBeamformer::SetInferenceCallback(std::function<void(InferenceResultMeta &&)> callback)
+{
+    this->inference_callback_ = std::move(callback);
+}
+
 void vuprs::HybridBeamformer::SetConsumerGate(std::function<bool()> gate)
 {
     this->consumer_gate_ = std::move(gate);
@@ -104,6 +109,11 @@ double vuprs::HybridBeamformer::InferenceFrameTimeMs() const
 uint32_t vuprs::HybridBeamformer::InferenceFrameSamples(double fs) const
 {
     return this->fault_detector.FrameLengthSamples(fs);
+}
+
+uint32_t vuprs::HybridBeamformer::InferenceTensorLength() const
+{
+    return this->inference_ready.load() ? this->fault_detector.OutputTensorLength() : 0;
 }
 
 void vuprs::HybridBeamformer::ScanSwitch(bool enable)
@@ -293,7 +303,6 @@ bool vuprs::HybridBeamformer::StartBeamformerWithConfiguration(const vuprs::Hybr
     std::vector<std::vector<double>> fir_coefficients;                      /* Coefficient of FIR filter bank */
     std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> _dma_descriptors;   /* SG descriptors for AXI DMA */
     std::vector<int> predelay_count;
-    std::vector<double> predelay_time;
     std::vector<std::string> channel_name;
     int descriptor_update_cycle_us;
     uint32_t fir_len;
@@ -362,7 +371,7 @@ bool vuprs::HybridBeamformer::StartBeamformerWithConfiguration(const vuprs::Hybr
                                               this->hardware_fs.load(),
                                               true,
                                               &predelay_count,
-                                              &predelay_time,
+                                              nullptr,
                                               &channel_name);
         /* - Set bandpass range */
         this->fir.SetFrequencyRange(config.bf_freq__lower, config.bf_freq__upper);
@@ -421,7 +430,6 @@ bool vuprs::HybridBeamformer::StartBeamformerWithConfiguration(const vuprs::Hybr
 bool vuprs::HybridBeamformer::ReDirect(double alt, double az, double wave_velocity)
 {
     std::vector<int> predelay_count, old_predelay_count;
-    std::vector<double> predelay_time, old_predelay_time;
     std::vector<std::string> channel_name, old_channel_name;
     std::lock_guard<std::mutex> lock(this->mut_alg); /* LOCK */
     const double old_alt = this->target_alt_;
@@ -437,7 +445,7 @@ bool vuprs::HybridBeamformer::ReDirect(double alt, double az, double wave_veloci
                                               this->hardware_fs.load(),
                                               true,
                                               &predelay_count,
-                                              &predelay_time,
+                                              nullptr,
                                               &channel_name);
         redirected = vuprs::FPGA_API__PDLY__SetPredelay(&this->controller,
                                                         predelay_count,
@@ -466,7 +474,7 @@ bool vuprs::HybridBeamformer::ReDirect(double alt, double az, double wave_veloci
                                                   this->hardware_fs.load(),
                                                   true,
                                                   &old_predelay_count,
-                                                  &old_predelay_time,
+                                                  nullptr,
                                                   &old_channel_name);
             if (!vuprs::FPGA_API__PDLY__SetPredelay(&this->controller,
                                                     old_predelay_count,
@@ -504,6 +512,8 @@ bool vuprs::HybridBeamformer::run(const vuprs::HybridBeamformerConfig &config)
     this->threads.emplace_back([this]()
                                { this->THREAD__ScanPowerCalculation(); });
     this->threads.emplace_back([this]()
+                               { this->THREAD__InferenceCalculation(); });
+    this->threads.emplace_back([this]()
                                { this->THREAD__ReadCircularBuffer(); });
     return true;
 }
@@ -514,6 +524,7 @@ bool vuprs::HybridBeamformer::stop()
     this->algorithm_cv.notify_all();
     this->dma_interrupt_cv.notify_all();
     this->scan_cv.notify_all();
+    this->inference_cv.notify_all();
     for (auto &f : this->threads)
     {
         if (f.joinable())
@@ -528,6 +539,10 @@ bool vuprs::HybridBeamformer::stop()
     {
         std::lock_guard<std::mutex> lock(this->mut_queue); /* LOCK */
         this->array_signal_queue.clear();
+    }
+    {
+        std::lock_guard<std::mutex> lock(this->mut_inference_wait); /* LOCK */
+        this->inference_pending = false;
     }
     this->circular_buffer_irq = false;
     this->dma_descriptor_irq = false;
@@ -661,6 +676,44 @@ void vuprs::HybridBeamformer::THREAD__ScanPowerCalculation()
     }
 }
 
+void vuprs::HybridBeamformer::THREAD__InferenceCalculation()
+{
+    Eigen::Matrix<double, -1, 1> inference_res;
+    while (this->system_run)
+    {
+        {
+            std::unique_lock<std::mutex> lock(this->mut_inference_wait); /* LOCK */
+            this->inference_cv.wait(lock, [this]()
+                                    { return !this->system_run || this->inference_pending; });
+            if (!this->system_run)
+                break;
+            this->inference_pending = false;
+        }
+        try
+        {
+            {
+                std::lock_guard<std::mutex> lock(this->mut_npu); /* LOCK */
+                if (!this->inference_ready || !this->fault_detector.CheckReady())
+                    continue;
+                this->fault_detector.RunInference();
+                this->fault_detector.GetResult(&inference_res, nullptr, false);
+            }
+            if (inference_res.size() <= 0)
+                continue;
+            vuprs::InferenceResultMeta result_meta;
+            vuprs::Q31__DOUBLE_TO_UINT32(inference_res,
+                                         &result_meta.tensor,
+                                         inference_res.array().abs().maxCoeff());
+            if (this->inference_callback_)
+                this->inference_callback_(std::move(result_meta));
+        }
+        catch (const std::exception &e)
+        {
+            HYBRID_LOG(V_ERROR) << "Error in [HybridBeamformer::THREAD__InferenceCalculation] " << e.what();
+        }
+    }
+}
+
 void vuprs::HybridBeamformer::THREAD__ListenDMAInterrupt()
 {
     uint32_t r_val;
@@ -702,8 +755,10 @@ void vuprs::HybridBeamformer::THREAD__ReadResult()
     std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> _ref_descriptors;
     vuprs::AlignedBufferDMA buffer;
     std::vector<double> result_d;
-    Eigen::Matrix<double, -1, 1> inference_res;
     bool has_interrupt;
+#if ENABLE_INFERENCE
+    std::chrono::steady_clock::time_point last_inference_wake{};
+#endif
     int last_read_index = -1;
     double _hardware_fs;
 #if VUPRS_DEBUG
@@ -716,7 +771,7 @@ void vuprs::HybridBeamformer::THREAD__ReadResult()
     _hardware_fs = this->hardware_fs.load();
     auto process_descriptor = [&](const vuprs::AXI_DMA_ScatterGatherDescriptor &desc)
     {
-        /* Skip the whole frame (DDR read + inference) when no consumer is attached. */
+        /* Skip the whole frame when no consumer is attached. */
         if (this->consumer_gate_ && !this->consumer_gate_())
             return;
         try
@@ -738,22 +793,39 @@ void vuprs::HybridBeamformer::THREAD__ReadResult()
             vuprs::Q16__UINT32_TO_DOUBLE(result_meta.signal, &result_d);
 #endif
 #if ENABLE_INFERENCE
-            /* Inference: only if the model was initialized successfully. */
+            /* Feed BF data; wake inference when ready and rate-limited. */
             if (this->inference_ready)
             {
-                std::lock_guard<std::mutex> lock(this->mut_npu); /* LOCK */
-                this->fault_detector.InputSignal(result_d, _hardware_fs);
-                if (this->fault_detector.CheckReady())
+                try
                 {
-                    this->fault_detector.RunInference();
-                    this->fault_detector.GetResult(&inference_res,
-                                                   &result_meta.inference_result_identity,
-                                                   false);
-                    /* Convert to uint32_t Q31 inference result */
-                    vuprs::Q31__DOUBLE_TO_UINT32(inference_res,
-                                                 &result_meta.inference_result,
-                                                 inference_res.array().abs().maxCoeff());
-                    result_meta.inference_valid = true;
+                    const auto now = std::chrono::steady_clock::now();
+                    bool ready = false;
+                    {
+                        std::lock_guard<std::mutex> lock(this->mut_npu); /* LOCK */
+                        this->fault_detector.InputSignal(result_d, _hardware_fs);
+                        ready = this->fault_detector.CheckReady();
+                    }
+                    if (ready)
+                    {
+                        bool notify = false;
+                        {
+                            std::lock_guard<std::mutex> lock(this->mut_inference_wait); /* LOCK */
+                            if (!this->inference_pending &&
+                                (last_inference_wake == std::chrono::steady_clock::time_point{} ||
+                                 now - last_inference_wake >= std::chrono::microseconds(1000000 / INFERENCE_MAX_RATE_HZ)))
+                            {
+                                this->inference_pending = true;
+                                last_inference_wake = now;
+                                notify = true;
+                            }
+                        }
+                        if (notify)
+                            this->inference_cv.notify_one();
+                    }
+                }
+                catch (const std::exception &e)
+                {
+                    HYBRID_LOG(V_WARN) << "Inference feed failed: " << e.what();
                 }
             }
 #endif

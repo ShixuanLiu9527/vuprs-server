@@ -19,11 +19,12 @@ namespace vuprs
 {
     struct BeamformerResultMeta
     {
-        std::vector<uint32_t> signal;           /* raw signal from DDR (Q16) */
-        std::vector<uint32_t> inference_result; /* inference result from NPU (Q31) */
-        int inference_result_identity;          /* inference result class identity */
-        bool inference_valid;
-        BeamformerResultMeta() : inference_result_identity(-1), inference_valid(false) {}
+        std::vector<uint32_t> signal; /* raw signal from DDR (Q16) */
+    };
+
+    struct InferenceResultMeta
+    {
+        std::vector<uint32_t> tensor; /* model output tensor (Q31) */
     };
 
     /**
@@ -72,10 +73,13 @@ namespace vuprs
         /* Thread parameters */
         std::mutex mut; /* Global mutex lock */
 
-        /* NPU */
+        /* NPU / inference */
         std::mutex mut_npu;
         FaultDetector fault_detector;
         std::atomic<bool> inference_ready{false}; /* true only after successful model init */
+        std::mutex mut_inference_wait;
+        std::condition_variable inference_cv;
+        bool inference_pending = false; /* protected by mut_inference_wait */
 
         /* Scan */
         std::mutex mut_scan_opt;                         /* Scan mutex lock */
@@ -126,6 +130,7 @@ namespace vuprs
         /* Optional consumers; set before run() and left unchanged while running. */
         std::function<void(BeamformerResultMeta &&)> result_callback_;
         std::function<void(ScanResult &&)> scan_callback_;
+        std::function<void(InferenceResultMeta &&)> inference_callback_;
         std::function<bool()> consumer_gate_; /* optional: skip a frame when false */
 
         /* Threads */
@@ -165,6 +170,11 @@ namespace vuprs
          * @brief Get the covariance snapshot and do scan power calculation.
          */
         void THREAD__ScanPowerCalculation();
+
+        /**
+         * @brief Run model inference when woken by the BF result thread.
+         */
+        void THREAD__InferenceCalculation();
 
     public:
         HybridBeamformer();
@@ -207,11 +217,12 @@ namespace vuprs
         /**
          * @brief Set optional result consumers.
          *
-         * @note Call before run(); callbacks execute on DSP/scan threads and
+         * @note Call before run(); callbacks execute on DSP/scan/inference threads and
          * @note must be non-blocking.
          */
         void SetResultCallback(std::function<void(BeamformerResultMeta &&)> callback);
         void SetScanCallback(std::function<void(ScanResult &&)> callback);
+        void SetInferenceCallback(std::function<void(InferenceResultMeta &&)> callback);
 
         /**
          * @brief Set an optional gate checked on the DSP/scan threads before doing work.
@@ -230,6 +241,7 @@ namespace vuprs
         uint32_t FIRLength() const;
         double InferenceFrameTimeMs() const;
         uint32_t InferenceFrameSamples(double fs) const;
+        uint32_t InferenceTensorLength() const;
 
         /* ------ Part 1: Control (Run & Stop) ------ */
 

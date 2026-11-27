@@ -42,11 +42,11 @@
 /**
  * @defgroup Physical parameters.
  */
-#define DEFAULT_WAVE_VELOCITY 346.0     /* Wave velocity of the sound */
-#define MIN_SAMPLING_FREQUENCY 10.0     /* Minimum supported sampling frequency (Hz) */
-#define MIN_BEAMFORMER_FREQUENCY 10.0   /* Minimum lower/upper band edge (Hz) */
+#define DEFAULT_WAVE_VELOCITY 346.0        /* Wave velocity of the sound */
+#define MIN_SAMPLING_FREQUENCY 10.0        /* Minimum supported sampling frequency (Hz) */
+#define MIN_BEAMFORMER_FREQUENCY 10.0      /* Minimum lower/upper band edge (Hz) */
 #define MIN_COVARIANCE_SNAPSHOT_WINDOW 1.0 /* Minimum covariance EMA snapshot window */
-#define MAX_WAVE_VELOCITY 100000.0      /* Engineering upper bound for wave velocity (m/s) */
+#define MAX_WAVE_VELOCITY 100000.0         /* Engineering upper bound for wave velocity (m/s) */
 /**
  * @}
  */
@@ -60,6 +60,7 @@
 #define MIN_SCANNING_ALTITUDE_DEG 10.0      /* Exclusive lower bound of scanning altitude (deg) */
 #define DEFAULT_SCANNING_ALTITUDE_MIN 15.0  /* Minium altitude angle for scanning */
 #define SCAN_MAX_RATE_HZ 20                 /* Max scan update rate (snapshot capture + power map), Hz */
+#define INFERENCE_MAX_RATE_HZ 10            /* Max inference trigger rate, Hz */
 /**
  * @}
  */

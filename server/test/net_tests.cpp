@@ -43,6 +43,8 @@ namespace
                 buffers[2] = asio::buffer(frame.bf_samples->data(), frame.bf_samples->size() * sizeof(uint32_t));
             else if (frame.scan_values)
                 buffers[2] = asio::buffer(frame.scan_values->data(), frame.scan_values->size() * sizeof(uint16_t));
+            else if (frame.inference_values)
+                buffers[2] = asio::buffer(frame.inference_values->data(), frame.inference_values->size() * sizeof(uint32_t));
         }
         return buffers;
     }
@@ -111,14 +113,11 @@ namespace
         BfDataHeader bf;
         bf.sample_rate_millihz = 10000000;
         bf.sample_count = 8192;
-        bf.inference_identity = -1;
-        bf.inference_valid = 0;
         auto bf_bytes = EncodeBfDataHeader(bf);
         BfDataHeader bf_decoded;
         CHECK(DecodeBfDataHeader(bf_bytes.data(), bf_bytes.size(), &bf_decoded, &error));
         CHECK(bf_decoded.sample_rate_millihz == bf.sample_rate_millihz);
         CHECK(bf_decoded.sample_count == bf.sample_count);
-        CHECK(bf_decoded.inference_identity == bf.inference_identity);
 
         ScanDataHeader scan;
         scan.points_half = 100;
@@ -149,6 +148,21 @@ namespace
         CHECK(scan_frame.payload_bytes == DATA_HEADER_SIZE + 75 * sizeof(uint16_t));
         CHECK(DecodeFrameHeader(scan_frame.header.data(), scan_frame.header.size(), &frame_header, &error));
         CHECK(frame_header.type == MessageType::SCAN_DATA);
+
+        InferenceDataHeader inference;
+        inference.tensor_length = 6;
+        auto inference_bytes = EncodeInferenceDataHeader(inference);
+        InferenceDataHeader inference_decoded;
+        CHECK(DecodeInferenceDataHeader(inference_bytes.data(), inference_bytes.size(), &inference_decoded, &error));
+        CHECK(inference_decoded.tensor_length == inference.tensor_length);
+        CHECK(inference_decoded.data_format == static_cast<uint32_t>(InferenceFormat::INT32_Q31));
+
+        auto tensor = std::make_shared<std::vector<uint32_t>>(6, 0x0FFFFFFFU);
+        auto inference_frame = MakeInferenceFrame(inference, tensor, 13, NowNs());
+        CHECK(inference_frame.payload_bytes == DATA_HEADER_SIZE + 6 * sizeof(uint32_t));
+        CHECK(DecodeFrameHeader(inference_frame.header.data(), inference_frame.header.size(), &frame_header, &error));
+        CHECK(frame_header.type == MessageType::INFERENCE_DATA);
+        CHECK(frame_header.sequence == 13);
     }
 
     void TestLoopback()
@@ -242,8 +256,6 @@ namespace
         vuprs::net::BfDataHeader bf;
         bf.sample_rate_millihz = 10000000;
         bf.sample_count = 4;
-        bf.inference_identity = 9;
-        bf.inference_valid = 1;
         auto samples = std::make_shared<std::vector<uint32_t>>(4);
         (*samples)[0] = 0x00010000U;
         (*samples)[1] = 0xFFFFFFFFU;
@@ -259,7 +271,6 @@ namespace
         std::string decode_error;
         CHECK(vuprs::net::DecodeBfDataHeader(payload.data(), payload.size(), &bf_out, &decode_error));
         CHECK(bf_out.sample_count == 4);
-        CHECK(bf_out.inference_identity == 9);
 
         vuprs::net::ScanDataHeader scan;
         scan.points_half = 100;
@@ -282,6 +293,24 @@ namespace
         CHECK(vuprs::net::DecodeScanDataHeader(payload.data(), payload.size(), &scan_out, &decode_error));
         CHECK(scan_out.points_half == 100);
         CHECK(scan_out.data_points == 3);
+
+        vuprs::net::InferenceDataHeader inference;
+        inference.tensor_length = 5;
+        auto tensor = std::make_shared<std::vector<uint32_t>>(5);
+        (*tensor)[0] = 1;
+        (*tensor)[1] = 2;
+        (*tensor)[2] = 3;
+        (*tensor)[3] = 4;
+        (*tensor)[4] = 5;
+        server.Publisher()->Publish(vuprs::net::MakeInferenceFrame(inference, tensor, 102, vuprs::net::NowNs()));
+
+        CHECK(read_one(&header, &payload));
+        CHECK(header.type == vuprs::net::MessageType::INFERENCE_DATA);
+        CHECK(header.sequence == 102);
+        CHECK(payload.size() == vuprs::net::DATA_HEADER_SIZE + 5 * sizeof(uint32_t));
+        vuprs::net::InferenceDataHeader inference_out;
+        CHECK(vuprs::net::DecodeInferenceDataHeader(payload.data(), payload.size(), &inference_out, &decode_error));
+        CHECK(inference_out.tensor_length == 5);
 
         send_request(6, R"({"cmd":"stop","params":{}})");
         CHECK(read_one(&header, &payload));

@@ -294,16 +294,25 @@ void vuprs::WidebandBeamformerTemplate::GetFIRExpectedFrequencyResponse(Eigen::M
     dst->col(nyquist_idx).imag().setZero();
 }
 
-void vuprs::WidebandBeamformerTemplate::UpdateElementPredelay_externalFS(double fir_length,
-                                                                         double fs,
-                                                                         bool include_fir_group_delay,
-                                                                         std::vector<int> *element_predelay_count,
-                                                                         std::vector<double> *element_predelay_time,
-                                                                         std::vector<std::string> *channel_name)
+void vuprs::WidebandBeamformerTemplate::UpdatePredelayExpMatrix()
 {
-    RUNTIME_CHECK(this->ConfigDone(), "bf", "No signal input");
-    RUNTIME_CHECK(element_predelay_time && element_predelay_count && channel_name, "bf", "Predelay pointer is NULL");
-    /* Calculate predelay */
+    uint64_t M = this->array.size();
+    /* [T1, T2, ..., TM] */
+    Eigen::Map<const Eigen::VectorXd> Tm_vec(this->element_predelay_time.data(), M);
+    /* [ exp(j*2*pi*fk*Tm) ] */
+    this->pre_delay_exp_arg = (Tm_vec * this->signal_frequency_list_complex.transpose() * 2.0 * PI).array().exp();
+}
+
+void vuprs::WidebandBeamformerTemplate::UpdateAndGetElementPredelay(double fir_length,
+                                                                    double fs,
+                                                                    bool include_fir_group_delay,
+                                                                    std::vector<int> *element_predelay_count,
+                                                                    std::vector<double> *element_predelay_time,
+                                                                    std::vector<std::string> *channel_name)
+{
+    RUNTIME_CHECK(this->ConfigDone(), "bf", "Config not complete");
+    RUNTIME_CHECK(fs > 0.0, "bf", "Invalid sampling frequency");
+    RUNTIME_CHECK(element_predelay_count && channel_name, "bf", "Predelay output pointer is NULL");
     uint64_t M = this->array.size();
     double Ts = 1.0 / fs;
     int min_predelay_count = INT_MAX;
@@ -317,53 +326,13 @@ void vuprs::WidebandBeamformerTemplate::UpdateElementPredelay_externalFS(double 
         this->element_predelay_count[i] -= min_predelay_count;
         this->element_predelay_time[i] = this->element_predelay_count[i] * Ts;
     }
-    *element_predelay_time = this->element_predelay_time;
     *element_predelay_count = this->element_predelay_count;
     *channel_name = this->element_channel_name;
+    if (element_predelay_time != nullptr)
+        *element_predelay_time = this->element_predelay_time;
     /* Refresh FIR predelay phases; InputSignal() only does this when fs/N change. */
-    if (fs > 0.0 && !this->element_predelay_time.empty() &&
-        this->signal_frequency_list_complex.size() > 0)
-    {
+    if (!this->element_predelay_time.empty() && this->signal_frequency_list_complex.size() > 0)
         this->UpdatePredelayExpMatrix();
-    }
-}
-
-void vuprs::WidebandBeamformerTemplate::UpdatePredelayExpMatrix()
-{
-    uint64_t M = this->array.size();
-    /* [T1, T2, ..., TM] */
-    Eigen::Map<const Eigen::VectorXd> Tm_vec(this->element_predelay_time.data(), M);
-    /* [ exp(j*2*pi*fk*Tm) ] */
-    this->pre_delay_exp_arg = (Tm_vec * this->signal_frequency_list_complex.transpose() * 2.0 * PI).array().exp();
-}
-
-void vuprs::WidebandBeamformerTemplate::UpdateAndGetElementPredelay(double fir_length,
-                                                                    bool include_fir_group_delay,
-                                                                    std::vector<int> *element_predelay_count,
-                                                                    std::vector<double> *element_predelay_time,
-                                                                    std::vector<std::string> *channel_name)
-{
-    RUNTIME_CHECK(this->ConfigDone(), "bf", "Signal is empty");
-    this->UpdateElementPredelay_externalFS(fir_length,
-                                           this->fs,
-                                           include_fir_group_delay,
-                                           element_predelay_count,
-                                           element_predelay_time,
-                                           channel_name);
-}
-
-void vuprs::WidebandBeamformerTemplate::UpdateAndGetElementPredelay(double fir_length,
-                                                                    double fs,
-                                                                    bool include_fir_group_delay,
-                                                                    std::vector<int> *element_predelay_count,
-                                                                    std::vector<double> *element_predelay_time,
-                                                                    std::vector<std::string> *channel_name)
-{
-    this->UpdateElementPredelay_externalFS(fir_length,
-                                           fs, include_fir_group_delay,
-                                           element_predelay_count,
-                                           element_predelay_time,
-                                           channel_name);
 }
 
 bool vuprs::WidebandBeamformerTemplate::SnapshotScanCovariance(ScanCovarianceSnapshot *snapshot,

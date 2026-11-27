@@ -23,7 +23,8 @@ namespace vuprs
             CONTROL_REQUEST = 0x0001,
             CONTROL_RESPONSE = 0x0002,
             BF_DATA = 0x0003,
-            SCAN_DATA = 0x0004
+            SCAN_DATA = 0x0004,
+            INFERENCE_DATA = 0x0005
         };
 
         enum class SampleFormat : uint32_t
@@ -34,6 +35,11 @@ namespace vuprs
         enum class ScanFormat : uint32_t
         {
             UINT16_MINMAX_NORMALIZED = 1
+        };
+
+        enum class InferenceFormat : uint32_t
+        {
+            INT32_Q31 = 1
         };
 
         struct FrameHeader
@@ -52,9 +58,14 @@ namespace vuprs
             uint32_t sample_rate_millihz = 0;
             uint32_t sample_count = 0;
             uint32_t sample_format = static_cast<uint32_t>(SampleFormat::INT32_Q16_16);
-            int32_t inference_identity = -1;
-            uint32_t inference_valid = 0;
-            uint32_t reserved[3] = {0, 0, 0};
+            uint32_t reserved[5] = {0, 0, 0, 0, 0};
+        };
+
+        struct InferenceDataHeader
+        {
+            uint32_t tensor_length = 0;
+            uint32_t data_format = static_cast<uint32_t>(InferenceFormat::INT32_Q31);
+            uint32_t reserved[6] = {0, 0, 0, 0, 0, 0};
         };
 
         struct ScanDataHeader
@@ -74,6 +85,7 @@ namespace vuprs
          *        - bytes: complete payload (JSON/control or prebuilt bytes)
          *        - bf_samples: BF samples; data_header is sent before them
          *        - scan_values: scan values; data_header is sent before them
+         *        - inference_values: inference tensor; data_header is sent before them
          */
         struct OutFrame
         {
@@ -82,6 +94,7 @@ namespace vuprs
             std::shared_ptr<const std::vector<uint8_t>> bytes;
             std::shared_ptr<const std::vector<uint32_t>> bf_samples;
             std::shared_ptr<const std::vector<uint16_t>> scan_values;
+            std::shared_ptr<const std::vector<uint32_t>> inference_values;
             uint32_t payload_bytes = 0;
         };
 
@@ -93,8 +106,10 @@ namespace vuprs
 
         std::array<uint8_t, DATA_HEADER_SIZE> EncodeBfDataHeader(const BfDataHeader &header);
         std::array<uint8_t, DATA_HEADER_SIZE> EncodeScanDataHeader(const ScanDataHeader &header);
+        std::array<uint8_t, DATA_HEADER_SIZE> EncodeInferenceDataHeader(const InferenceDataHeader &header);
         bool DecodeBfDataHeader(const uint8_t *data, size_t bytes, BfDataHeader *header, std::string *error);
         bool DecodeScanDataHeader(const uint8_t *data, size_t bytes, ScanDataHeader *header, std::string *error);
+        bool DecodeInferenceDataHeader(const uint8_t *data, size_t bytes, InferenceDataHeader *header, std::string *error);
 
         OutFrame MakeJsonFrame(MessageType type, uint32_t request_id, const std::string &payload);
         OutFrame MakeBfFrame(const BfDataHeader &data_header,
@@ -105,6 +120,10 @@ namespace vuprs
                                std::shared_ptr<const std::vector<uint16_t>> values,
                                uint64_t sequence,
                                uint64_t timestamp_ns);
+        OutFrame MakeInferenceFrame(const InferenceDataHeader &data_header,
+                                    std::shared_ptr<const std::vector<uint32_t>> tensor,
+                                    uint64_t sequence,
+                                    uint64_t timestamp_ns);
     }
 }
 

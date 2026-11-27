@@ -75,6 +75,7 @@ namespace vuprs
         bool LoadServerConfigFromJson(const std::string &filename);
         void OnBfResult(BeamformerResultMeta &&meta);
         void OnScanResult(ScanResult &&result);
+        void OnInferenceResult(InferenceResultMeta &&meta);
         void UpdateBeamformerName(const std::string &name);
 
         bool config_done_ = false;
@@ -98,6 +99,7 @@ namespace vuprs
 
         std::atomic<uint64_t> bf_sequence_{0};
         std::atomic<uint64_t> scan_sequence_{0};
+        std::atomic<uint64_t> inference_sequence_{0};
     };
 }
 

@@ -95,6 +95,19 @@ uint32_t vuprs::FaultDetector::FrameLengthSamples(double fs) const
     return this->extractor.FrameLengthSamples(fs);
 }
 
+uint32_t vuprs::FaultDetector::OutputTensorLength() const
+{
+    const std::vector<rknn_tensor_attr> &outputs = this->model.GetOutputAttrs();
+    if (outputs.empty() || outputs[0].n_dims == 0)
+        return 0;
+    uint64_t elements = 1;
+    for (uint32_t i = 0; i < outputs[0].n_dims; i++)
+        elements *= static_cast<uint64_t>(outputs[0].dims[i]);
+    if (elements == 0 || elements > static_cast<uint64_t>(UINT32_MAX))
+        return 0;
+    return static_cast<uint32_t>(elements);
+}
+
 void vuprs::FaultDetector::RunInference()
 {
     RUNTIME_CHECK(this->CheckReady(), "default_detect", "Model not ready.");
@@ -111,16 +124,8 @@ void vuprs::FaultDetector::RunInference()
 
 void vuprs::FaultDetector::GetResult(Eigen::Matrix<double, -1, 1> *res, int *identity, bool use_softmax)
 {
-    /* Retrieve output attributes */
-    std::vector<rknn_tensor_attr> output_attrs = this->model.GetOutputAttrs();
-    RUNTIME_CHECK(output_attrs.size() >= 1, "default_detect", "Model has no output.");
-    rknn_tensor_attr &out_attr = output_attrs[0];
-    /* Calculate number of output elements from tensor dimensions */
-    uint32_t n_elements = 1;
-    for (uint32_t i = 0; i < out_attr.n_dims; i++)
-    {
-        n_elements *= out_attr.dims[i];
-    }
+    uint32_t n_elements = this->OutputTensorLength();
+    RUNTIME_CHECK(n_elements > 0, "default_detect", "Model has no valid output tensor.");
     /* Allocate buffer and get output from NPU.
      * Note: [RknnModel::GetOutput] requests float32 output (want_float = 1),
      * so the NPU runtime dequantizes the tensor (FP32/INT8/INT16... all

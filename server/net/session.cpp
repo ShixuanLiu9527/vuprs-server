@@ -299,6 +299,9 @@ std::array<asio::const_buffer, 3> vuprs::net::Session::BuildBuffers() const
         else if (this->current_.scan_values)
             buffers[2] = asio::buffer(this->current_.scan_values->data(),
                                       this->current_.scan_values->size() * sizeof(uint16_t));
+        else if (this->current_.inference_values)
+            buffers[2] = asio::buffer(this->current_.inference_values->data(),
+                                      this->current_.inference_values->size() * sizeof(uint32_t));
     }
     return buffers;
 }

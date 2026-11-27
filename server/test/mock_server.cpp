@@ -100,8 +100,6 @@ int main(int argc, char *argv[])
                 header.sample_rate_millihz = static_cast<uint32_t>(service->SampleRate() * 1000.0);
                 header.sample_count = static_cast<uint32_t>(sample_count);
                 header.sample_format = static_cast<uint32_t>(vuprs::net::SampleFormat::INT32_Q16_16);
-                header.inference_identity = 0;
-                header.inference_valid = 0;
                 publisher->Publish(vuprs::net::MakeBfFrame(header, samples, ++bf_sequence, vuprs::net::NowNs()));
 
                 const auto now = std::chrono::steady_clock::now();

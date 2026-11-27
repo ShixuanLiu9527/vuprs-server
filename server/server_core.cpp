@@ -210,6 +210,8 @@ void vuprs::ServerCore::InitSystemConfigFiles(const vuprs::SystemConfigFiles &co
                                             { this->OnBfResult(std::move(meta)); });
         this->beamformer_.SetScanCallback([this](ScanResult &&result)
                                           { this->OnScanResult(std::move(result)); });
+        this->beamformer_.SetInferenceCallback([this](InferenceResultMeta &&meta)
+                                               { this->OnInferenceResult(std::move(meta)); });
         this->beamformer_.SetConsumerGate([this]()
                                           { return this->publisher_ && this->publisher_->HasSession(); });
         this->config_done_ = true;
@@ -274,8 +276,6 @@ void vuprs::ServerCore::OnBfResult(BeamformerResultMeta &&meta)
     header.sample_rate_millihz = static_cast<uint32_t>(std::llround(this->beamformer_.HardwareSamplingFrequency() * 1000.0));
     header.sample_count = static_cast<uint32_t>(samples->size());
     header.sample_format = static_cast<uint32_t>(net::SampleFormat::INT32_Q16_16);
-    header.inference_identity = meta.inference_result_identity;
-    header.inference_valid = meta.inference_valid ? 1U : 0U;
     this->publisher_->Publish(net::MakeBfFrame(header, std::move(samples), ++this->bf_sequence_, net::NowNs()));
 }
 
@@ -295,6 +295,17 @@ void vuprs::ServerCore::OnScanResult(ScanResult &&result)
     this->publisher_->Publish(net::MakeScanFrame(header, std::move(values), ++this->scan_sequence_, net::NowNs()));
 }
 
+void vuprs::ServerCore::OnInferenceResult(InferenceResultMeta &&meta)
+{
+    if (!this->publisher_ || !this->publisher_->HasSession())
+        return;
+    auto tensor = std::make_shared<std::vector<uint32_t>>(std::move(meta.tensor));
+    net::InferenceDataHeader header;
+    header.tensor_length = static_cast<uint32_t>(tensor->size());
+    header.data_format = static_cast<uint32_t>(net::InferenceFormat::INT32_Q31);
+    this->publisher_->Publish(net::MakeInferenceFrame(header, std::move(tensor), ++this->inference_sequence_, net::NowNs()));
+}
+
 vuprs::net::ControlResult vuprs::ServerCore::Execute(const std::string &cmd, const nlohmann::json &params)
 {
     using vuprs::net::ControlError;
@@ -305,6 +316,8 @@ vuprs::net::ControlResult vuprs::ServerCore::Execute(const std::string &cmd, con
         result.params["protocol_version"] = "1";
         result.params["server_version"] = "vuprs-1";
         result.params["capabilities"] = nlohmann::json::object({{"bf", "1"}, {"scan", "1"}, {"inference", this->beamformer_.InferenceReady() ? "1" : "0"}});
+        result.params["inference_tensor_length"] = std::to_string(this->beamformer_.InferenceTensorLength());
+        result.params["inference_format"] = "q31";
 
         HybridBeamformerConfig config;
         {
@@ -581,6 +594,8 @@ vuprs::net::ControlResult vuprs::ServerCore::Execute(const std::string &cmd, con
         }
         result.params["scan_enabled"] = this->beamformer_.ScanSwitch() ? "1" : "0";
         result.params["inference_ready"] = this->beamformer_.InferenceReady() ? "1" : "0";
+        result.params["inference_tensor_length"] = std::to_string(this->beamformer_.InferenceTensorLength());
+        result.params["inference_format"] = "q31";
         result.params["data_client"] = (this->publisher_ && this->publisher_->HasSession()) ? "1" : "0";
         result.params["protocol_version"] = "1";
         return result;

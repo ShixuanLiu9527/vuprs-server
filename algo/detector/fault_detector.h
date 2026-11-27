@@ -49,6 +49,9 @@ namespace vuprs
         /** @brief Samples required for one inference frame at fs. */
         uint32_t FrameLengthSamples(double fs) const;
 
+        /** @brief Output tensor 0 element count; 0 if unavailable. */
+        uint32_t OutputTensorLength() const;
+
         bool CheckReady() const { return this->extractor.Flushed() && this->model.ModelReady(); }
 
         void RunInference();

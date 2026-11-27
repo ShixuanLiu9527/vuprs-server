@@ -33,24 +33,6 @@ namespace vuprs
 
         void UpdateParameters();
 
-        /**
-         * @brief Get element predelay parameters.
-         *
-         * @note Check PredelayEnable() in advance.
-         *
-         * @param fir_length FIR filter bank length.
-         * @param fs sampling frequency
-         * @param include_fir_group_delay true: include FIR group delay, false: exclude FIR group delay.
-         * @param element_predelay_count integer delay. (count = -round[delay{m}/Ts + (L-1)/2])
-         * @param elementPredelay integer delay time. (Tm = -round[delay{m}/Ts + (L-1)/2] * Ts)
-         * @param channel_name corresponding channel name.
-         */
-        void UpdateElementPredelay_externalFS(
-            double fir_length, double fs, bool include_fir_group_delay,
-            std::vector<int> *element_predelay_count,
-            std::vector<double> *element_predelay_time,
-            std::vector<std::string> *channel_name);
-
     protected:
         bool first_snapshot;
         bool is_array_config_done;
@@ -215,26 +197,6 @@ namespace vuprs
         /**
          * @brief Get element predelay parameters.
          *
-         * @note Use internal sampling frequency (set by certain signal).
-         * @note The output predelay count will be aligned to 0.
-         * @note e.g. predelay count = [13, 12, 23]
-         * @note then: output predelay count = [13 - 12, 12 - 12, 23 - 12] = [1, 0, 11].
-         *
-         * @param fir_length FIR filter bank length.
-         * @param include_fir_group_delay true: include FIR group delay, false: exclude FIR group delay.
-         * @param element_predelay_count (cannot be NULL) integer delay. (count = -round[delay{m}/Ts + (L-1)/2])
-         * @param element_predelay_time (cannot be NULL) integer delay time. (Tm = -round[delay{m}/Ts + (L-1)/2] * Ts)
-         * @param channel_name (cannot be NULL) corresponding channel name.
-         */
-        void UpdateAndGetElementPredelay(double fir_length,
-                                         bool include_fir_group_delay,
-                                         std::vector<int> *element_predelay_count,
-                                         std::vector<double> *element_predelay_time,
-                                         std::vector<std::string> *channel_name);
-
-        /**
-         * @brief Get element predelay parameters.
-         *
          * @note The output predelay count will be aligned to 0.
          * @note e.g. predelay count = [13, 12, 23]
          * @note then: output predelay count = [13 - 12, 12 - 12, 23 - 12] = [1, 0, 11].
@@ -243,7 +205,7 @@ namespace vuprs
          * @param fs sampling frequency.
          * @param include_fir_group_delay true: include FIR group delay, false: exclude FIR group delay.
          * @param element_predelay_count (cannot be NULL) integer delay. (count = -round[delay{m}/Ts + (L-1)/2])
-         * @param element_predelay_time (cannot be NULL) integer delay time. (Tm = -round[delay{m}/Ts + (L-1)/2] * Ts)
+         * @param element_predelay_time (optional) integer delay time. (Tm = -round[delay{m}/Ts + (L-1)/2] * Ts)
          * @param channel_name (cannot be NULL) corresponding channel name.
          */
         void UpdateAndGetElementPredelay(double fir_length,
