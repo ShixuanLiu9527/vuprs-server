@@ -521,9 +521,22 @@ bool vuprs::HybridBeamformer::run(const vuprs::HybridBeamformerConfig &config)
 bool vuprs::HybridBeamformer::stop()
 {
     this->system_run = false;
+    /* Lock each wait mutex once to close the predicate/sleep race before notify. */
+    {
+        std::lock_guard<std::mutex> lock(this->mut_queue); /* LOCK */
+    }
     this->algorithm_cv.notify_all();
+    {
+        std::lock_guard<std::mutex> lock(this->mut_dma); /* LOCK */
+    }
     this->dma_interrupt_cv.notify_all();
+    {
+        std::lock_guard<std::mutex> lock(this->mut_scan_wait); /* LOCK */
+    }
     this->scan_cv.notify_all();
+    {
+        std::lock_guard<std::mutex> lock(this->mut_inference_wait); /* LOCK */
+    }
     this->inference_cv.notify_all();
     for (auto &f : this->threads)
     {
