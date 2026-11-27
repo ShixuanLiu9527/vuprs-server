@@ -1,12 +1,12 @@
-#include "server/server_core.h"
-
 #include <cmath>
 #include <fstream>
-#include <iostream>
 #include <utility>
 #include "config.h"
 #include "logger/check.h"
 #include "server/net/frame.h"
+#include "server/server_core.h"
+
+#define SERVER_LOG(level) _LOG(this->server_logger_ ? this->server_logger_ : spdlog::default_logger(), level)
 
 namespace
 {
@@ -179,6 +179,7 @@ void vuprs::ServerCore::InitSystemConfigFiles(const vuprs::SystemConfigFiles &co
     bool config_result = true;
     try
     {
+        this->server_logger_ = vuprs::LogManager::getLogger("server", "log.txt", config.logger_configs.server_logger_dir);
         config_result &= this->LoadServerConfigFromJson(config.server_config_json);
         {
             std::lock_guard<std::mutex> lock(this->mut_bf_); /* LOCK */
@@ -191,13 +192,13 @@ void vuprs::ServerCore::InitSystemConfigFiles(const vuprs::SystemConfigFiles &co
                 if (!this->beamformer_.InitInference(config.inference_model_config_json,
                                                      config.logger_configs.inference_logger_dir))
                 {
-                    std::cout << "[server] inference unavailable, continuing without fault detection." << std::endl;
+                    SERVER_LOG(V_WARN) << "[server] inference unavailable, continuing without fault detection.";
                 }
             }
             catch (const std::exception &e)
             {
-                std::cout << "[server] inference init failed: " << e.what()
-                          << ", continuing without fault detection." << std::endl;
+                SERVER_LOG(V_ERROR) << "[server] inference init failed: " << e.what()
+                                    << ", continuing without fault detection.";
             }
         }
         {
@@ -205,7 +206,6 @@ void vuprs::ServerCore::InitSystemConfigFiles(const vuprs::SystemConfigFiles &co
             config_result &= this->bf_config_.FromJson(config.hybrid_default_config_json);
         }
         RUNTIME_CHECK(config_result, "server", "Config error.");
-        this->server_logger_ = vuprs::LogManager::getLogger("server", "log.txt", config.logger_configs.server_logger_dir);
         this->beamformer_.SetResultCallback([this](BeamformerResultMeta &&meta)
                                             { this->OnBfResult(std::move(meta)); });
         this->beamformer_.SetScanCallback([this](ScanResult &&result)
@@ -216,7 +216,7 @@ void vuprs::ServerCore::InitSystemConfigFiles(const vuprs::SystemConfigFiles &co
     }
     catch (const std::exception &e)
     {
-        std::cout << "Error in [ServerCore::InitSystemConfigFiles] " << e.what() << std::endl;
+        SERVER_LOG(V_ERROR) << "Error in [ServerCore::InitSystemConfigFiles] " << e.what();
     }
 }
 
@@ -234,7 +234,7 @@ bool vuprs::ServerCore::Run()
         std::lock_guard<std::mutex> lock(this->mut_bf_); /* LOCK */
         if (!this->beamformer_.CheckConfigValid(config, &info))
         {
-            std::cerr << "[server] invalid beamformer config: " << info << std::endl;
+            SERVER_LOG(V_ERROR) << "[server] invalid beamformer config: " << info;
             return false;
         }
         return this->beamformer_.run(config);
@@ -250,7 +250,7 @@ void vuprs::ServerCore::Stop()
     }
     catch (const std::exception &e)
     {
-        std::cerr << "[server] stop beamformer failed: " << e.what() << std::endl;
+        SERVER_LOG(V_ERROR) << "[server] stop beamformer failed: " << e.what();
     }
 }
 
@@ -377,12 +377,16 @@ vuprs::net::ControlResult vuprs::ServerCore::Execute(const std::string &cmd, con
             config = this->bf_config_;
         }
         std::lock_guard<std::mutex> lock(this->mut_bf_); /* LOCK */
-        bool ok = this->beamformer_.BindBeamformer(std::move(algorithm));
-        ok = this->beamformer_.stop() && ok;
-        ok = this->beamformer_.run(config) && ok;
-        if (ok)
-            this->UpdateBeamformerName(name);
-        return ok ? Ok() : Error(ControlError::NOT_READY, "beamformer change failed");
+        /* Stop and join the worker threads before replacing the algorithm object */
+        if (!this->beamformer_.stop())
+            return Error(ControlError::NOT_READY, "beamformer stop failed");
+        if (!this->beamformer_.BindBeamformer(std::move(algorithm)))
+            return Error(ControlError::NOT_READY, "beamformer change failed");
+        /* Name reflects the bound algorithm even if run() fails. */
+        this->UpdateBeamformerName(name);
+        if (!this->beamformer_.run(config))
+            return Error(ControlError::NOT_READY, "beamformer change failed");
+        return Ok();
     }
     if (cmd == "redirect")
     {
@@ -396,10 +400,17 @@ vuprs::net::ControlResult vuprs::ServerCore::Execute(const std::string &cmd, con
             config = this->bf_config_;
             config.bf_target__alt = alt;
             config.bf_target__az = az;
+        }
+        {
+            std::lock_guard<std::mutex> lock(this->mut_bf_); /* LOCK */
+            if (!this->beamformer_.ReDirect(alt, az, config.bf_wave_velocity))
+                return Error(ControlError::INTERNAL, "redirect failed");
+        }
+        {
+            std::lock_guard<std::mutex> lock(this->mut_bf_config_); /* LOCK */
             this->bf_config_ = config;
         }
-        std::lock_guard<std::mutex> lock(this->mut_bf_); /* LOCK */
-        return this->beamformer_.ReDirect(alt, az, config.bf_wave_velocity) ? Ok() : Error(ControlError::INTERNAL, "redirect failed");
+        return Ok();
     }
     if (cmd == "validate_config")
     {

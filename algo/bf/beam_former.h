@@ -1,6 +1,7 @@
 #ifndef BEAM_FORMER_H
 #define BEAM_FORMER_H
 
+#include <algorithm>
 #include "algo/bf/beam_former_template.h"
 
 namespace vuprs
@@ -30,8 +31,9 @@ namespace vuprs
             this->invR_ps_hat.resize(freq_nums);
             this->w.resize(freq_nums);
             /* Solver cache: one solver per worker chunk (max = thread count). */
-            if (this->eig_solver_cache.size() != std::thread::hardware_concurrency())
-                this->eig_solver_cache.resize(std::max(1u, std::thread::hardware_concurrency()));
+            const size_t worker_count = std::max<size_t>(size_t{1}, std::thread::hardware_concurrency());
+            if (this->eig_solver_cache.size() != worker_count)
+                this->eig_solver_cache.resize(worker_count);
         }
 
     public:

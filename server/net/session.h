@@ -12,6 +12,11 @@
 #include "server/net/control_worker.h"
 #include "server/net/frame.h"
 
+namespace spdlog
+{
+    class logger;
+}
+
 namespace vuprs
 {
     namespace net
@@ -21,6 +26,7 @@ namespace vuprs
             size_t max_payload_bytes = MAX_PAYLOAD_BYTES;
             size_t data_queue_frames = 64;
             size_t control_queue_frames = 16;
+            std::shared_ptr<spdlog::logger> logger; /* optional; defaults to spdlog::default_logger() */
         };
 
         /**
@@ -77,6 +83,7 @@ namespace vuprs
             asio::ip::tcp::socket socket_;
             std::shared_ptr<ControlWorker> worker_;
             SessionOptions options_;
+            std::shared_ptr<spdlog::logger> logger_;
             CloseHandler on_close_;
             std::string remote_;
 

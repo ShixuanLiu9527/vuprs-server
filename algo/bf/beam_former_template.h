@@ -55,6 +55,7 @@ namespace vuprs
         bool first_snapshot;
         bool is_array_config_done;
         bool is_signal_empty, is_cov_matrix_empty;
+        int covariance_update_count = 0; /* Number of UpdateCovarianceMatrix() calls since reset, capped at M (element count); solving is enabled once it reaches M */
         std::mutex mut_scan;
         Eigen::Matrix<double, -1, -1> scan_timedelay;                                          /* Size: M x numScans, real time delay T{m, s} = pos{m}.dot(pv{s}) / v, controlled by mut_scan */
         vuprs::AlignedEigenVector<Eigen::Matrix<Eigen::dcomplex, -1, -1>> scan_weight_cache;   /* Size: numScans x numBands(in-band), scan weight W{f, s} = exp(-j * 2 * pi * f * T{m, s}), controlled by mut_scan */

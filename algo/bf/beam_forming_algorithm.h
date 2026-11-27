@@ -2,12 +2,14 @@
 #define BEAM_FORMING_ALGORITHM_H
 
 #include <Eigen/Dense>
+#include <algorithm>
 #include <vector>
 #include <vector>
 #include <queue>
 #include <thread>
 #include <mutex>
 #include <condition_variable>
+#include <exception>
 #include <functional>
 #include <future>
 #include <iostream>
@@ -26,6 +28,33 @@ namespace vuprs
         int max_iteration;                  /* max iteration counts */
     };
 
+    /** @brief Clamp value into [lower, upper]. */
+    template <typename T>
+    inline T Clamp(const T &value, const T &lower, const T &upper)
+    {
+        return value < lower ? lower : (value > upper ? upper : value);
+    }
+
+    /** @brief Wait for every future, then rethrow the first exception. */
+    inline void WaitForAllFutures(std::vector<std::future<void>> &futures)
+    {
+        std::exception_ptr first_error;
+        for (auto &future : futures)
+        {
+            try
+            {
+                future.get();
+            }
+            catch (...)
+            {
+                if (!first_error)
+                    first_error = std::current_exception();
+            }
+        }
+        if (first_error)
+            std::rethrow_exception(first_error);
+    }
+
     class ThreadPool
     {
     private:
@@ -38,6 +67,9 @@ namespace vuprs
     public:
         ThreadPool(size_t num_threads) : stop(false)
         {
+            /* At least one worker; never exceed logical CPUs. */
+            const size_t max_threads = std::max<size_t>(size_t{1}, std::thread::hardware_concurrency());
+            num_threads = vuprs::Clamp<size_t>(num_threads, size_t{1}, max_threads);
             for (size_t i = 0; i < num_threads; ++i)
             {
                 /* Create one thread */

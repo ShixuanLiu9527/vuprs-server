@@ -73,6 +73,7 @@ int main(int argc, char *argv[])
         net_config.max_payload_bytes = core->MaxPayloadBytes();
         net_config.data_queue_frames = core->DataQueueFrames();
         net_config.control_queue_frames = core->ControlQueueFrames();
+        net_config.logger = core->Logger();
         vuprs::net::AsioServer server(net_config, core);
         core->SetPublisher(server.Publisher());
 

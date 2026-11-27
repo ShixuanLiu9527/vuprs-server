@@ -112,25 +112,14 @@ void vuprs::WidebandBeamformerTemplate::UpdateCovarianceMatrix()
     this->array.GetArraySignalMatrix(&this->snap_signal_matrix_freq_domain, nullptr, true); /* Get array signal */
     int data_points = this->snap_signal_matrix_freq_domain.cols();
     if (this->estimate_cov_matrix.empty())
-    {
         this->estimate_cov_matrix.resize(data_points);
-    }
-    else if (this->estimate_cov_matrix.size() != static_cast<size_t>(data_points))
-    {
-        RUNTIME_CHECK(false, "bf", "Data points in snapshot != latest");
-    }
+    RUNTIME_CHECK(this->estimate_cov_matrix.size() == static_cast<size_t>(data_points), "bf", "Data points in snapshot != latest");
     if (this->mean_cov_matrix.empty())
-    {
         this->mean_cov_matrix.resize(data_points);
-    }
-    else if (this->mean_cov_matrix.size() != static_cast<size_t>(data_points))
-    {
-        RUNTIME_CHECK(false, "bf", "Data points in snapshot != latest");
-    }
-    /* Chunked parallel update.
-     * Phase 1: mean_cov[i] = a * x_i * x_i.H + (1 - a) * mean_cov[i], where x_i is the i-th
-     * column of the snapshot signal matrix. Each chunk keeps one preallocated M x M scratch
-     * matrix so the bin loop performs no heap allocation. */
+    RUNTIME_CHECK(this->mean_cov_matrix.size() == static_cast<size_t>(data_points), "bf", "Data points in snapshot != latest");
+    /* Chunked parallel update. */
+    /* - Phase 1: mean_cov[i] = a * x_i * x_i.H + (1 - a) * mean_cov[i], where x_i is the i-th column of the snapshot signal matrix. -*/
+    /* - Each chunk keeps one preallocated M x M scratch matrix so the bin loop performs no heap allocation. - */
     int M = this->snap_signal_matrix_freq_domain.rows();
     int n_chunks = std::max(1, std::min(std::max(1, static_cast<int>(std::thread::hardware_concurrency())), data_points));
     int chunk_size = (data_points + n_chunks - 1) / n_chunks;
@@ -174,11 +163,10 @@ void vuprs::WidebandBeamformerTemplate::UpdateCovarianceMatrix()
                     }
                 }));
         }
-        for (auto &f : futures)
-            f.get();
+        vuprs::WaitForAllFutures(futures);
     }
-    /* Phase 2: estimate_cov[i] = b * mean[i - 1] + a * mean[i] + b * mean[i + 1].
-     * All mean matrices are ready after phase 1 (barrier), so the chunks are independent again. */
+    /* - Phase 2: estimate_cov[i] = b * mean[i - 1] + a * mean[i] + b * mean[i + 1]. -*/
+    /* - All mean matrices are ready after phase 1 (barrier), so the chunks are independent again. - */
     {
         std::vector<std::future<void>> futures;
         futures.reserve(n_chunks);
@@ -206,11 +194,13 @@ void vuprs::WidebandBeamformerTemplate::UpdateCovarianceMatrix()
                     }
                 }));
         }
-        for (auto &f : futures)
-            f.get();
+        vuprs::WaitForAllFutures(futures);
     }
     this->is_cov_matrix_empty = false;
     this->first_snapshot = false;
+    /* Cap at M: only the transition to "enough snapshots" matters. */
+    if (this->covariance_update_count < M)
+        ++this->covariance_update_count;
 }
 
 void vuprs::WidebandBeamformerTemplate::SetCovarianceMatrixFittingParam(double snaps_window_size, double adjacent_freq_average_index)
@@ -247,7 +237,7 @@ void vuprs::WidebandBeamformerTemplate::UpdateWorkBinRange()
     double pad = 10.0 * df;
     double f_lo = (this->work_freq_lower > 0.0) ? std::max(0.0, this->work_freq_lower - pad) : 0.0;
     double f_hi = (this->work_freq_upper > 0.0) ? std::min(this->fs / 2.0, this->work_freq_upper + pad)
-                                                 : this->fs / 2.0;
+                                                : this->fs / 2.0;
     const double *freq = this->signal_frequency_list.data();
     int lo = static_cast<int>(std::lower_bound(freq, freq + f_total, f_lo) - freq);
     int hi = static_cast<int>(std::upper_bound(freq, freq + f_total, f_hi) - freq) - 1;
@@ -274,6 +264,7 @@ void vuprs::WidebandBeamformerTemplate::ResetCovarianceMatrices()
     this->first_snapshot = true;
     this->is_signal_empty = true;
     this->is_cov_matrix_empty = true;
+    this->covariance_update_count = 0;
     this->mean_cov_matrix.clear();
     this->mean_cov_matrix.shrink_to_fit();
     this->estimate_cov_matrix.clear();
@@ -329,6 +320,12 @@ void vuprs::WidebandBeamformerTemplate::UpdateElementPredelay_externalFS(double 
     *element_predelay_time = this->element_predelay_time;
     *element_predelay_count = this->element_predelay_count;
     *channel_name = this->element_channel_name;
+    /* Refresh FIR predelay phases; InputSignal() only does this when fs/N change. */
+    if (fs > 0.0 && !this->element_predelay_time.empty() &&
+        this->signal_frequency_list_complex.size() > 0)
+    {
+        this->UpdatePredelayExpMatrix();
+    }
 }
 
 void vuprs::WidebandBeamformerTemplate::UpdatePredelayExpMatrix()
@@ -431,11 +428,11 @@ bool vuprs::WidebandBeamformerTemplate::ScanForPositionPower(std::vector<double>
     RUNTIME_CHECK(alt.size() == az.size(), "bf", "Altitude and azimuth size mismatch");
 
     /* STEP 0: Prepare for data */
-    int M = this->array.size();                                                       /* Element counts */
-    int k = alt.size();                                                               /* Scan points counts */
-    int f_count = snapshot.covariance.size();                                         /* In-band frequency counts */
+    int M = this->array.size();               /* Element counts */
+    int k = alt.size();                       /* Scan points counts */
+    int f_count = snapshot.covariance.size(); /* In-band frequency counts */
     /* Reuse per-call accumulators (single scan caller at a time). */
-    Eigen::Matrix<double, 1, -1> &total_power = this->scan_total_power;               /* Total power for each scan position */
+    Eigen::Matrix<double, 1, -1> &total_power = this->scan_total_power; /* Total power for each scan position */
     if (total_power.cols() != k)
         total_power = Eigen::Matrix<double, 1, -1>::Zero(k);
     else
@@ -520,8 +517,7 @@ bool vuprs::WidebandBeamformerTemplate::ScanForPositionPower(std::vector<double>
                     }
                 }));
         }
-        for (auto &f : futures)
-            f.get();
+        vuprs::WaitForAllFutures(futures);
         for (int c = 0; c < n_chunks; c++)
             total_power += this->scan_partial_power[c];
         total_power /= (double)M * (double)M; /* CBF scan weight: w = ps / M, so power = ps.H * R * ps / M^2 */
@@ -578,6 +574,15 @@ void vuprs::WidebandBeamformerTemplate::CalculateBeamforming()
     const int bin_count = bin_hi - bin_lo + 1;
     if (bin_count <= 0)
         return;
+    /* A sum of K rank-one snapshots has rank <= K. Until the covariance has been
+     * updated at least M times (M = element count) it is rank-deficient, so keep
+     * CBF weights and do not attempt a covariance-based solve (DCRCB/MVDR). */
+    if (this->covariance_update_count < M)
+    {
+        for (int i = bin_lo; i <= bin_hi; ++i)
+            this->result_weight_vectors.col(i) = this->steering_vectors.col(i) / M;
+        return;
+    }
     /* Chunk iteration (never spawn more chunks than bins, and never divide by zero). */
     unsigned hw = std::max(1u, std::thread::hardware_concurrency());
     int chunk_number = std::min<int>(static_cast<int>(hw), bin_count);
@@ -607,6 +612,5 @@ void vuprs::WidebandBeamformerTemplate::CalculateBeamforming()
                 }
             }));
     }
-    for (auto &f : futures)
-        f.get();
+    vuprs::WaitForAllFutures(futures);
 }

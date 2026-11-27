@@ -9,6 +9,11 @@
 #include "server/net/frame_publisher.h"
 #include "server/net/session.h"
 
+namespace spdlog
+{
+    class logger;
+}
+
 namespace vuprs
 {
     namespace net
@@ -21,6 +26,7 @@ namespace vuprs
             size_t data_queue_frames = 64;
             size_t control_queue_frames = 16;
             size_t control_worker_queue = 64;
+            std::shared_ptr<spdlog::logger> logger; /* optional; defaults to spdlog::default_logger() */
         };
 
         /**

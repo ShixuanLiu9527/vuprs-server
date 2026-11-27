@@ -59,6 +59,7 @@ namespace vuprs
 
         void InitSystemConfigFiles(const vuprs::SystemConfigFiles &config);
         bool ConfigDone() const { return this->config_done_; }
+        std::shared_ptr<spdlog::logger> Logger() const { return this->server_logger_; }
         bool Run();
         void Stop();
         uint16_t Port() const { return this->server_config_.port; }

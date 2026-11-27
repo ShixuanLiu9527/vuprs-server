@@ -1,6 +1,8 @@
+#include <utility>
+#include "logger/log_manager.h"
 #include "server/net/asio_server.h"
 
-#include <iostream>
+#define NET_LOG(level) _LOG(this->config_.logger, level)
 
 vuprs::net::AsioServer::AsioServer(AsioServerConfig config, std::shared_ptr<IControlService> service)
     : config_(std::move(config)),
@@ -16,6 +18,8 @@ vuprs::net::AsioServer::AsioServer(AsioServerConfig config, std::shared_ptr<ICon
         this->config_.control_worker_queue = 1;
     if (this->config_.max_payload_bytes == 0)
         this->config_.max_payload_bytes = MAX_PAYLOAD_BYTES;
+    if (!this->config_.logger)
+        this->config_.logger = spdlog::default_logger();
 }
 
 vuprs::net::AsioServer::~AsioServer()
@@ -106,7 +110,9 @@ void vuprs::net::AsioServer::OnAccept(const asio::error_code &ec, asio::ip::tcp:
     if (ec)
     {
         if (ec != asio::error::operation_aborted)
-            std::cerr << "[net] accept failed: " << ec.message() << std::endl;
+        {
+            NET_LOG(V_ERROR) << "[net] accept failed: " << ec.message();
+        }
         this->DoAccept();
         return;
     }
@@ -115,6 +121,7 @@ void vuprs::net::AsioServer::OnAccept(const asio::error_code &ec, asio::ip::tcp:
     options.max_payload_bytes = this->config_.max_payload_bytes;
     options.data_queue_frames = this->config_.data_queue_frames;
     options.control_queue_frames = this->config_.control_queue_frames;
+    options.logger = this->config_.logger;
 
     auto session = std::make_shared<Session>(
         this->io_, std::move(socket), this->control_, options,
@@ -127,7 +134,7 @@ void vuprs::net::AsioServer::OnAccept(const asio::error_code &ec, asio::ip::tcp:
     if (old)
         old->Close();
     session->Start();
-    std::cout << "[net] client connected: " << session->Remote() << std::endl;
+    NET_LOG(V_INFO) << "[net] client connected: " << session->Remote();
 
     this->DoAccept();
 }
@@ -138,5 +145,5 @@ void vuprs::net::AsioServer::OnSessionClosed(Session *session)
         return;
     this->publisher_->ResetSession(session);
     this->session_.reset();
-    std::cout << "[net] client disconnected." << std::endl;
+    NET_LOG(V_INFO) << "[net] client disconnected.";
 }

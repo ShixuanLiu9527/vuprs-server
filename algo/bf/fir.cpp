@@ -114,8 +114,7 @@ bool vuprs::FIRCalculator::SolveCoeffUseExpectedFrequencyResponse(const Eigen::M
                 }
             }));
     }
-    for (auto &f : futures)
-        f.get();
+    vuprs::WaitForAllFutures(futures);
     return true;
 }
 

@@ -206,8 +206,7 @@ void vuprs::BeamFormingArray::GetArraySignalMatrix(Eigen::Matrix<Eigen::dcomplex
                     signal_matrix->row(i) = this->element_array[i].element_signal_frequency_domain_eigen.transpose();
                 }));
         }
-        for (auto &f : futures)
-            f.get();
+        vuprs::WaitForAllFutures(futures);
     }
     else
     {

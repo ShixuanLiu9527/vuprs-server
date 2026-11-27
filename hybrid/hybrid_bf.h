@@ -7,6 +7,7 @@
 #include <atomic>
 #include <condition_variable>
 #include <functional>
+#include <string>
 #include "algo/bf/beam_former.h"
 #include "algo/bf/fir.h"
 #include "hybrid/hybrid_bf_config.h"
@@ -95,10 +96,16 @@ namespace vuprs
         std::mutex mut_alg;                                      /* Algorithm mutex lock (bf/fir/hardware_fs) */
         vuprs::FIRCalculator fir;                                /* FIR algorithm, [controlled by mut_alg] (can be only used in THREAD__AlgorithmCalculation) */
         std::unique_ptr<vuprs::WidebandBeamformerTemplate> bf;   /* Beam forming algorithm, [controlled by mut_alg] (can be only used in THREAD__AlgorithmCalculation) */
+        std::string bf_array_config_json_;                       /* Array config path for binding a new bf */
         std::shared_ptr<vuprs::ThreadPool> shared_thread_pool;   /* One pool for all bf/scan/fir/array parallel work, so workers never exceed the core count */
         std::atomic<double> hardware_fs{0.0};                    /* Hardware sampling frequency, calculate by SCI register */
         double bf_freq__lower;                                   /* Bandpass lower boundary (Hz), set at start, read-only afterwards */
         double bf_freq__upper;                                   /* Bandpass upper boundary (Hz), set at start, read-only afterwards */
+        /* Last successfully applied target [mut_alg]. */
+        double target_alt_ = 0.0;
+        double target_az_ = 0.0;
+        double target_wave_velocity_ = 0.0;
+        bool target_valid_ = false;
 
         /* DMA Interrupt */
         std::atomic<uint32_t> dma_current_desc{0xFFFFFFFF}; /* current descriptor address, initialized to an invalid value */
@@ -185,6 +192,7 @@ namespace vuprs
          * @brief Bind beam forming algorithm.
          *
          * @param beamformer beam forming algorithm (must be created by user, and bind to this class).
+         * @note Call only when stopped; the remembered array config is applied automatically.
          */
         bool BindBeamformer(std::unique_ptr<vuprs::WidebandBeamformerTemplate> beamformer = nullptr);
 

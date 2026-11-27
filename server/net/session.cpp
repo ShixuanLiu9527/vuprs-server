@@ -1,7 +1,7 @@
 #include "server/net/session.h"
 
-#include <iostream>
 #include <utility>
+#include "logger/log_manager.h"
 
 vuprs::net::Session::Session(asio::io_context &io,
                              asio::ip::tcp::socket socket,
@@ -12,8 +12,11 @@ vuprs::net::Session::Session(asio::io_context &io,
       socket_(std::move(socket)),
       worker_(std::move(worker)),
       options_(options),
+      logger_(options.logger),
       on_close_(std::move(on_close))
 {
+    if (!this->logger_)
+        this->logger_ = spdlog::default_logger();
     asio::error_code ec;
     this->socket_.set_option(asio::ip::tcp::no_delay(true), ec);
     const auto endpoint = this->socket_.remote_endpoint(ec);
@@ -321,10 +324,10 @@ void vuprs::net::Session::Fail(const asio::error_code &ec, const std::string &wh
 {
     if (this->closed_.load())
         return;
-    std::cerr << "[net][" << this->remote_ << "] " << where;
+    std::string message = "[net][" + this->remote_ + "] " + where;
     if (ec)
-        std::cerr << ": " << ec.message();
-    std::cerr << std::endl;
+        message += ": " + ec.message();
+    _LOG(this->logger_, V_ERROR) << message;
     this->CloseOnStrand();
 }
 
