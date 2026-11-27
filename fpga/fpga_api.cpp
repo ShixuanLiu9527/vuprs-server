@@ -51,10 +51,8 @@ bool vuprs::FPGA_API__CBUF__ReadCircularBuffer(vuprs::FPGAController *controller
 {
     PARAM_CHECK(controller->ConfigDone(), "fpga", "FPGA Controller not configured in advance.");
     RUNTIME_CHECK(controller->dev__circular_buffer.Refreshed(), "fpga", "Circular buffer not refreshed.");
-
     uint32_t r_val, CBF;
     bool operate_status = true;
-
     /* STEP 1: Clear buffer (thread-local so repeated reads reuse the allocation) */
     static thread_local vuprs::AlignedBufferDMA buffer;
     /* STEP 2: Freeze */
@@ -70,8 +68,8 @@ bool vuprs::FPGA_API__CBUF__ReadCircularBuffer(vuprs::FPGAController *controller
     operate_status &= controller->mem___circular_buffer_bram.ReadMemory(&buffer, 0, signal_points * ADC_FRAME_WORD_SIZE * sizeof(uint32_t));
     /* STEP 4: Read current BRAM pointer & convert */
     operate_status &= controller->dev__circular_buffer.ReadSingleRegister(vuprs::Circular_Buffer__Registers::CBUF_CBP, &CBF);
-    uint32_t pointPos = std::max(0, FPGA_CBF_TO_DATA_POSITION(CBF)); /* rotate points = (CBF + 4) / 40 - 1 */
-    operate_status &= vuprs::FPGACircularBuffer2Frames(&buffer, signal, fs, voltageScale, pointPos);
+    uint32_t point_pos = std::max(0, FPGA_CBF_TO_DATA_POSITION(CBF)); /* rotate points = (CBF + 4) / 40 - 1 */
+    operate_status &= vuprs::FPGACircularBuffer2Frames(&buffer, signal, fs, voltageScale, point_pos);
     /* STEP 5: Reset */
     operate_status &= controller->dev__circular_buffer.WriteSingleRegister(vuprs::Circular_Buffer__Registers::CBUF_RST, 0);
     return operate_status;
@@ -88,14 +86,11 @@ bool vuprs::FPGA_API__CBUF__ResetCircularBuffer(vuprs::FPGAController *controlle
 /* ----------------------------------------------------------------------------- */
 
 bool vuprs::FPGA_API__PDLY__SetPredelay(vuprs::FPGAController *controller,
-                                        const std::vector<int> &channel_predelay,
-                                        const std::vector<std::string> &channel_name)
+                                        const std::vector<int> &channel_predelay)
 {
     PARAM_CHECK(controller->ConfigDone(), "fpga", " FPGA Controller not configured in advance.");
-    PARAM_CHECK(channel_name.size() == channel_predelay.size(), "fpga", " Channel name list & channel predelay list not the same size.");
     PARAM_CHECK(channel_predelay.size() == ADC_CHANNEL_NUMBER, "fpga", " Invalid channel predelay size.");
 
-    std::vector<uint16_t> predelay_ordered(ADC_CHANNEL_NUMBER);
     std::vector<uint32_t> predelay_to_write(ADC_CHANNEL_NUMBER / 2);
     const std::vector<vuprs::PreDelay_Unit__Registers> registers_to_write = {
         vuprs::PreDelay_Unit__Registers::PREDLY_CH1_CH2,
@@ -107,15 +102,11 @@ bool vuprs::FPGA_API__PDLY__SetPredelay(vuprs::FPGAController *controller,
         vuprs::PreDelay_Unit__Registers::PREDLY_CH13_CH14,
         vuprs::PreDelay_Unit__Registers::PREDLY_CH15_CH16,
     };
-    for (uint32_t i = 0; i < ADC_CHANNEL_NUMBER; i++)
-    {
-        int pos = vuprs::FindValueInVec<std::string>(channel_name, ADC_CHANNEL_ADDR_MAP[i]);
-        PARAM_CHECK(pos >= 0, "fpga", " Missing channel: " + ADC_CHANNEL_ADDR_MAP[i]);
-        predelay_ordered[i] = static_cast<uint16_t>(channel_predelay[pos]);
-    }
+    /* channel_predelay is already in ADC channel order (A1..A8, B1..B8). */
     for (uint32_t i = 0; i < ADC_CHANNEL_NUMBER / 2; i++)
     {
-        predelay_to_write[i] = UINT16_SPLI_TO_UINT32(predelay_ordered[2 * i], predelay_ordered[2 * i + 1]);
+        predelay_to_write[i] = UINT16_SPLI_TO_UINT32(static_cast<uint16_t>(channel_predelay[2 * i]),
+                                                     static_cast<uint16_t>(channel_predelay[2 * i + 1]));
     }
     return controller->dev__predelay_unit.WriteMultipleRegister(registers_to_write, predelay_to_write);
 }

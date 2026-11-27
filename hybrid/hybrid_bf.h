@@ -82,29 +82,29 @@ namespace vuprs
         bool inference_pending = false; /* protected by mut_inference_wait */
 
         /* Scan */
-        std::mutex mut_scan_opt;                         /* Scan mutex lock */
-        std::vector<double> scan_alt, scan_az;           /* controlled by mut_scan_opt */
-        int scan_points_in_hemisphere;                   /* controlled by mut_scan_opt */
-        double scan_wave_velocity, scan_alt_min;         /* controlled by mut_scan_opt */
-        std::atomic<uint64_t> scan_generation{0};        /* incremented when a new covariance snapshot is ready (at most SCAN_MAX_RATE_HZ per second) */
-        std::atomic<uint64_t> scan_options_generation{0}; /* incremented when points/alt_min/wave velocity change */
-        std::mutex mut_scan_snapshot;                    /* protects scan_snapshot */
+        std::mutex mut_scan_opt;                                            /* Scan mutex lock */
+        std::vector<double> scan_alt, scan_az;                              /* controlled by mut_scan_opt */
+        int scan_points_in_hemisphere;                                      /* controlled by mut_scan_opt */
+        double scan_wave_velocity, scan_alt_min;                            /* controlled by mut_scan_opt */
+        std::atomic<uint64_t> scan_generation{0};                           /* incremented when a new covariance snapshot is ready (at most SCAN_MAX_RATE_HZ per second) */
+        std::atomic<uint64_t> scan_options_generation{0};                   /* incremented when points/alt_min/wave velocity change */
+        std::mutex mut_scan_snapshot;                                       /* protects scan_snapshot */
         std::shared_ptr<const vuprs::ScanCovarianceSnapshot> scan_snapshot; /* cached covariance snapshot for scan */
-        std::mutex mut_scan_wait;                        /* Scan wait mutex [controlled by scan_cv] */
-        std::condition_variable scan_cv;                 /* Scan condition var, controlled by mut_scan_wait */
+        std::mutex mut_scan_wait;                                           /* Scan wait mutex [controlled by scan_cv] */
+        std::condition_variable scan_cv;                                    /* Scan condition var, controlled by mut_scan_wait */
 
         /* Circular buffer interrupt */
-        std::mutex mut_queue;                                    /* Array signal queue mutex */
-        std::condition_variable algorithm_cv;                    /* Algorithm interrupt condition var, [controlled by mut_queue] */
-        std::deque<vuprs::SignalData> array_signal_queue;        /* Array signal queue, [controlled by mut_queue] */
-        std::mutex mut_alg;                                      /* Algorithm mutex lock (bf/fir/hardware_fs) */
-        vuprs::FIRCalculator fir;                                /* FIR algorithm, [controlled by mut_alg] (can be only used in THREAD__AlgorithmCalculation) */
-        std::unique_ptr<vuprs::WidebandBeamformerTemplate> bf;   /* Beam forming algorithm, [controlled by mut_alg] (can be only used in THREAD__AlgorithmCalculation) */
-        std::string bf_array_config_json_;                       /* Array config path for binding a new bf */
-        std::shared_ptr<vuprs::ThreadPool> shared_thread_pool;   /* One pool for all bf/scan/fir/array parallel work, so workers never exceed the core count */
-        std::atomic<double> hardware_fs{0.0};                    /* Hardware sampling frequency, calculate by SCI register */
-        double bf_freq__lower;                                   /* Bandpass lower boundary (Hz), set at start, read-only afterwards */
-        double bf_freq__upper;                                   /* Bandpass upper boundary (Hz), set at start, read-only afterwards */
+        std::mutex mut_queue;                                  /* Array signal queue mutex */
+        std::condition_variable algorithm_cv;                  /* Algorithm interrupt condition var, [controlled by mut_queue] */
+        std::deque<vuprs::SignalData> array_signal_queue;      /* Array signal queue, [controlled by mut_queue] */
+        std::mutex mut_alg;                                    /* Algorithm mutex lock (bf/fir/hardware_fs) */
+        vuprs::FIRCalculator fir;                              /* FIR algorithm, [controlled by mut_alg] (can be only used in thread_algorithm) */
+        std::unique_ptr<vuprs::WidebandBeamformerTemplate> bf; /* Beam forming algorithm, [controlled by mut_alg] (can be only used in thread_algorithm) */
+        std::string bf_array_config_json_;                     /* Array config path for binding a new bf */
+        std::shared_ptr<vuprs::ThreadPool> shared_thread_pool; /* One pool for all bf/scan/fir/array parallel work, so workers never exceed the core count */
+        std::atomic<double> hardware_fs{0.0};                  /* Hardware sampling frequency, calculate by SCI register */
+        double bf_freq__lower;                                 /* Bandpass lower boundary (Hz), set at start, read-only afterwards */
+        double bf_freq__upper;                                 /* Bandpass upper boundary (Hz), set at start, read-only afterwards */
         /* Last successfully applied target [mut_alg]. */
         double target_alt_ = 0.0;
         double target_az_ = 0.0;
@@ -141,7 +141,7 @@ namespace vuprs
          * @note If interrupt detected, dma_descriptor_irq <-- true.
          * @note Control mutex lock: mut_dma.
          */
-        void THREAD__ListenDMAInterrupt();
+        void thread_listen_bf();
 
         /**
          * @brief After interrupted, read data from FPGA DDR and deliver it to the result callback.
@@ -151,7 +151,7 @@ namespace vuprs
          * @note STEP 3: Push data to the result callback.
          * @note Control mutex lock: mut_dma.
          */
-        void THREAD__ReadResult();
+        void thread_read_bf();
 
         /**
          * @brief Read circular buffer and push data to the array signal queue.
@@ -159,22 +159,22 @@ namespace vuprs
          * @note If interrupt detected, circular_buffer_irq <-- true.
          * @note Control mutex lock: mut_queue.
          */
-        void THREAD__ReadCircularBuffer();
+        void thread_read_cbuf();
 
         /**
          * @brief Pop the array signal queue, do beam forming, and issue FIR coefficients.
          */
-        void THREAD__AlgorithmCalculation();
+        void thread_algorithm();
 
         /**
          * @brief Get the covariance snapshot and do scan power calculation.
          */
-        void THREAD__ScanPowerCalculation();
+        void thread_scan();
 
         /**
          * @brief Run model inference when woken by the BF result thread.
          */
-        void THREAD__InferenceCalculation();
+        void thread_inference();
 
     public:
         HybridBeamformer();

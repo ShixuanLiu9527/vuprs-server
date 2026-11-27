@@ -70,17 +70,54 @@ namespace vuprs
     };
 
     /**
+     * @brief Beam forming array base.
+     *
+     * @note Owns the element list and loads it from a JSON array config.
+     * @note LoadArrayFromJson() sorts elements by ADC channel (A1..A8, B1..B8),
+     * @note so element_array[i] always corresponds to ADC channel i.
+     *
+     * @note aligned.
+     */
+    class BeamFormingArrayBase
+    {
+    protected:
+        vuprs::AlignedEigenVector<vuprs::BeamFormingElement> element_array;
+        double max_element_position_error = 0.0; /* all elements share the same position error radius, unit: m */
+
+    public:
+        BeamFormingArrayBase() = default;
+
+        virtual ~BeamFormingArrayBase() = 0; /* abstract base: instantiate a derived array instead */
+
+        /**
+         * @brief Load beam forming array from json file.
+         *
+         * @note Elements are sorted by ADC channel (A1..A8, B1..B8) after loading,
+         * @note and the file must contain every ADC channel exactly once.
+         *
+         * @throw std::runtime_error when error occurs.
+         */
+        bool LoadArrayFromJson(const std::string &filename);
+
+        bool empty() const;
+
+        BeamFormingElement &operator[](size_t idx) { return this->element_array[idx]; }
+        const BeamFormingElement &operator[](size_t idx) const { return this->element_array[idx]; }
+        size_t size() const { return this->element_array.size(); }
+
+        EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+    };
+
+    /**
      * @brief Beam forming array.
      *
      * @note aligned.
      */
-    class BeamFormingArray
+    class BeamFormingArray : public BeamFormingArrayBase
     {
     private:
         std::shared_ptr<vuprs::ThreadPool> thread_pool; /* Owned fallback; replaced by SetThreadPool() */
-        double max_element_position_error;
         Eigen::Matrix<Eigen::dcomplex, -1, 1> time_delay_vector;
-        vuprs::AlignedEigenVector<vuprs::BeamFormingElement> element_array;
         double fs = 0.0;             /* sampling frequency for this signal, unit: Hz */
         double sampling_time = 0.0;  /* sampling time for this signal, unit: sec */
         int signal_point_counts = 0; /* sampling points for this signal */
@@ -88,15 +125,6 @@ namespace vuprs
 
     public:
         BeamFormingArray();
-
-        ~BeamFormingArray();
-
-        /**
-         * @brief Load beam forming array from json file.
-         *
-         * @throw std::runtime_error when error occurs.
-         */
-        bool LoadArrayFromJson(const std::string &filename);
 
         /**
          * @brief Replace the internal thread pool with a shared one.
@@ -182,36 +210,22 @@ namespace vuprs
          */
         double CalculateSteeringVectorErrorRadius(double signal_frequency) const;
 
-        bool empty() const;
-
-        BeamFormingElement &operator[](size_t idx) { return this->element_array[idx]; }
-        const BeamFormingElement &operator[](size_t idx) const { return this->element_array[idx]; }
-        size_t size() const { return this->element_array.size(); }
-
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };
 
     /**
      * @brief Beam forming scan array.
      *
+     * @note Same geometry as BeamFormingArray (loaded from the same config and
+     * @note sorted into the same ADC channel order), but resolves time delay for
+     * @note scan positions instead of holding a target steering vector.
+     *
      * @note aligned.
      */
-    class BeamFormingScanArray
+    class BeamFormingScanArray : public BeamFormingArrayBase
     {
-    private:
-        vuprs::AlignedEigenVector<vuprs::BeamFormingElement> element_array;
-
     public:
-        BeamFormingScanArray();
-
-        ~BeamFormingScanArray();
-
-        /**
-         * @brief Load beam forming scan array from json file.
-         *
-         * @throw std::runtime_error when error occurs.
-         */
-        bool LoadArrayFromJson(const std::string &filename);
+        BeamFormingScanArray() = default;
 
         /**
          * @brief Calculate steering vector for one frequency domain.
@@ -253,8 +267,6 @@ namespace vuprs
         Eigen::Matrix<Eigen::dcomplex, -1, -1> GetImagTimedelay(const std::vector<double> &alt,
                                                                 const std::vector<double> &az,
                                                                 double wave_velocity) const;
-
-        bool empty() const;
 
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };

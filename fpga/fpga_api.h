@@ -69,8 +69,7 @@ namespace vuprs
      * @note All predelay values should be equal or smaller than MAX_PDLY.
      *
      * @param controller FPGA controller.
-     * @param channel_predelay channel predelay values (n * Ts).
-     * @param channel_name corrsponding channel name.
+     * @param channel_predelay channel predelay values (n * Ts), in ADC channel order (A1..A8, B1..B8).
      *
      * @retval true: success.
      * @retval false: failed.
@@ -78,8 +77,7 @@ namespace vuprs
      * @throw std::runtime_error
      */
     bool FPGA_API__PDLY__SetPredelay(vuprs::FPGAController *controller,
-                                     const std::vector<int> &channel_predelay,
-                                     const std::vector<std::string> &channel_name);
+                                     const std::vector<int> &channel_predelay);
 
     /**
      * @brief Reset Predelay Unit.

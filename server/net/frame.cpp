@@ -1,7 +1,6 @@
-#include "server/net/frame.h"
-
 #include <chrono>
 #include <cstring>
+#include "server/net/frame.h"
 
 namespace
 {

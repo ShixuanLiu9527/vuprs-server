@@ -1,6 +1,5 @@
-#include "server/net/control_worker.h"
-
 #include <exception>
+#include "server/net/control_worker.h"
 
 vuprs::net::ControlWorker::ControlWorker(std::shared_ptr<IControlService> service, size_t max_queue)
     : service_(std::move(service)), max_queue_(max_queue == 0 ? 1 : max_queue)

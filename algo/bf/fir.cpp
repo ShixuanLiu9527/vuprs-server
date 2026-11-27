@@ -53,12 +53,13 @@ void vuprs::FIRCalculator::SetFrequencyRange(double lower, double upper)
 }
 
 bool vuprs::FIRCalculator::SolveCoeffUseExpectedFrequencyResponse(const Eigen::Matrix<Eigen::dcomplex, -1, -1> &response,
-                                                                  const std::vector<std::string> &channel_name, double fs)
+                                                                  double fs)
 {
     PARAM_CHECK(this->config_done, "bf", " Config not complete.");
     int M = response.rows();          /* M */
     int N_2_plus_1 = response.cols(); /* N/2+1 */
     int N = (N_2_plus_1 - 1) * 2;     /* N */
+    PARAM_CHECK(static_cast<uint32_t>(M) == ADC_CHANNEL_NUMBER, "bf", " FIR banks must match ADC channel count.");
     PARAM_CHECK(N >= static_cast<int>(this->fir_length), "bf", " Too little response for solving.");
     this->fir_coefficient.resize(M);
     for (auto &val : this->fir_coefficient)
@@ -80,8 +81,7 @@ bool vuprs::FIRCalculator::SolveCoeffUseExpectedFrequencyResponse(const Eigen::M
             [&, i]()
             {
                 Eigen::Matrix<Eigen::dcomplex, -1, 1> Hd = response.row(i).transpose();
-                /* Remap: element FIR coef to channel FIR coef */
-                int dst_index = vuprs::FindValueInVec(vuprs::ADC_CHANNEL_ADDR_MAP, channel_name[i]);
+                /* Response row i is already the coefficient bank of ADC channel i. */
                 Eigen::Matrix<Eigen::dcomplex, -1, 1> h(N, 1);
                 std::vector<double> h_real_vec;
                 /* add filter */
@@ -110,7 +110,7 @@ bool vuprs::FIRCalculator::SolveCoeffUseExpectedFrequencyResponse(const Eigen::M
                 {
                     std::unique_lock<std::mutex> lock(this->mtx); /* LOCK */
                     this->max_abs_coefficient = std::max(channel_max, this->max_abs_coefficient);
-                    this->fir_coefficient[dst_index] = h_real_vec;
+                    this->fir_coefficient[i] = h_real_vec;
                 }
             }));
     }

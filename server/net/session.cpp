@@ -1,7 +1,6 @@
-#include "server/net/session.h"
-
 #include <utility>
 #include "logger/log_manager.h"
+#include "server/net/session.h"
 
 vuprs::net::Session::Session(asio::io_context &io,
                              asio::ip::tcp::socket socket,

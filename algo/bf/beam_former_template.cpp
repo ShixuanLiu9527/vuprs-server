@@ -47,14 +47,9 @@ bool vuprs::WidebandBeamformerTemplate::ConfigArrayFromJson(const std::string &a
 {
     if (this->array.LoadArrayFromJson(array_config_json_filename))
     {
-        int array_size = this->array.size();
-        this->element_channel_name.resize(array_size);
+        size_t array_size = this->array.size();
         this->element_predelay_time.resize(array_size);
         this->element_predelay_count.resize(array_size);
-        for (int i = 0; i < array_size; i++)
-        {
-            this->element_channel_name[i] = this->array[i].adc_channel;
-        }
         this->is_array_config_done = true;
         this->scan_array.LoadArrayFromJson(array_config_json_filename); /* Load scan array, which has same element position as array but different time delay */
         return true;
@@ -276,18 +271,17 @@ void vuprs::WidebandBeamformerTemplate::GetWeightVectorValues(Eigen::Matrix<Eige
     *dst = this->result_weight_vectors;
 }
 
-void vuprs::WidebandBeamformerTemplate::GetFIRExpectedFrequencyResponse(Eigen::Matrix<Eigen::dcomplex, -1, -1> *dst, std::vector<std::string> *channel_name, bool consider_predelay) const
+void vuprs::WidebandBeamformerTemplate::GetFIRExpectedFrequencyResponse(Eigen::Matrix<Eigen::dcomplex, -1, -1> *dst, bool consider_predelay) const
 {
-    RUNTIME_CHECK(dst && channel_name, "bf", "Destination cannot be NULL");
+    RUNTIME_CHECK(dst, "bf", "Destination cannot be NULL");
     RUNTIME_CHECK(!this->is_signal_empty, "bf", "No signal input");
     if (!consider_predelay)
     {
         *dst = this->result_weight_vectors;
         return;
     }
-    /* w*(fk) x exp(j*2*pi*fk*Tm) */
+    /* w*(fk) x exp(j*2*pi*fk*Tm); rows are already in ADC channel order. */
     *dst = this->result_weight_vectors.array().conjugate() * this->pre_delay_exp_arg.array();
-    *channel_name = this->element_channel_name;
     /* set 0 & nyquist to real */
     int nyquist_idx = dst->cols() - 1;
     dst->col(0).imag().setZero();
@@ -307,18 +301,20 @@ void vuprs::WidebandBeamformerTemplate::UpdateAndGetElementPredelay(double fir_l
                                                                     double fs,
                                                                     bool include_fir_group_delay,
                                                                     std::vector<int> *element_predelay_count,
-                                                                    std::vector<double> *element_predelay_time,
-                                                                    std::vector<std::string> *channel_name)
+                                                                    std::vector<double> *element_predelay_time)
 {
     RUNTIME_CHECK(this->ConfigDone(), "bf", "Config not complete");
     RUNTIME_CHECK(fs > 0.0, "bf", "Invalid sampling frequency");
-    RUNTIME_CHECK(element_predelay_count && channel_name, "bf", "Predelay output pointer is NULL");
+    RUNTIME_CHECK(element_predelay_count, "bf", "Predelay output pointer is NULL");
     uint64_t M = this->array.size();
     double Ts = 1.0 / fs;
     int min_predelay_count = INT_MAX;
+    const double group_delay_count = (fir_length - 1.0) / 2.0;
     for (uint64_t i = 0; i < M; i++)
     {
-        this->element_predelay_count[i] = include_fir_group_delay ? -std::round(this->array[i].time_delay / Ts + (fir_length - 1.0) / 2.0) : -std::round(this->array[i].time_delay / Ts);
+        const double time_delay_count = this->array[i].time_delay / Ts;
+        this->element_predelay_count[i] = include_fir_group_delay ? -std::round(time_delay_count + group_delay_count)
+                                                                  : -std::round(time_delay_count);
         min_predelay_count = std::min(this->element_predelay_count[i], min_predelay_count);
     }
     for (uint64_t i = 0; i < M; i++)
@@ -327,7 +323,6 @@ void vuprs::WidebandBeamformerTemplate::UpdateAndGetElementPredelay(double fir_l
         this->element_predelay_time[i] = this->element_predelay_count[i] * Ts;
     }
     *element_predelay_count = this->element_predelay_count;
-    *channel_name = this->element_channel_name;
     if (element_predelay_time != nullptr)
         *element_predelay_time = this->element_predelay_time;
     /* Refresh FIR predelay phases; InputSignal() only does this when fs/N change. */

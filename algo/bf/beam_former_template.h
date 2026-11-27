@@ -63,7 +63,6 @@ namespace vuprs
         int work_bin_hi = -1;                                                                  /* Last in-band bin (inclusive, includes FIR transition band) */
         std::vector<int> element_predelay_count;                                               /* Predelay count (size = M) */
         std::vector<double> element_predelay_time;                                             /* Predelay time = count * Ts (size = M) */
-        std::vector<std::string> element_channel_name;                                         /* element channel name list (size = M) */
         vuprs::AlignedEigenVector<Eigen::Matrix<Eigen::dcomplex, -1, -1>> mean_cov_matrix;     /* Size: N / 2 + 1, cov_matrix[i] is the mean cov matrix in band [i] */
         vuprs::AlignedEigenVector<Eigen::Matrix<Eigen::dcomplex, -1, -1>> estimate_cov_matrix; /* Size: N / 2 + 1, cov_matrix[i] is the mean cov matrix in band [i] */
         std::vector<Eigen::Matrix<Eigen::dcomplex, -1, -1>> covariance_update_scratch;         /* Size: n_chunks, one M x M scratch per worker chunk (UpdateCovarianceMatrix), algorithm thread only */
@@ -165,12 +164,12 @@ namespace vuprs
         /**
          * @brief Get expected frequency response of FIR filter bank.
          *
+         * @note Rows are in ADC channel order (A1..A8, B1..B8), same as the hardware FIR banks.
+         *
          * @param dst output expected frequency response.
-         * @param channel_name corresponding channel name.
          * @param consider_predelay if consider predelay in frequency response.
          */
         void GetFIRExpectedFrequencyResponse(Eigen::Matrix<Eigen::dcomplex, -1, -1> *dst,
-                                             std::vector<std::string> *channel_name,
                                              bool consider_predelay) const;
 
         /**
@@ -206,14 +205,14 @@ namespace vuprs
          * @param include_fir_group_delay true: include FIR group delay, false: exclude FIR group delay.
          * @param element_predelay_count (cannot be NULL) integer delay. (count = -round[delay{m}/Ts + (L-1)/2])
          * @param element_predelay_time (optional) integer delay time. (Tm = -round[delay{m}/Ts + (L-1)/2] * Ts)
-         * @param channel_name (cannot be NULL) corresponding channel name.
+         *
+         * @note Outputs are in ADC channel order (A1..A8, B1..B8), same as the hardware predelay registers.
          */
         void UpdateAndGetElementPredelay(double fir_length,
                                          double fs,
                                          bool include_fir_group_delay,
                                          std::vector<int> *element_predelay_count,
-                                         std::vector<double> *element_predelay_time,
-                                         std::vector<std::string> *channel_name);
+                                         std::vector<double> *element_predelay_time);
 
         bool ConfigDone() const;
         bool CalculateEnable() const;

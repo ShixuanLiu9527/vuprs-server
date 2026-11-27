@@ -6,41 +6,8 @@ vuprs::SignalData::SignalData()
     this->_channel_name = vuprs::ADC_CHANNEL_ADDR_MAP;
 }
 
-bool vuprs::SignalData::contains(const std::string &channel_name) const
-{
-    auto it = this->CHANNEL_NAME__TO__CHANNEL_INDEX.find(channel_name);
-    if (it != this->CHANNEL_NAME__TO__CHANNEL_INDEX.end())
-    {
-        return true;
-    }
-    else
-    {
-        return false;
-    }
-}
-
-void vuprs::SignalData::TakeChannelData(const std::string &channel_name, std::vector<std::complex<double>> *data)
-{
-    auto it = this->CHANNEL_NAME__TO__CHANNEL_INDEX.find(channel_name);
-    PARAM_CHECK(it != this->CHANNEL_NAME__TO__CHANNEL_INDEX.end(), "fpga", " Invalid channel name: " + channel_name);
-    PARAM_CHECK(data != nullptr, "fpga", " Data cannot be NULL.");
-    data->swap(this->_channel_data[it->second]);
-}
-
-void vuprs::SignalData::_UpdataHashMap()
-{
-    PARAM_CHECK(this->_channel_data.size() == this->_channel_name.size(), "fpga", " Unmatch channel & name size.");
-    int data_channels = this->_channel_data.size();
-    this->CHANNEL_NAME__TO__CHANNEL_INDEX.clear();
-    for (int i = 0; i < data_channels; i++)
-    {
-        this->CHANNEL_NAME__TO__CHANNEL_INDEX.insert(std::make_pair(this->_channel_name[i], i));
-    }
-}
-
 void vuprs::SignalData::ToCSV(const std::string &output_file)
 {
-    this->_UpdataHashMap();
     PARAM_CHECK(!(this->_channel_data.empty() || this->_channel_name.empty()), "fpga", " No channel data to export.");
     std::string dir;
     vuprs::SplitFile(output_file, &dir, nullptr, nullptr);
@@ -85,16 +52,13 @@ void vuprs::SignalData::ToCSV(const std::string &output_file)
 bool vuprs::FPGACircularBuffer2Frames(vuprs::AlignedBufferDMA *buffer, vuprs::SignalData *adc_data, double fs, double v_scale, uint32_t point_pos_cbf)
 {
     PARAM_CHECK(buffer->is_allocated(), "fpga", " Buffer is empty.");
-
     const uint16_t *raw_buffer_data = buffer->as<const uint16_t>();
     ssize_t vector_size = static_cast<ssize_t>(buffer->size() / sizeof(uint16_t)), frame_parsed_size = 0;
     uint32_t header_ptr = 0, tailer_ptr = ADC_FRAME_HALF_WORD_SIZE - 2;
     adc_data->_channel_data.clear();
     adc_data->_channel_data.resize(ADC_CHANNEL_NUMBER);
     for (uint32_t i = 0; i < ADC_CHANNEL_NUMBER; i++)
-    {
         adc_data->_channel_data[i].reserve(vector_size / ADC_FRAME_HALF_WORD_SIZE + 1);
-    }
     while ((tailer_ptr + 1) < vector_size)
     {
         if ((header_ptr + 1) < vector_size && (tailer_ptr + 1) < vector_size)
@@ -109,8 +73,7 @@ bool vuprs::FPGACircularBuffer2Frames(vuprs::AlignedBufferDMA *buffer, vuprs::Si
             {
                 adc_data->_channel_data[ch].emplace_back(
                     std::complex<double>(
-                        vuprs::Q15__ADC_UINT16_TO_DOUBLE(raw_buffer_data[header_ptr + ch + 2],
-                                                         v_scale),
+                        vuprs::Q15__ADC_UINT16_TO_DOUBLE(raw_buffer_data[header_ptr + ch + 2], v_scale),
                         0.0));
             }
             frame_parsed_size++;
@@ -118,16 +81,11 @@ bool vuprs::FPGACircularBuffer2Frames(vuprs::AlignedBufferDMA *buffer, vuprs::Si
         header_ptr += ADC_FRAME_HALF_WORD_SIZE;
         tailer_ptr += ADC_FRAME_HALF_WORD_SIZE;
     }
-
+    /* - Rotate - */
     for (uint32_t ch = 0; ch < ADC_CHANNEL_NUMBER; ch++)
-    {
         vuprs::RotateCircularBuffer<std::complex<double>>(&adc_data->_channel_data[ch], point_pos_cbf);
-    }
     adc_data->fs = fs;
     adc_data->sampling_time = (1.0 / fs) * ((double)frame_parsed_size - 1.0);
     adc_data->signal_points = frame_parsed_size;
-    adc_data->_UpdataHashMap();
-
     return true;
 }
-

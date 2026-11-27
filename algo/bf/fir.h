@@ -50,9 +50,10 @@ namespace vuprs
          * @brief Solve FIR coefficient use expected frequency response.
          *
          * @note Target response size = M x (N/2+1), M = element size & FIR banks, N = signal points.
+         * @note Response rows must be in ADC channel order (A1..A8, B1..B8); FIR bank i is
+         * @note generated from response row i.
          *
          * @param response target response (N/2+1).
-         * @param channel_name corresponding channel name for [response].
          * @param fs sampling frequency.
          *
          * @throw std::runtime_error
@@ -61,7 +62,6 @@ namespace vuprs
          * @retval false: failed.
          */
         bool SolveCoeffUseExpectedFrequencyResponse(const Eigen::Matrix<Eigen::dcomplex, -1, -1> &response,
-                                                    const std::vector<std::string> &channel_name,
                                                     double fs);
 
         /**

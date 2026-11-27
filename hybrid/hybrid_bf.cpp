@@ -3,6 +3,7 @@
 #include "config.h"
 #include "hybrid/hybrid_bf.h"
 #include "logger/check.h"
+#include "misc/rate_limiter.h"
 
 #define HYBRID_LOG(level) _LOG(this->hybrid_logger ? this->hybrid_logger : spdlog::default_logger(), level)
 
@@ -182,24 +183,6 @@ bool vuprs::HybridBeamformer::InitInference(const std::string &model_config_json
 #endif
 }
 
-bool vuprs::HybridBeamformer::CheckScanningConfigValid(const ScanningConfig &config, std::string *info) const
-{
-    bool retval = true;
-#define _CHECK_AND_RETURN(STR)        \
-    if (!retval)                      \
-    {                                 \
-        if (info != nullptr)          \
-            *info = std::string(STR); \
-        return false;                 \
-    }
-    retval &= config.points_in_hemisphere > 0 && config.points_in_hemisphere <= MAX_SCANNING_POINTS_IN_HALF;
-    _CHECK_AND_RETURN("points_in_hemisphere must be in [1, MAX_SCANNING_POINTS_IN_HALF]")
-    retval &= std::isfinite(config.alt_min) &&
-              config.alt_min > MIN_SCANNING_ALTITUDE_DEG && config.alt_min <= 90.0;
-    _CHECK_AND_RETURN("alt_min must be finite, > 10.0 deg and <= 90.0 deg")
-    return retval;
-}
-
 bool vuprs::HybridBeamformer::ScanOptions(const ScanningConfig &config, double wave_velocity)
 {
     PARAM_CHECK(this->CheckScanningConfigValid(config, nullptr), "hybrid", "Invalid scan options.");
@@ -230,54 +213,70 @@ bool vuprs::HybridBeamformer::ScanOptions(const ScanningConfig &config, double w
     return true;
 }
 
+#define CHECK_AND_RETURN(VAL, STR)        \
+    do                                    \
+    {                                     \
+        if (!VAL)                         \
+        {                                 \
+            if (info != nullptr)          \
+                *info = std::string(STR); \
+            return false;                 \
+        }                                 \
+    } while (0)
+
+bool vuprs::HybridBeamformer::CheckScanningConfigValid(const ScanningConfig &config, std::string *info) const
+{
+    bool retval = true;
+    retval &= config.points_in_hemisphere > 0 && config.points_in_hemisphere <= MAX_SCANNING_POINTS_IN_HALF;
+    CHECK_AND_RETURN(retval, "points_in_hemisphere must be in [1, MAX_SCANNING_POINTS_IN_HALF]");
+    retval &= std::isfinite(config.alt_min) &&
+              config.alt_min > MIN_SCANNING_ALTITUDE_DEG && config.alt_min <= 90.0;
+    CHECK_AND_RETURN(retval, "alt_min must be finite, > 10.0 deg and <= 90.0 deg");
+    return retval;
+}
+
 bool vuprs::HybridBeamformer::CheckConfigValid(const vuprs::HybridBeamformerConfig &config, std::string *info) const
 {
     bool retval = true;
-#define _CHECK_AND_RETURN(STR)        \
-    if (!retval)                      \
-    {                                 \
-        if (info != nullptr)          \
-            *info = std::string(STR); \
-        return false;                 \
-    }
     /* FPGA hardware must be initialized first */
     retval &= this->controller.ConfigDone();
-    _CHECK_AND_RETURN("config not complete")
+    CHECK_AND_RETURN(retval, "config not complete");
     /* Sampling frequency must be within the range supported by the ADC controller */
     retval &= std::isfinite(config.fs) &&
               (config.fs >= MIN_SAMPLING_FREQUENCY && config.fs <= this->controller.dev__adc_controller.MaxSamplingFrequency()) &&
               (this->controller.dev__adc_controller.GetSCIValueForSamplingFrequency(config.fs) != 0xFFFFFFFF);
-    _CHECK_AND_RETURN("fs out of range or not supported by the ADC (must be min_fs <= fs <= max_fs)")
+    CHECK_AND_RETURN(retval, "fs out of range or not supported by the ADC (must be min_fs <= fs <= max_fs)");
     /* Bandpass frequency range must be positive and below the Nyquist frequency */
     retval &= std::isfinite(config.bf_freq__lower) &&
               (config.bf_freq__lower >= MIN_BEAMFORMER_FREQUENCY && config.bf_freq__lower < config.fs / 2.0);
     retval &= std::isfinite(config.bf_freq__upper) &&
               (config.bf_freq__upper >= MIN_BEAMFORMER_FREQUENCY && config.bf_freq__upper < config.fs / 2.0);
     retval &= (config.bf_freq__lower < config.bf_freq__upper);
-    _CHECK_AND_RETURN("bf_freq out of range (must be min_frequency <= lower < upper < fs/2)")
+    CHECK_AND_RETURN(retval, "bf_freq out of range (must be min_frequency <= lower < upper < fs/2)");
     /* Pointing direction must be within the physical hemisphere */
     retval &= std::isfinite(config.bf_target__alt) && (config.bf_target__alt >= -90.0 && config.bf_target__alt <= 90.0);
     retval &= std::isfinite(config.bf_target__az) && (config.bf_target__az >= -180.0 && config.bf_target__az <= 180.0);
     retval &= std::isfinite(config.bf_wave_velocity) &&
               (config.bf_wave_velocity > 0 && config.bf_wave_velocity <= MAX_WAVE_VELOCITY);
-    _CHECK_AND_RETURN("bf_target out of range (alt in [-90,90], az in [-180,180], 0 < wave_velocity <= max)")
+    CHECK_AND_RETURN(retval, "bf_target out of range (alt in [-90,90], az in [-180,180], 0 < wave_velocity <= max)");
     /* Covariance matrix fitting parameters */
     retval &= std::isfinite(config.bf_cov_snapshots_window_size) &&
               (config.bf_cov_snapshots_window_size >= MIN_COVARIANCE_SNAPSHOT_WINDOW);
     retval &= std::isfinite(config.bf_cov_freq_average_index) && (config.bf_cov_freq_average_index >= 0.0 && config.bf_cov_freq_average_index < 1.0);
-    _CHECK_AND_RETURN("bf_cov out of range (window_size >= 1, freq_average_index in [0,1))")
+    CHECK_AND_RETURN(retval, "bf_cov out of range (window_size >= 1, freq_average_index in [0,1))");
     /* DMA buffers: non-zero size, aligned, and the total size must fit in DDR (use uint64 to avoid overflow) */
     retval &= (config.dma__buffer_count > 0 && config.dma__buffer_points > 0);
     uint64_t total_ddr_capacity = static_cast<uint64_t>(config.dma__buffer_count) *
                                   static_cast<uint64_t>(config.dma__buffer_points) * sizeof(uint32_t);
     retval &= (total_ddr_capacity <= static_cast<uint64_t>(this->controller.mem__ddr.MaxSizeBytes()));
-    _CHECK_AND_RETURN("dma buffer size/count invalid or total exceeds DDR capacity")
+    CHECK_AND_RETURN(retval, "dma buffer size/count invalid or total exceeds DDR capacity");
     /* Data queues */
     retval &= (config.queue__circular_buffer_queue_size_max > 0);
-    _CHECK_AND_RETURN("queue size must be > 0")
+    CHECK_AND_RETURN(retval, "queue size must be > 0");
     return retval;
-#undef _CHECK_AND_RETURN
 }
+
+#undef CHECK_AND_RETURN
 
 bool vuprs::HybridBeamformer::ResetHardwareBeamformer()
 {
@@ -295,15 +294,12 @@ bool vuprs::HybridBeamformer::ResetHardwareBeamformer()
 
 bool vuprs::HybridBeamformer::StartBeamformerWithConfiguration(const vuprs::HybridBeamformerConfig &config)
 {
-    PARAM_CHECK(this->ConfigDone() &&
-                    this->bf != nullptr &&
-                    this->bf->ConfigDone(),
+    PARAM_CHECK(this->ConfigDone() && this->bf != nullptr && this->bf->ConfigDone(),
                 "hybrid_bf", " Config not complete.");
     Eigen::Matrix<Eigen::dcomplex, -1, -1> fir_expected_frequency_response; /* Expected frequency response of FIR filter bank */
     std::vector<std::vector<double>> fir_coefficients;                      /* Coefficient of FIR filter bank */
     std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> _dma_descriptors;   /* SG descriptors for AXI DMA */
     std::vector<int> predelay_count;
-    std::vector<std::string> channel_name;
     int descriptor_update_cycle_us;
     uint32_t fir_len;
     bool retval = true;
@@ -371,8 +367,7 @@ bool vuprs::HybridBeamformer::StartBeamformerWithConfiguration(const vuprs::Hybr
                                               this->hardware_fs.load(),
                                               true,
                                               &predelay_count,
-                                              nullptr,
-                                              &channel_name);
+                                              nullptr);
         /* - Set bandpass range */
         this->fir.SetFrequencyRange(config.bf_freq__lower, config.bf_freq__upper);
         this->bf->SetWorkFrequencyRange(config.bf_freq__lower, config.bf_freq__upper);
@@ -403,9 +398,7 @@ bool vuprs::HybridBeamformer::StartBeamformerWithConfiguration(const vuprs::Hybr
                                                                true,
                                                                true);
     /* - FPGA config step 2 - Config Pre-delay Unit */
-    retval &= vuprs::FPGA_API__PDLY__SetPredelay(&this->controller,
-                                                 predelay_count,
-                                                 channel_name);
+    retval &= vuprs::FPGA_API__PDLY__SetPredelay(&this->controller, predelay_count);
     /* - FPGA config step 3 - Enable FIR */
     retval &= vuprs::FPGA_API__FIR__RunningControl(&this->controller, true);
     /* - FPGA config step 4 - Update FIR coefficients with 0 */
@@ -430,7 +423,6 @@ bool vuprs::HybridBeamformer::StartBeamformerWithConfiguration(const vuprs::Hybr
 bool vuprs::HybridBeamformer::ReDirect(double alt, double az, double wave_velocity)
 {
     std::vector<int> predelay_count, old_predelay_count;
-    std::vector<std::string> channel_name, old_channel_name;
     std::lock_guard<std::mutex> lock(this->mut_alg); /* LOCK */
     const double old_alt = this->target_alt_;
     const double old_az = this->target_az_;
@@ -445,11 +437,8 @@ bool vuprs::HybridBeamformer::ReDirect(double alt, double az, double wave_veloci
                                               this->hardware_fs.load(),
                                               true,
                                               &predelay_count,
-                                              nullptr,
-                                              &channel_name);
-        redirected = vuprs::FPGA_API__PDLY__SetPredelay(&this->controller,
-                                                        predelay_count,
-                                                        channel_name);
+                                              nullptr);
+        redirected = vuprs::FPGA_API__PDLY__SetPredelay(&this->controller, predelay_count);
     }
     catch (const std::exception &e)
     {
@@ -474,11 +463,8 @@ bool vuprs::HybridBeamformer::ReDirect(double alt, double az, double wave_veloci
                                                   this->hardware_fs.load(),
                                                   true,
                                                   &old_predelay_count,
-                                                  nullptr,
-                                                  &old_channel_name);
-            if (!vuprs::FPGA_API__PDLY__SetPredelay(&this->controller,
-                                                    old_predelay_count,
-                                                    old_channel_name))
+                                                  nullptr);
+            if (!vuprs::FPGA_API__PDLY__SetPredelay(&this->controller, old_predelay_count))
             {
                 HYBRID_LOG(V_ERROR) << "Error in [HybridBeamformer::ReDirect] rollback PDLY write failed.";
             }
@@ -504,17 +490,17 @@ bool vuprs::HybridBeamformer::run(const vuprs::HybridBeamformerConfig &config)
     /* Start threads */
     this->system_run = true;
     this->threads.emplace_back([this]()
-                               { this->THREAD__ReadResult(); });
+                               { this->thread_read_bf(); });
     this->threads.emplace_back([this]()
-                               { this->THREAD__ListenDMAInterrupt(); });
+                               { this->thread_listen_bf(); });
     this->threads.emplace_back([this]()
-                               { this->THREAD__AlgorithmCalculation(); });
+                               { this->thread_algorithm(); });
     this->threads.emplace_back([this]()
-                               { this->THREAD__ScanPowerCalculation(); });
+                               { this->thread_scan(); });
     this->threads.emplace_back([this]()
-                               { this->THREAD__InferenceCalculation(); });
+                               { this->thread_inference(); });
     this->threads.emplace_back([this]()
-                               { this->THREAD__ReadCircularBuffer(); });
+                               { this->thread_read_cbuf(); });
     return true;
 }
 
@@ -576,7 +562,7 @@ bool vuprs::HybridBeamformer::stop()
 
 /* ------------------------------------------ Thread Control ----------------------------------------- */
 
-void vuprs::HybridBeamformer::THREAD__ScanPowerCalculation()
+void vuprs::HybridBeamformer::thread_scan()
 {
     vuprs::ScanResult scan_result;
     std::shared_ptr<const vuprs::ScanCovarianceSnapshot> cov_snapshot;
@@ -647,7 +633,7 @@ void vuprs::HybridBeamformer::THREAD__ScanPowerCalculation()
         }
         catch (const std::exception &e)
         {
-            HYBRID_LOG(V_ERROR) << "Error in [HybridBeamformer::THREAD__ScanPowerCalculation] " << e.what();
+            HYBRID_LOG(V_ERROR) << "Error in [HybridBeamformer::thread_scan] " << e.what();
             calculate_status = false;
         }
         last_generation = snapshot_generation;
@@ -689,7 +675,7 @@ void vuprs::HybridBeamformer::THREAD__ScanPowerCalculation()
     }
 }
 
-void vuprs::HybridBeamformer::THREAD__InferenceCalculation()
+void vuprs::HybridBeamformer::thread_inference()
 {
     Eigen::Matrix<double, -1, 1> inference_res;
     while (this->system_run)
@@ -722,12 +708,12 @@ void vuprs::HybridBeamformer::THREAD__InferenceCalculation()
         }
         catch (const std::exception &e)
         {
-            HYBRID_LOG(V_ERROR) << "Error in [HybridBeamformer::THREAD__InferenceCalculation] " << e.what();
+            HYBRID_LOG(V_ERROR) << "Error in [HybridBeamformer::thread_inference] " << e.what();
         }
     }
 }
 
-void vuprs::HybridBeamformer::THREAD__ListenDMAInterrupt()
+void vuprs::HybridBeamformer::thread_listen_bf()
 {
     uint32_t r_val;
     bool is_first_change = true;
@@ -755,7 +741,7 @@ void vuprs::HybridBeamformer::THREAD__ListenDMAInterrupt()
         }
         catch (const std::exception &e)
         {
-            HYBRID_LOG(V_ERROR) << "Error in [HybridBeamformer::THREAD__ListenDMAInterrupt] Error: " << e.what();
+            HYBRID_LOG(V_ERROR) << "Error in [HybridBeamformer::thread_listen_bf] Error: " << e.what();
         }
         if (!this->system_run)
             break; /* Jump out */
@@ -763,14 +749,14 @@ void vuprs::HybridBeamformer::THREAD__ListenDMAInterrupt()
     }
 }
 
-void vuprs::HybridBeamformer::THREAD__ReadResult()
+void vuprs::HybridBeamformer::thread_read_bf()
 {
     std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> _ref_descriptors;
     vuprs::AlignedBufferDMA buffer;
     std::vector<double> result_d;
     bool has_interrupt;
 #if ENABLE_INFERENCE
-    std::chrono::steady_clock::time_point last_inference_wake{};
+    vuprs::RateLimiter inference_limiter(std::chrono::microseconds(1000000 / INFERENCE_MAX_RATE_HZ));
 #endif
     int last_read_index = -1;
     double _hardware_fs;
@@ -811,7 +797,6 @@ void vuprs::HybridBeamformer::THREAD__ReadResult()
             {
                 try
                 {
-                    const auto now = std::chrono::steady_clock::now();
                     bool ready = false;
                     {
                         std::lock_guard<std::mutex> lock(this->mut_npu); /* LOCK */
@@ -823,12 +808,9 @@ void vuprs::HybridBeamformer::THREAD__ReadResult()
                         bool notify = false;
                         {
                             std::lock_guard<std::mutex> lock(this->mut_inference_wait); /* LOCK */
-                            if (!this->inference_pending &&
-                                (last_inference_wake == std::chrono::steady_clock::time_point{} ||
-                                 now - last_inference_wake >= std::chrono::microseconds(1000000 / INFERENCE_MAX_RATE_HZ)))
+                            if (!this->inference_pending && inference_limiter.Allow())
                             {
                                 this->inference_pending = true;
-                                last_inference_wake = now;
                                 notify = true;
                             }
                         }
@@ -861,7 +843,7 @@ void vuprs::HybridBeamformer::THREAD__ReadResult()
         }
         catch (const std::exception &e)
         {
-            HYBRID_LOG(V_ERROR) << "Error in [HybridBeamformer::THREAD__ReadResult] " << e.what();
+            HYBRID_LOG(V_ERROR) << "Error in [HybridBeamformer::thread_read_bf] " << e.what();
         }
     };
     while (this->system_run)
@@ -894,7 +876,7 @@ void vuprs::HybridBeamformer::THREAD__ReadResult()
         }
         if (current_index < 0)
         {
-            HYBRID_LOG(V_WARN) << "Warning in [HybridBeamformer::THREAD__ReadResult] Cannot match current descriptor address to any in the reference list.";
+            HYBRID_LOG(V_WARN) << "Warning in [HybridBeamformer::thread_read_bf] Cannot match current descriptor address to any in the reference list.";
             continue;
         }
         const int previous_index = (current_index + descriptor_count - 1) % descriptor_count;
@@ -906,12 +888,15 @@ void vuprs::HybridBeamformer::THREAD__ReadResult()
     }
 }
 
-void vuprs::HybridBeamformer::THREAD__ReadCircularBuffer()
+void vuprs::HybridBeamformer::thread_read_cbuf()
 {
     uint32_t r_val = 0;
     while (this->system_run)
     {
-        /* Check refreshed */
+        std::this_thread::sleep_for(std::chrono::microseconds(this->circular_buffer_wait_time_us));
+        if (!this->system_run)
+            break;
+        /* - Check refreshed - */
         r_val = 0;
         try
         {
@@ -922,52 +907,46 @@ void vuprs::HybridBeamformer::THREAD__ReadCircularBuffer()
         }
         catch (const std::exception &e)
         {
-            HYBRID_LOG(V_ERROR) << "Error in [HybridBeamformer::THREAD__ReadCircularBuffer] " << e.what();
+            HYBRID_LOG(V_ERROR) << "Error in [HybridBeamformer::thread_read_cbuf] " << e.what();
         }
-        if (r_val == 0x01)
+        if (r_val != 0x01)
+            continue; /* back to the sleep at the loop start */
+        /* - Read circular buffer - */
+        try
         {
-            /* Read circular buffer */
-            try
+            vuprs::SignalData multi_channel_signal; /* signal data (from circular buffer) */
+            if (vuprs::FPGA_API__CBUF__ReadCircularBuffer(&this->controller, &multi_channel_signal))
             {
-                vuprs::SignalData multi_channel_signal; /* signal data (from circular buffer) */
-                if (vuprs::FPGA_API__CBUF__ReadCircularBuffer(&this->controller, &multi_channel_signal))
                 {
-                    {
-                        std::lock_guard<std::mutex> lock(this->mut_queue); /* LOCK */
-                        this->array_signal_queue.push_back(std::move(multi_channel_signal));
-                        if (this->array_signal_queue.size() > this->circular_buffer_queue_size_max)
-                        {
-                            this->array_signal_queue.pop_front(); /* Pop the oldest data to avoid overflow */
-                        }
-                    }
-                    this->circular_buffer_irq = true;
-                    algorithm_cv.notify_all();
+                    std::lock_guard<std::mutex> lock(this->mut_queue); /* LOCK */
+                    this->array_signal_queue.push_back(std::move(multi_channel_signal));
+                    /* - Pop the oldest data to avoid overflow - */
+                    if (this->array_signal_queue.size() > this->circular_buffer_queue_size_max)
+                        this->array_signal_queue.pop_front();
                 }
-                else
-                {
-                    RUNTIME_CHECK(false, "hybrid_bf", " Cannot read circular buffer.");
-                }
+                this->circular_buffer_irq = true;
+                algorithm_cv.notify_all();
             }
-            catch (const std::exception &e)
+            else
             {
-                HYBRID_LOG(V_ERROR) << "Error in [HybridBeamformer::THREAD__ReadCircularBuffer]" << e.what();
+                RUNTIME_CHECK(false, "hybrid_bf", " Cannot read circular buffer.");
             }
         }
-        if (!this->system_run)
-            break; /* Jump out */
-        std::this_thread::sleep_for(std::chrono::microseconds(this->circular_buffer_wait_time_us));
+        catch (const std::exception &e)
+        {
+            HYBRID_LOG(V_ERROR) << "Error in [HybridBeamformer::thread_read_cbuf]" << e.what();
+        }
     }
 }
 
-void vuprs::HybridBeamformer::THREAD__AlgorithmCalculation()
+void vuprs::HybridBeamformer::thread_algorithm()
 {
     bool has_interrupt, operation_status;
     vuprs::SignalData signal;
     Eigen::Matrix<Eigen::dcomplex, -1, -1> fir_expected_frequency_response; /* Expected frequency response of FIR filter bank */
     std::vector<std::vector<double>> fir_coefficients;                      /* Coefficient of FIR filter bank, [channel][point] */
-    std::vector<std::string> channel_name;                                  /* Channel name */
-    /* Scan snapshot throttle: epoch means "capture immediately on next opportunity". */
-    std::chrono::steady_clock::time_point last_scan_snapshot_time{};
+    /* Scan snapshot throttle: first capture happens immediately. */
+    vuprs::RateLimiter scan_snapshot_limiter(std::chrono::microseconds(1000000 / SCAN_MAX_RATE_HZ));
 #if VUPRS_DEBUG
     int debug_file_group = 0;
 #endif
@@ -1015,11 +994,8 @@ void vuprs::HybridBeamformer::THREAD__AlgorithmCalculation()
             if (this->scan_enable && (!this->consumer_gate_ || this->consumer_gate_()))
             {
                 /* - Publish a covariance snapshot [SCAN_MAX_RATE_HZ] times per sec - */
-                const auto now = std::chrono::steady_clock::now();
-                if (last_scan_snapshot_time == std::chrono::steady_clock::time_point{} ||
-                    now - last_scan_snapshot_time >= std::chrono::microseconds(1000000 / SCAN_MAX_RATE_HZ))
+                if (scan_snapshot_limiter.Allow())
                 {
-                    last_scan_snapshot_time = now;
                     auto snapshot = std::make_shared<vuprs::ScanCovarianceSnapshot>();
                     std::lock_guard<std::mutex> snapshot_lock(this->mut_scan_snapshot); /* LOCK */
                     if (this->bf->SnapshotScanCovariance(snapshot.get(), this->bf_freq__lower, this->bf_freq__upper))
@@ -1036,25 +1012,21 @@ void vuprs::HybridBeamformer::THREAD__AlgorithmCalculation()
             }
             else
             {
-                last_scan_snapshot_time = {}; /* Scan off: next enable captures immediately. */
+                scan_snapshot_limiter.Reset(); /* Scan off: next enable captures immediately. */
             }
             /* - Check calculate enabled */
             RUNTIME_CHECK(this->bf->CalculateEnable(), "hybrid_bf", " Beam forming algorithm cannot calculate.");
             /* Step 3: Calculate beamforming */
             this->bf->CalculateBeamforming();
             /* Step 4: Get FIR filter bank expected frequency response */
-            this->bf->GetFIRExpectedFrequencyResponse(&fir_expected_frequency_response,
-                                                      &channel_name,
-                                                      true);
+            this->bf->GetFIRExpectedFrequencyResponse(&fir_expected_frequency_response, true);
             /* Step 5: Convert frequency response to FIR coefficients */
-            this->fir.SolveCoeffUseExpectedFrequencyResponse(fir_expected_frequency_response,
-                                                             channel_name,
-                                                             this->hardware_fs.load());
+            this->fir.SolveCoeffUseExpectedFrequencyResponse(fir_expected_frequency_response, this->hardware_fs.load());
             this->fir.GetFIRBankCoefficient(&fir_coefficients);
         }
         catch (const std::exception &e)
         {
-            HYBRID_LOG(V_ERROR) << "Error in [HybridBeamformer::THREAD__AlgorithmCalculation] " << e.what();
+            HYBRID_LOG(V_ERROR) << "Error in [HybridBeamformer::thread_algorithm] " << e.what();
             continue;
         }
 #if VUPRS_DEBUG
@@ -1074,7 +1046,7 @@ void vuprs::HybridBeamformer::THREAD__AlgorithmCalculation()
         }
         catch (const std::exception &e)
         {
-            HYBRID_LOG(V_ERROR) << "Error in [HybridBeamformer::THREAD__AlgorithmCalculation] " << e.what();
+            HYBRID_LOG(V_ERROR) << "Error in [HybridBeamformer::thread_algorithm] " << e.what();
         }
     }
 }
