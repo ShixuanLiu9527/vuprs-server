@@ -1,16 +1,19 @@
-#ifndef BEAM_FORMER_TEMPLATE_H
-#define BEAM_FORMER_TEMPLATE_H
+#ifndef BEAM_FORMING_ENGINE_H
+#define BEAM_FORMING_ENGINE_H
 
+#include <memory>
 #include <mutex>
-#include "algo/bf/beam_forming_basic.h"
-#include "algo/bf/beam_forming_algorithm.h"
+#include "algo/bf/bf_basic.h"
+#include "misc/mt.h"
 
 namespace vuprs
 {
+    class BeamFormingAlgo;
+
     /**
      * @brief Scan covariance snapshot.
      *
-     * @note Captured by WidebandBeamformerTemplate::SnapshotScanCovariance() while the caller
+     * @note Captured by BeamFormingEngine::SnapshotScanCovariance() while the caller
      * @note holds its own lock (fast copy), then consumed by ScanForPositionPower() which
      * @note reads no shared state and therefore needs no lock.
      */
@@ -21,10 +24,18 @@ namespace vuprs
         double fs;                                                                    /* Sampling frequency at snapshot time */
     };
 
-    class WidebandBeamformerTemplate
+    /**
+     * @brief Persistent wideband beam former engine.
+     *
+     * @note Owns the array, signal data, covariance matrices and scan state. The
+     * @note algorithm itself is a replaceable BeamFormingAlgo, so
+     * @note switching algorithms keeps the covariance matrix warm.
+     */
+    class BeamFormingEngine
     {
     private:
-        std::shared_ptr<ThreadPool> thread_pool; /* Owned fallback; replaced by SetThreadPool() */
+        std::unique_ptr<BeamFormingAlgo> strategy_; /* replaceable algorithm (owns only algorithm-specific caches) */
+        std::shared_ptr<ThreadPool> thread_pool;    /* Owned fallback; replaced by SetThreadPool() */
         double covariance_snap_window_size;
         double adjacent_freq_average_index;
         double adjacent_freq_average_index_1;
@@ -47,8 +58,7 @@ namespace vuprs
         std::vector<double> scan_cache_alt;                                                    /* Cache key: altitude list, controlled by mut_scan */
         std::vector<double> scan_cache_az;                                                     /* Cache key: azimuth list, controlled by mut_scan */
         Eigen::Matrix<double, -1, 1> scan_cache_freq_list;                                     /* Cache key: in-band frequency list, controlled by mut_scan */
-        vuprs::BeamFormingArray array;                                                         /* beamforming array */
-        vuprs::BeamFormingScanArray scan_array;                                                /* for scanning, which has same element position as array but different time delay */
+        vuprs::BeamFormingArray array;                                                         /* beamforming array (also provides scan geometry) */
         Eigen::Matrix<Eigen::dcomplex, -1, -1> snap_signal_matrix_freq_domain;                 /* Size: (M) x (N / 2 + 1) */
         Eigen::Matrix<Eigen::dcomplex, -1, -1> steering_vectors;                               /* Size: (M) x (N / 2 + 1) */
         Eigen::Matrix<Eigen::dcomplex, -1, -1> result_weight_vectors;                          /* Size: (M) x (N / 2 + 1) */
@@ -70,20 +80,6 @@ namespace vuprs
         Eigen::Matrix<double, 1, -1> scan_total_power;                                         /* Reused total power accumulator (ScanForPositionPower), scan thread only */
         std::vector<Eigen::Matrix<Eigen::dcomplex, -1, -1>> scan_rw_scratch;                   /* Reused R * W temp per chunk (ScanForPositionPower), scan thread only */
 
-        /**
-         * @brief Calculate beamforming for one frequency.
-         *
-         * @note for frequency index [i]: corresponding steering vector = steering_vectors[i];
-         * @note                          corresponding covariance matrix = estimate_cov_matrix[i];
-         * @note                          result weight vector = result_weight_vectors.col(i);
-         *
-         * @param freq_index frequency index
-         * @param chunk_id parallel chunk id (unique per worker task), used to index per-worker caches
-         */
-        virtual void CalculateBeamformingForOneFreq(int freq_index, int chunk_id = -1) = 0;
-
-        virtual void PrepareCalculationCache(int freq_nums) = 0;
-
         void UpdatePredelayExpMatrix();
 
         /**
@@ -92,9 +88,19 @@ namespace vuprs
         void UpdateWorkBinRange();
 
     public:
-        WidebandBeamformerTemplate();
+        BeamFormingEngine();
 
-        virtual ~WidebandBeamformerTemplate();
+        ~BeamFormingEngine();
+
+        /**
+         * @brief Replace the beam forming algorithm strategy.
+         *
+         * @note Must not be called while beam forming tasks are running.
+         * @note Array, signal and covariance state are retained across swaps.
+         *
+         * @param strategy new algorithm (cannot be NULL).
+         */
+        void SetStrategy(std::unique_ptr<BeamFormingAlgo> strategy);
 
         /* STEP 1: CONFIG */
 

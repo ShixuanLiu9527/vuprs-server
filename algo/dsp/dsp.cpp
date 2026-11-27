@@ -288,7 +288,7 @@ void vuprs::CutTheFirstHalf(Eigen::Matrix<Eigen::dcomplex, -1, 1> *input_data)
     int size = input_data->rows();
     if (size <= 0)
         return;
-    input_data->resize(size / 2 + 1);
+    input_data->conservativeResize(size / 2 + 1);
 }
 
 void vuprs::CompleteConjugateSymmetric(std::vector<std::complex<double>> *input_data)

@@ -1,8 +1,8 @@
 #ifndef FIR_H
 #define FIR_H
 
-#include "algo/bf/beam_forming_algorithm.h"
-#include "algo/bf/beam_forming_basic.h"
+#include "misc/mt.h"
+#include "algo/bf/bf_basic.h"
 
 namespace vuprs
 {

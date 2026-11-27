@@ -13,7 +13,7 @@
 #include "misc/string_parse.h"
 #include "fpga/fpga_data_conversion.h"
 #include "algo/dsp/dsp.h"
-#include "algo/bf/beam_forming_algorithm.h"
+#include "misc/mt.h"
 #include "algo/bf/aligned_eigen_vector.h"
 
 #define VUPRS_EPS_1 1e-5
@@ -104,6 +104,20 @@ namespace vuprs
         BeamFormingElement &operator[](size_t idx) { return this->element_array[idx]; }
         const BeamFormingElement &operator[](size_t idx) const { return this->element_array[idx]; }
         size_t size() const { return this->element_array.size(); }
+
+        /**
+         * @brief Calculate the real time delay matrix for arbitrary target directions.
+         *
+         * @note Used by scan: output->col{i} = [T{1}, T{2}, ..., T{M}].T,
+         * @note where T{m} = pos{m} . pointing_vector / wave_velocity.
+         *
+         * @param alt altitude list (degree).
+         * @param az azimuth list (degree).
+         * @param wave_velocity velocity of wave, unit: m/sec.
+         */
+        Eigen::Matrix<double, -1, -1> GetTimeDelay(const std::vector<double> &alt,
+                                                   const std::vector<double> &az,
+                                                   double wave_velocity) const;
 
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };
@@ -209,64 +223,6 @@ namespace vuprs
          * @param signal_frequency signal frequency.
          */
         double CalculateSteeringVectorErrorRadius(double signal_frequency) const;
-
-        EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-    };
-
-    /**
-     * @brief Beam forming scan array.
-     *
-     * @note Same geometry as BeamFormingArray (loaded from the same config and
-     * @note sorted into the same ADC channel order), but resolves time delay for
-     * @note scan positions instead of holding a target steering vector.
-     *
-     * @note aligned.
-     */
-    class BeamFormingScanArray : public BeamFormingArrayBase
-    {
-    public:
-        BeamFormingScanArray() = default;
-
-        /**
-         * @brief Calculate steering vector for one frequency domain.
-         *
-         * @param matrix output steering vector.
-         * @param alt alt of the target position (relative to array), unit: deg.
-         * @param az az of the target position (relative to array), unit: deg.
-         * @param frequency signal frequency (unit: Hz), omega = 2 * pi * f.
-         * @param wave_velocity velocity of wave, unit: m/sec.
-         */
-        void GetSteeringVectorMatrix(Eigen::Matrix<Eigen::dcomplex, -1, -1> *matrix,
-                                     const std::vector<double> &alt,
-                                     const std::vector<double> &az,
-                                     double frequency,
-                                     double wave_velocity) const;
-
-        /**
-         * @brief Calculate real time delay matrix for all scan positions.
-         *
-         * @note output->col{i} = [T{1}, T{2}, ..., T{M}].T, T is real.
-         *
-         * @param alt alt of the target position (relative to array), unit: deg.
-         * @param az az of the target position (relative to array), unit: deg.
-         * @param wave_velocity velocity of wave, unit: m/sec.
-         */
-        Eigen::Matrix<double, -1, -1> GetTimeDelay(const std::vector<double> &alt,
-                                                   const std::vector<double> &az,
-                                                   double wave_velocity) const;
-
-        /**
-         * @brief Calculate imaginary time delay matrix for all scan positions.
-         *
-         * @note output->col{i} = [jT{1}, jT{2}, ..., jT{M}].T, jT = j * T
-         *
-         * @param alt alt of the target position (relative to array), unit: deg.
-         * @param az az of the target position (relative to array), unit: deg.
-         * @param wave_velocity velocity of wave, unit: m/sec.
-         */
-        Eigen::Matrix<Eigen::dcomplex, -1, -1> GetImagTimedelay(const std::vector<double> &alt,
-                                                                const std::vector<double> &az,
-                                                                double wave_velocity) const;
 
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };

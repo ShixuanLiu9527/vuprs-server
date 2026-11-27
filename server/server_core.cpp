@@ -375,13 +375,13 @@ vuprs::net::ControlResult vuprs::ServerCore::Execute(const std::string &cmd, con
         if (!params.contains("beamformer") || !params["beamformer"].is_string())
             return Error(ControlError::INVALID_PARAMS, "missing beamformer");
         const std::string name = params["beamformer"].get<std::string>();
-        std::unique_ptr<WidebandBeamformerTemplate> algorithm;
+        std::unique_ptr<BeamFormingAlgo> algorithm;
         if (name == "mvdr")
-            algorithm = std::make_unique<Beamformer_MVDR>();
+            algorithm = std::make_unique<BF_MVDR>();
         else if (name == "cbf")
-            algorithm = std::make_unique<Beamformer_CBF>();
+            algorithm = std::make_unique<BF_CBF>();
         else if (name == "dcrcb")
-            algorithm = std::make_unique<Beamformer_DCRCB>();
+            algorithm = std::make_unique<BF_DCRCB>();
         else
             return Error(ControlError::INVALID_PARAMS, "invalid beamformer");
         HybridBeamformerConfig config;

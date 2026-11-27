@@ -1,7 +1,8 @@
 #include "config.h"
 #include <algorithm>
 #include "misc/file_processing.h"
-#include "algo/bf/beam_forming_basic.h"
+#include "algo/bf/bf_basic.h"
+#include "algo/utils/math_utils.h"
 #include "logger/check.h"
 
 /* --------------------------------------------------------------------------------------------------------------- */
@@ -249,11 +250,7 @@ double vuprs::BeamFormingArray::GetMaxAbsoluteTimeDelay() const
     return this->time_delay_vector.array().abs().matrix().maxCoeff();
 }
 
-/* --------------------------------------------------------------------------------------------------------------- */
-/* -------------------------------------------- Beam Forming Scan Array ------------------------------------------ */
-/* --------------------------------------------------------------------------------------------------------------- */
-
-Eigen::Matrix<double, -1, -1> vuprs::BeamFormingScanArray::GetTimeDelay(const std::vector<double> &alt,
+Eigen::Matrix<double, -1, -1> vuprs::BeamFormingArrayBase::GetTimeDelay(const std::vector<double> &alt,
                                                                         const std::vector<double> &az,
                                                                         double wave_velocity) const
 {
@@ -275,22 +272,6 @@ Eigen::Matrix<double, -1, -1> vuprs::BeamFormingScanArray::GetTimeDelay(const st
         res.col(i) = element_position_matrix * pointing_vector / wave_velocity;
     }
     return res;
-}
-
-Eigen::Matrix<Eigen::dcomplex, -1, -1> vuprs::BeamFormingScanArray::GetImagTimedelay(const std::vector<double> &alt, const std::vector<double> &az, double wave_velocity) const
-{
-    return this->GetTimeDelay(alt, az, wave_velocity).cast<Eigen::dcomplex>() * std::complex<double>(0.0, 1.0);
-}
-
-void vuprs::BeamFormingScanArray::GetSteeringVectorMatrix(Eigen::Matrix<Eigen::dcomplex, -1, -1> *matrix, const std::vector<double> &alt, const std::vector<double> &az, double frequency, double wave_velocity) const
-{
-    PARAM_CHECK(!this->empty(), "bf", " Array is empty.");
-    PARAM_CHECK(alt.size() == az.size(), "bf", " Size of alt and az should be the same.");
-    Eigen::Matrix<Eigen::dcomplex, -1, -1> jT = this->GetImagTimedelay(alt,
-                                                                       az,
-                                                                       wave_velocity);
-    (*matrix) = (-2.0 * PI * frequency) * jT;
-    matrix->array() = matrix->array().exp();
 }
 
 /* --------------------------------------------------------------------------------------------------------------- */

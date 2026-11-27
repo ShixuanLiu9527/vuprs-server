@@ -4,6 +4,7 @@
 #include "hybrid/hybrid_bf.h"
 #include "logger/check.h"
 #include "misc/rate_limiter.h"
+#include "algo/utils/math_utils.h"
 
 #define HYBRID_LOG(level) _LOG(this->hybrid_logger ? this->hybrid_logger : spdlog::default_logger(), level)
 
@@ -23,7 +24,7 @@ vuprs::HybridBeamformer::HybridBeamformer()
                              &this->scan_az);
     }
     this->scan_options_initialized = false;
-    this->BindBeamformer(std::make_unique<vuprs::Beamformer_DCRCB>()); /* default: DCRCB */
+    this->BindBeamformer(std::make_unique<vuprs::BF_DCRCB>()); /* default: DCRCB */
 }
 
 vuprs::HybridBeamformer::~HybridBeamformer()
@@ -37,23 +38,16 @@ vuprs::HybridBeamformer::~HybridBeamformer()
     }
 }
 
-bool vuprs::HybridBeamformer::BindBeamformer(std::unique_ptr<vuprs::WidebandBeamformerTemplate> beamformer)
+bool vuprs::HybridBeamformer::BindBeamformer(std::unique_ptr<vuprs::BeamFormingAlgo> strategy)
 {
-    if (beamformer == nullptr)
+    if (strategy == nullptr)
         return false;
     RUNTIME_CHECK(!this->system_run, "hybrid_bf", " Cannot bind beamformer while running.");
-    /* New bf has no array config; reuse the path saved by Init. */
-    if (!this->bf_array_config_json_.empty() && !beamformer->ConfigArrayFromJson(this->bf_array_config_json_))
-        return false;
-    if (this->shared_thread_pool)
-    {
-        beamformer->SetThreadPool(this->shared_thread_pool);
-    }
-    {
-        std::lock_guard<std::mutex> lock(this->mut_alg); /* LOCK */
-        this->bf = std::move(beamformer);
-        this->target_valid_ = false; /* New bf has no target yet. */
-    }
+    std::lock_guard<std::mutex> lock(this->mut_alg); /* LOCK */
+    if (!this->bf)
+        this->bf = std::make_unique<vuprs::BeamFormingEngine>();
+    /* Only the algorithm is swapped; array/signal/covariance stay in the persistent engine. */
+    this->bf->SetStrategy(std::move(strategy));
     return true;
 }
 
@@ -145,10 +139,6 @@ bool vuprs::HybridBeamformer::InitHybridBeamformer(const std::string &fpga_confi
     catch (const std::exception &e)
     {
         RUNTIME_CHECK(false, "hybrid_bf", " Error occurred in initialization.");
-    }
-    if (array_config_ok)
-    {
-        this->bf_array_config_json_ = bf_array_config_json;
     }
     this->hybrid_logger = vuprs::LogManager::getLogger("hybrid",
                                                        "log.txt",
@@ -354,9 +344,7 @@ bool vuprs::HybridBeamformer::StartBeamformerWithConfiguration(const vuprs::Hybr
         /* - Hardware sampling frequency */
         this->hardware_fs = this->controller.dev__adc_controller.SCI2FS(SCI);
         HYBRID_LOG(V_DEBUG) << "Hardware fs = " + std::to_string(this->hardware_fs.load()) + " Hz.";
-        /* - Reset algorithm obj */
-        this->bf->ResetCovarianceMatrices();
-        /* - Set covariance matrix fitting parameters */
+        /* - Set covariance matrix fitting parameters (covariance itself is retained across restarts) */
         this->bf->SetCovarianceMatrixFittingParam(config.bf_cov_snapshots_window_size, config.bf_cov_freq_average_index);
         /* - Set beamformer pointing position */
         this->bf->SetTargetDirection(config.bf_target__alt,

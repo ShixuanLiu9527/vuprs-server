@@ -1,8 +1,38 @@
+#include <algorithm>
 #include <cmath>
-#include "algo/bf/beam_forming_algorithm.h"
+#include "algo/utils/math_utils.h"
 #include "logger/check.h"
 
-#define BEAM_FORMING_ALGORITHM_DEBUG_PRINT false
+namespace
+{
+    constexpr double PI = 3.14159265358979323846;
+}
+
+double vuprs::rad2deg(double rad) { return rad / PI * 180.0; }
+double vuprs::deg2rad(double deg) { return deg / 180.0 * PI; }
+
+Eigen::Matrix<double, 3, 1> vuprs::AltAz2PointingVector(double alt,
+                                                        double az)
+{
+    Eigen::Matrix<double, 3, 1> vec;
+    double c_alt = cos(vuprs::deg2rad(alt)), c_az = cos(vuprs::deg2rad(az)),
+           s_alt = sin(vuprs::deg2rad(alt)), s_az = sin(vuprs::deg2rad(az));
+    vec << c_alt * s_az, c_alt * c_az, s_alt;
+    return vec.normalized();
+}
+
+void vuprs::PointingVector2AltAz(const Eigen::Matrix<double, 3, 1> &vec,
+                                 double *alt,
+                                 double *az)
+{
+    double x = vec(0, 0), y = vec(1, 0), z = vec(2, 0);
+    if (z > 1.0)
+        z = 1.0;
+    else if (z < -1.0)
+        z = -1.0;
+    *alt = vuprs::rad2deg(asin(z));
+    *az = vuprs::rad2deg(atan2(x, y));
+}
 
 void vuprs::SetIterationConfigDefault(IterationConfig *config)
 {
@@ -16,13 +46,13 @@ void vuprs::SetIterationConfigDefault(IterationConfig *config)
 
 bool vuprs::SecantIteration1D(const vuprs::IterationConfig &config, double *result)
 {
-    RUNTIME_CHECK(config.func != nullptr, "bf", "Original function = NULL");
-    RUNTIME_CHECK(result != nullptr, "bf", "Original result = NULL");
+    RUNTIME_CHECK(config.func != nullptr, "math", "Original function = NULL");
+    RUNTIME_CHECK(result != nullptr, "math", "Original result = NULL");
 
     double f_lower = config.func(config.lower_region);
     double f_upper = config.func(config.upper_region);
 
-    RUNTIME_CHECK(f_lower * f_upper <= 0.0, "bf", "No zeros within the specified range");
+    RUNTIME_CHECK(f_lower * f_upper <= 0.0, "math", "No zeros within the specified range");
     double x0 = config.lower_region;
     double x1 = config.upper_region;
     double f0 = f_lower;
@@ -77,14 +107,14 @@ bool vuprs::SecantIteration1D(const vuprs::IterationConfig &config, double *resu
 
 bool vuprs::NewtonIteration1D(const vuprs::IterationConfig &config, double *result)
 {
-    RUNTIME_CHECK(config.func != nullptr, "bf", "Original function = NULL");
+    RUNTIME_CHECK(config.func != nullptr, "math", "Original function = NULL");
     if (config.func != nullptr && config.diff == nullptr)
     {
         return vuprs::BisectionIteration1D(config, result);
     }
-    RUNTIME_CHECK(result != nullptr, "bf", "result = NULL");
+    RUNTIME_CHECK(result != nullptr, "math", "result = NULL");
     RUNTIME_CHECK(config.func(config.lower_region) * config.func(config.upper_region) <= 0.0,
-                  "bf",
+                  "math",
                   "No zeros within the specified range");
 
     double x = 0.5 * (config.lower_region + config.upper_region), xp1 = x;
@@ -122,14 +152,14 @@ bool vuprs::NewtonIteration1D(const vuprs::IterationConfig &config, double *resu
 
 bool vuprs::RobustNewtonIteration1D(const vuprs::IterationConfig &config, double *result)
 {
-    RUNTIME_CHECK(config.func != nullptr, "bf", "Original function = NULL");
+    RUNTIME_CHECK(config.func != nullptr, "math", "Original function = NULL");
     if (config.func != nullptr && config.diff == nullptr)
     {
         return vuprs::BisectionIteration1D(config, result);
     }
-    RUNTIME_CHECK(result != nullptr, "bf", "result = NULL");
+    RUNTIME_CHECK(result != nullptr, "math", "result = NULL");
     RUNTIME_CHECK(config.func(config.lower_region) * config.func(config.upper_region) <= 0.0,
-                  "bf",
+                  "math",
                   "No zeros within the specified range");
 
     double x = 0.5 * (config.lower_region + config.upper_region), xp1 = x, increase = 0.0;
@@ -177,8 +207,8 @@ bool vuprs::RobustNewtonIteration1D(const vuprs::IterationConfig &config, double
 
 bool vuprs::BisectionIteration1D(const vuprs::IterationConfig &config, double *result)
 {
-    RUNTIME_CHECK(config.func != nullptr, "bf", "Original function = NULL");
-    RUNTIME_CHECK(result != nullptr, "bf", "result = NULL");
+    RUNTIME_CHECK(config.func != nullptr, "math", "Original function = NULL");
+    RUNTIME_CHECK(result != nullptr, "math", "result = NULL");
 
     double left = config.lower_region, right = config.upper_region, mid = 0.5 * (left + right);
     double fl = config.func(left), fr = config.func(right), fm = 0.0;
@@ -207,7 +237,7 @@ bool vuprs::BisectionIteration1D(const vuprs::IterationConfig &config, double *r
             *result = right;
             return true;
         }
-        RUNTIME_CHECK(false, "bf", " No zeros within the specified range.");
+        RUNTIME_CHECK(false, "math", " No zeros within the specified range.");
     }
     *result = mid;
     for (int i = 0; i < max_iteration; i++)
@@ -250,12 +280,12 @@ void vuprs::EigenvalueDecomposition(const Eigen::Matrix<Eigen::dcomplex, -1, -1>
                                     Eigen::Matrix<double, -1, 1> *eigenvalues,
                                     Eigen::Matrix<Eigen::dcomplex, -1, -1> *eigenvectors)
 {
-    RUNTIME_CHECK(cov_matrix.rows() == cov_matrix.cols(), "bf", "Covariance matrix must be square");
-    RUNTIME_CHECK(eigenvalues && eigenvectors, "bf", "Output pointers cannot be null");
+    RUNTIME_CHECK(cov_matrix.rows() == cov_matrix.cols(), "math", "Covariance matrix must be square");
+    RUNTIME_CHECK(eigenvalues && eigenvectors, "math", "Output pointers cannot be null");
     Eigen::MatrixXcd H = (cov_matrix + cov_matrix.adjoint()) / 2.0;
     Eigen::SelfAdjointEigenSolver<Eigen::MatrixXcd> solver;
     solver.compute(H);
-    RUNTIME_CHECK(solver.info() == Eigen::Success, "bf", "Failed to solving eigenvalues");
+    RUNTIME_CHECK(solver.info() == Eigen::Success, "math", "Failed to solving eigenvalues");
     *eigenvalues = solver.eigenvalues().real();
     *eigenvectors = solver.eigenvectors();
 }
@@ -265,11 +295,11 @@ void vuprs::EigenvalueDecomposition(const Eigen::Matrix<Eigen::dcomplex, -1, -1>
                                     Eigen::Matrix<double, -1, 1> *eigenvalues,
                                     Eigen::Matrix<Eigen::dcomplex, -1, -1> *eigenvectors)
 {
-    RUNTIME_CHECK(cov_matrix.rows() == cov_matrix.cols(), "bf", "Covariance matrix must be square");
-    RUNTIME_CHECK(eigenvalues && eigenvectors, "bf", "Output pointers cannot be null");
+    RUNTIME_CHECK(cov_matrix.rows() == cov_matrix.cols(), "math", "Covariance matrix must be square");
+    RUNTIME_CHECK(eigenvalues && eigenvectors, "math", "Output pointers cannot be null");
     Eigen::MatrixXcd H = (cov_matrix + cov_matrix.adjoint()) / 2.0;
     solver.compute(H);
-    RUNTIME_CHECK(solver.info() == Eigen::Success, "bf", "Failed to solving eigenvalues");
+    RUNTIME_CHECK(solver.info() == Eigen::Success, "math", "Failed to solving eigenvalues");
     *eigenvalues = solver.eigenvalues().real();
     *eigenvectors = solver.eigenvectors();
 }
@@ -277,8 +307,8 @@ void vuprs::EigenvalueDecomposition(const Eigen::Matrix<Eigen::dcomplex, -1, -1>
 void vuprs::CholeskyDecomposition(const Eigen::Matrix<Eigen::dcomplex, -1, -1> &cov_matrix,
                                   Eigen::Matrix<Eigen::dcomplex, -1, -1> *G)
 {
-    RUNTIME_CHECK(cov_matrix.rows() == cov_matrix.cols(), "bf", "Covariance matrix must be square");
-    RUNTIME_CHECK(G, "bf", "Output pointer cannot be null");
+    RUNTIME_CHECK(cov_matrix.rows() == cov_matrix.cols(), "math", "Covariance matrix must be square");
+    RUNTIME_CHECK(G, "math", "Output pointer cannot be null");
     Eigen::Matrix<double, -1, 1> gamma;
     Eigen::Matrix<Eigen::dcomplex, -1, -1> U; /* R = U * gamma * U.H */
     vuprs::EigenvalueDecomposition(cov_matrix, &gamma, &U);
@@ -306,7 +336,7 @@ void vuprs::FibonacciGrid(int n_in_half,
                           std::vector<double> *alt,
                           std::vector<double> *az)
 {
-    RUNTIME_CHECK(alt && az, "bf", "Output pointers cannot be null");
+    RUNTIME_CHECK(alt && az, "math", "Output pointers cannot be null");
     double phi = (std::sqrt(5.0) - 1.0) / 2.0; /* Golden ratio */
     double xn, yn, zn, _alt, _az;
     int N = 2 * n_in_half + 1, n;

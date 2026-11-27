@@ -8,11 +8,13 @@
 #include <condition_variable>
 #include <functional>
 #include <string>
-#include "algo/bf/beam_former.h"
+#include "algo/bf/bf_engine.h"
+#include "algo/bf/bf_algo.h"
 #include "algo/bf/fir.h"
+#include "algo/detector/fault_detector.h"
+#include "misc/mt.h"
 #include "hybrid/hybrid_bf_config.h"
 #include "fpga/fpga_api.h"
-#include "algo/detector/fault_detector.h"
 #include "logger/log_manager.h"
 
 namespace vuprs
@@ -99,8 +101,7 @@ namespace vuprs
         std::deque<vuprs::SignalData> array_signal_queue;      /* Array signal queue, [controlled by mut_queue] */
         std::mutex mut_alg;                                    /* Algorithm mutex lock (bf/fir/hardware_fs) */
         vuprs::FIRCalculator fir;                              /* FIR algorithm, [controlled by mut_alg] (can be only used in thread_algorithm) */
-        std::unique_ptr<vuprs::WidebandBeamformerTemplate> bf; /* Beam forming algorithm, [controlled by mut_alg] (can be only used in thread_algorithm) */
-        std::string bf_array_config_json_;                     /* Array config path for binding a new bf */
+        std::unique_ptr<vuprs::BeamFormingEngine> bf;          /* Beam forming engine, [controlled by mut_alg] (can be only used in thread_algorithm) */
         std::shared_ptr<vuprs::ThreadPool> shared_thread_pool; /* One pool for all bf/scan/fir/array parallel work, so workers never exceed the core count */
         std::atomic<double> hardware_fs{0.0};                  /* Hardware sampling frequency, calculate by SCI register */
         double bf_freq__lower;                                 /* Bandpass lower boundary (Hz), set at start, read-only afterwards */
@@ -199,12 +200,14 @@ namespace vuprs
                            const std::string &inference_log_dir);
 
         /**
-         * @brief Bind beam forming algorithm.
+         * @brief Bind (or replace) the beam forming algorithm strategy.
          *
-         * @param beamformer beam forming algorithm (must be created by user, and bind to this class).
-         * @note Call only when stopped; the remembered array config is applied automatically.
+         * @param strategy beam forming algorithm strategy (must be created by user).
+         * @note Call only when stopped.
+         * @note Array, signal and covariance state are retained across strategy swaps, so
+         * @note switching algorithms does not restart covariance convergence.
          */
-        bool BindBeamformer(std::unique_ptr<vuprs::WidebandBeamformerTemplate> beamformer = nullptr);
+        bool BindBeamformer(std::unique_ptr<vuprs::BeamFormingAlgo> strategy = nullptr);
 
         /**
          * @brief Indicate config done.

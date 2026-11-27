@@ -1,20 +1,10 @@
-#ifndef BEAM_FORMING_ALGORITHM_H
-#define BEAM_FORMING_ALGORITHM_H
+#ifndef MATH_UTILS_H
+#define MATH_UTILS_H
 
 #include <Eigen/Dense>
-#include <algorithm>
-#include <vector>
-#include <vector>
-#include <queue>
-#include <thread>
-#include <mutex>
-#include <condition_variable>
-#include <exception>
+#include <complex>
 #include <functional>
-#include <future>
-#include <iostream>
-#include "algo/dsp/dsp.h"
-#include "logger/check.h"
+#include <vector>
 
 namespace vuprs
 {
@@ -35,105 +25,8 @@ namespace vuprs
         return value < lower ? lower : (value > upper ? upper : value);
     }
 
-    /** @brief Wait for every future, then rethrow the first exception. */
-    inline void WaitForAllFutures(std::vector<std::future<void>> &futures)
-    {
-        std::exception_ptr first_error;
-        for (auto &future : futures)
-        {
-            try
-            {
-                future.get();
-            }
-            catch (...)
-            {
-                if (!first_error)
-                    first_error = std::current_exception();
-            }
-        }
-        if (first_error)
-            std::rethrow_exception(first_error);
-    }
-
-    class ThreadPool
-    {
-    private:
-        std::vector<std::thread> workers;
-        std::queue<std::function<void()>> tasks;
-        std::mutex queue_mutex;
-        std::condition_variable condition;
-        bool stop;
-
-    public:
-        ThreadPool(size_t num_threads) : stop(false)
-        {
-            /* At least one worker; never exceed logical CPUs. */
-            const size_t max_threads = std::max<size_t>(size_t{1}, std::thread::hardware_concurrency());
-            num_threads = vuprs::Clamp<size_t>(num_threads, size_t{1}, max_threads);
-            for (size_t i = 0; i < num_threads; ++i)
-            {
-                /* Create one thread */
-                workers.emplace_back(
-                    [this]
-                    {
-                        while (true)
-                        {
-                            std::function<void()> task;
-                            {
-                                std::unique_lock<std::mutex> lock(this->queue_mutex);
-                                this->condition.wait(lock, [this] {return this->stop || !this->tasks.empty();});
-                                if (this->stop && this->tasks.empty()) return;
-                                task = std::move(this->tasks.front());
-                                this->tasks.pop();
-                            }
-                            try 
-                            {
-                                task();  /* Do task */
-                            } 
-                            catch (const std::exception& e) 
-                            {
-                                std::cout << "Task threw exception: " << e.what() << std::endl;
-                            } 
-                            catch (...)
-                            {
-                                std::cout << "Task threw unknown exception." << std::endl;
-                            }
-                        } });
-            }
-        }
-
-        template <class F, class... Args>
-        std::future<typename std::result_of<F(Args...)>::type> enqueue(F &&f, Args &&...args)
-        {
-            using return_type = typename std::result_of<F(Args...)>::type;
-            auto task = std::make_shared<std::packaged_task<return_type()>>(std::bind(std::forward<F>(f), std::forward<Args>(args)...));
-            std::future<return_type> result = task->get_future();
-            {
-                std::unique_lock<std::mutex> lock(queue_mutex);
-                RUNTIME_CHECK(!this->stop, "bf", " Enqueue on stopped ThreadPool");
-                tasks.emplace([task]()
-                              { (*task)(); });
-            }
-            condition.notify_one();
-            return result;
-        }
-
-        ~ThreadPool()
-        {
-            {
-                std::unique_lock<std::mutex> lock(queue_mutex);
-                stop = true;
-            }
-            condition.notify_all();
-            for (std::thread &worker : workers)
-            {
-                worker.join();
-            }
-        }
-    };
-
-    inline double rad2deg(double rad) { return rad / PI * 180.0; }
-    inline double deg2rad(double deg) { return deg / 180.0 * PI; }
+    double rad2deg(double rad);
+    double deg2rad(double deg);
 
     /**
      * @brief Alt, Az to pointing vector.
@@ -141,15 +34,7 @@ namespace vuprs
      * @param alt altitude in degrees.
      * @param az azimuth in degrees.
      */
-    inline Eigen::Matrix<double, 3, 1> AltAz2PointingVector(double alt,
-                                                            double az)
-    {
-        Eigen::Matrix<double, 3, 1> vec;
-        double c_alt = cos(vuprs::deg2rad(alt)), c_az = cos(vuprs::deg2rad(az)),
-               s_alt = sin(vuprs::deg2rad(alt)), s_az = sin(vuprs::deg2rad(az));
-        vec << c_alt * s_az, c_alt * c_az, s_alt;
-        return vec.normalized();
-    }
+    Eigen::Matrix<double, 3, 1> AltAz2PointingVector(double alt, double az);
 
     /**
      * @brief Pointing vector to Alt, Az.
@@ -158,18 +43,7 @@ namespace vuprs
      * @param alt output alt in degrees.
      * @param az output az in degrees.
      */
-    inline void PointingVector2AltAz(const Eigen::Matrix<double, 3, 1> &vec,
-                                     double *alt,
-                                     double *az)
-    {
-        double x = vec(0, 0), y = vec(1, 0), z = vec(2, 0);
-        if (z > 1.0)
-            z = 1.0;
-        else if (z < -1.0)
-            z = -1.0;
-        *alt = vuprs::rad2deg(asin(z));
-        *az = vuprs::rad2deg(atan2(x, y));
-    }
+    void PointingVector2AltAz(const Eigen::Matrix<double, 3, 1> &vec, double *alt, double *az);
 
     /**
      * @brief Set IterationConfig obj to default value.
