@@ -1,9 +1,13 @@
-#include "config.h"
 #include <algorithm>
-#include "misc/file_processing.h"
-#include "algo/bf/bf_basic.h"
-#include "algo/utils/math_utils.h"
+#include <cmath>
+#include <fstream>
+#include "config.h"
 #include "logger/check.h"
+#include "misc/file_processing.h"
+#include "misc/string_parse.h"
+#include "fpga/fpga_data_conversion.h"
+#include "algo/bf/bf_array.h"
+#include "algo/utils/math_utils.h"
 
 /* --------------------------------------------------------------------------------------------------------------- */
 /* ------------------------------------------- Beam Forming Element ---------------------------------------------- */

@@ -2,13 +2,10 @@
 #define FPGA_DATA_CONVERSION_H
 
 #include <vector>
-#include <fstream>
+#include <string>
 #include <stdint.h>
 #include <complex>
 #include <algorithm>
-#include "misc/aligned_buffer.h"
-#include "misc/file_processing.h"
-#include "fpga/fpga_data_type.h"
 
 #define ADC_CHANNEL_NUMBER 16U
 
@@ -85,6 +82,8 @@ constexpr uint16_t ADC_FRAME_TAILER__L = (uint16_t)(ADC_FRAME_TAILER & 0xFFFF);
 
 namespace vuprs
 {
+    class AlignedBufferDMA;
+
     const std::vector<std::string> ADC_CHANNEL_ADDR_MAP = {
         ADC_CHANNEL_NAME__A1, ADC_CHANNEL_NAME__A2, ADC_CHANNEL_NAME__A3, ADC_CHANNEL_NAME__A4,
         ADC_CHANNEL_NAME__A5, ADC_CHANNEL_NAME__A6, ADC_CHANNEL_NAME__A7, ADC_CHANNEL_NAME__A8,

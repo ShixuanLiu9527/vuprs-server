@@ -1,5 +1,6 @@
 #include "config.h"
 #include "fpga/fpga_api.h"
+#include "fpga/fpga_data_type.h"
 #include "logger/check.h"
 
 /* ----------------------------------------------------------------------------- */

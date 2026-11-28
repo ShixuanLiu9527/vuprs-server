@@ -2,8 +2,7 @@
 #define BEAM_FORMING_ALGO_H
 
 #include <Eigen/Dense>
-#include <complex>
-#include "algo/bf/aligned_eigen_vector.h"
+#include "misc/aligned_vec.h"
 
 namespace vuprs
 {

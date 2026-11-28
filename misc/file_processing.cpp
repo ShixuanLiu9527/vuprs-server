@@ -1,4 +1,8 @@
+#include <cerrno>
+#include <fstream>
 #include <iomanip>
+#include <sstream>
+#include <sys/stat.h>
 #include "misc/file_processing.h"
 #include "logger/check.h"
 

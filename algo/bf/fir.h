@@ -1,8 +1,13 @@
 #ifndef FIR_H
 #define FIR_H
 
+#include <cstdint>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <vector>
+#include "algo/dsp/dsp.h"
 #include "misc/mt.h"
-#include "algo/bf/bf_basic.h"
 
 namespace vuprs
 {

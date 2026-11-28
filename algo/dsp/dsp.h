@@ -1,12 +1,10 @@
 #ifndef VUPRS_DSP_H
 #define VUPRS_DSP_H
 
-#include <stdio.h>
-#include <stdlib.h>
+#include <algorithm>
 #include <vector>
 #include <stdint.h>
 #include <complex>
-#include <cstring>
 #include <Eigen/Dense>
 #include <atomic>
 #include <mutex>

@@ -1,8 +1,9 @@
-#include "config.h"
 #include <algorithm>
+#include "config.h"
+#include "logger/check.h"
 #include "algo/bf/bf_engine.h"
 #include "algo/bf/bf_algo.h"
-#include "logger/check.h"
+#include "fpga/fpga_data_conversion.h"
 
 vuprs::BeamFormingEngine::BeamFormingEngine()
 {
@@ -15,6 +16,43 @@ void vuprs::BeamFormingEngine::SetThreadPool(std::shared_ptr<ThreadPool> pool)
     RUNTIME_CHECK(pool != nullptr, "bf", "Thread pool cannot be NULL");
     this->thread_pool = std::move(pool);
     this->array.SetThreadPool(this->thread_pool);
+    this->fir_.SetThreadPool(this->thread_pool);
+}
+
+bool vuprs::BeamFormingEngine::ConfigFIRFromJson(const std::string &fir_config_json)
+{
+    return this->fir_.ConfigFIRFromJsonFile(fir_config_json);
+}
+
+uint32_t vuprs::BeamFormingEngine::FIRLength() const
+{
+    return this->fir_.FIRLength();
+}
+
+void vuprs::BeamFormingEngine::SetFIRFrequencyRange(double lower, double upper)
+{
+    this->fir_.SetFrequencyRange(lower, upper);
+}
+
+void vuprs::BeamFormingEngine::GetZeroFIRCoefficients(std::vector<std::vector<double>> *dst) const
+{
+    this->fir_.GetZeroFIRBankCoefficient(dst, static_cast<uint32_t>(this->array.size()));
+}
+
+bool vuprs::BeamFormingEngine::SolveFIRCoefficients(double fs, std::vector<std::vector<double>> *coefficients)
+{
+    RUNTIME_CHECK(coefficients != nullptr, "bf", "Coefficient output cannot be NULL");
+    Eigen::Matrix<Eigen::dcomplex, -1, -1> response;
+    this->GetFIRExpectedFrequencyResponse(&response, true);
+    if (!this->fir_.SolveCoeffUseExpectedFrequencyResponse(response, fs))
+        return false;
+    this->fir_.GetFIRBankCoefficient(coefficients);
+    return true;
+}
+
+double vuprs::BeamFormingEngine::MaxAbsoluteFIRCoefficient() const
+{
+    return this->fir_.MaxAbsoluteFIRCoefficient();
 }
 
 vuprs::BeamFormingEngine::~BeamFormingEngine()
@@ -310,8 +348,7 @@ void vuprs::BeamFormingEngine::UpdatePredelayExpMatrix()
     this->pre_delay_exp_arg = (Tm_vec * this->signal_frequency_list_complex.transpose() * 2.0 * PI).array().exp();
 }
 
-void vuprs::BeamFormingEngine::UpdateAndGetElementPredelay(double fir_length,
-                                                           double fs,
+void vuprs::BeamFormingEngine::UpdateAndGetElementPredelay(double fs,
                                                            bool include_fir_group_delay,
                                                            std::vector<int> *element_predelay_count,
                                                            std::vector<double> *element_predelay_time)
@@ -322,7 +359,7 @@ void vuprs::BeamFormingEngine::UpdateAndGetElementPredelay(double fir_length,
     uint64_t M = this->array.size();
     double Ts = 1.0 / fs;
     int min_predelay_count = INT_MAX;
-    const double group_delay_count = (fir_length - 1.0) / 2.0;
+    const double group_delay_count = (static_cast<double>(this->fir_.FIRLength()) - 1.0) / 2.0;
     for (uint64_t i = 0; i < M; i++)
     {
         const double time_delay_count = this->array[i].time_delay / Ts;

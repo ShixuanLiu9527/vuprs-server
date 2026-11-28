@@ -6,8 +6,11 @@
 #include <memory>
 #include "algo/inference/feature_extraction.h"
 #include "algo/inference/launch_npu.h"
-#include "algo/inference/post_processing.h"
-#include "logger/log_manager.h"
+
+namespace spdlog
+{
+    class logger;
+}
 
 namespace vuprs
 {

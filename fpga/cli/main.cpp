@@ -1,3 +1,4 @@
+#include <iostream>
 #include "fpga/cli/fpga_tool.h"
 
 int main(int argc, char *argv[])

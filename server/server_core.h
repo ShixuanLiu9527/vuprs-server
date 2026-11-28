@@ -7,10 +7,14 @@
 #include <mutex>
 #include <string>
 #include "hybrid/hybrid_bf.h"
-#include "logger/log_manager.h"
 #include "server/net/control_worker.h"
 #include "server/net/frame_publisher.h"
-#include "misc/string_parse.h"
+#include "3rdparty/nlohmann/json.hpp"
+
+namespace spdlog
+{
+    class logger;
+}
 
 namespace vuprs
 {

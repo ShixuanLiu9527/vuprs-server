@@ -2,13 +2,7 @@
 #define FILE_PROCESSING_H
 
 #include <string>
-#include <sys/stat.h>
-#include <stdexcept>
-#include <string>
 #include <vector>
-#include <fstream>
-#include <iostream>
-#include <sstream>
 #include <complex>
 
 namespace vuprs

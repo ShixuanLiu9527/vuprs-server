@@ -2,7 +2,7 @@
 #include <cmath>
 #include <thread>
 #include "algo/bf/bf_algo.h"
-#include "algo/bf/bf_basic.h"
+#include "algo/bf/bf_array.h"
 #include "algo/utils/math_utils.h"
 
 /* ------------------------------------------------------------------------------ */

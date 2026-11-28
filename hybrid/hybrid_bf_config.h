@@ -2,9 +2,9 @@
 #define HYBRID_BF_CONFIG_H
 
 #include <stdint.h>
+#include <string>
 #include <vector>
 #include "config.h"
-#include "fpga/fpga_controller.h"
 
 namespace vuprs
 {

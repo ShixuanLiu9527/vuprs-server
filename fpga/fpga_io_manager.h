@@ -2,21 +2,11 @@
 #define FPGA_IO_MANAGER_H
 
 #include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <string>
 #include <vector>
-#include <fstream>
-#include <stdexcept>
 #include <mutex>
 #include <atomic>
 #include <condition_variable>
-#include <fcntl.h>
-#include <unistd.h>
-#ifdef __linux__
-#include <sys/select.h>
-#include <sys/mman.h>
-#endif
 
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 #define ltohl(x) (x)

@@ -2,7 +2,7 @@
 #define V_CHECK_H
 
 #include <string>
-#include <cstdlib>
+#include <stdexcept>
 #include <cstring>
 
 #define _CHECK(header, condition, api, info)                                              \

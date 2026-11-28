@@ -2,7 +2,10 @@
 #include <fstream>
 #include <utility>
 #include "config.h"
+#include "algo/bf/bf_algo.h"
 #include "logger/check.h"
+#include "logger/log_manager.h"
+#include "misc/string_parse.h"
 #include "server/net/frame.h"
 #include "server/server_core.h"
 

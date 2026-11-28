@@ -3,7 +3,8 @@
 
 #include <memory>
 #include <mutex>
-#include "algo/bf/bf_basic.h"
+#include "algo/bf/bf_array.h"
+#include "algo/bf/fir.h"
 #include "misc/mt.h"
 
 namespace vuprs
@@ -36,6 +37,7 @@ namespace vuprs
     private:
         std::unique_ptr<BeamFormingAlgo> strategy_; /* replaceable algorithm (owns only algorithm-specific caches) */
         std::shared_ptr<ThreadPool> thread_pool;    /* Owned fallback; replaced by SetThreadPool() */
+        vuprs::FIRCalculator fir_;                  /* FIR filter bank generated from the beam forming weights */
         double covariance_snap_window_size;
         double adjacent_freq_average_index;
         double adjacent_freq_average_index_1;
@@ -116,11 +118,47 @@ namespace vuprs
         /**
          * @brief Replace the internal thread pool with a shared one.
          *
-         * @note All internal parallel work (covariance update, beam forming, scan power
-         * @note calculation and the array FFT) uses this pool.
+         * @note All internal parallel work (covariance update, beam forming, scan power,
+         * @note array FFT and FIR IFFT) uses this pool.
          * @note Must not be called while beam forming tasks are running.
          */
         void SetThreadPool(std::shared_ptr<ThreadPool> pool);
+
+        /**
+         * @brief Configure the FIR filter bank from JSON file.
+         */
+        bool ConfigFIRFromJson(const std::string &fir_config_json);
+
+        /**
+         * @brief FIR filter length.
+         */
+        uint32_t FIRLength() const;
+
+        /**
+         * @brief Set the FIR bandpass frequency range.
+         */
+        void SetFIRFrequencyRange(double lower, double upper);
+
+        /**
+         * @brief Get a zero FIR filter bank (one bank per array element).
+         */
+        void GetZeroFIRCoefficients(std::vector<std::vector<double>> *dst) const;
+
+        /**
+         * @brief Solve FIR coefficients from the current beam forming weights.
+         *
+         * @param fs sampling frequency.
+         * @param coefficients [output] FIR filter bank.
+         *
+         * @retval true: success.
+         * @retval false: failed.
+         */
+        bool SolveFIRCoefficients(double fs, std::vector<std::vector<double>> *coefficients);
+
+        /**
+         * @brief Maximum absolute FIR coefficient of the last solved bank.
+         */
+        double MaxAbsoluteFIRCoefficient() const;
 
         /* STEP 2: INPUT SIGNAL */
 
@@ -206,7 +244,8 @@ namespace vuprs
          * @note e.g. predelay count = [13, 12, 23]
          * @note then: output predelay count = [13 - 12, 12 - 12, 23 - 12] = [1, 0, 11].
          *
-         * @param fir_length FIR filter bank length.
+         * @note FIR filter length is read from the internal FIRCalculator (ConfigFIRFromJson()).
+         *
          * @param fs sampling frequency.
          * @param include_fir_group_delay true: include FIR group delay, false: exclude FIR group delay.
          * @param element_predelay_count (cannot be NULL) integer delay. (count = -round[delay{m}/Ts + (L-1)/2])
@@ -214,8 +253,7 @@ namespace vuprs
          *
          * @note Outputs are in ADC channel order (A1..A8, B1..B8), same as the hardware predelay registers.
          */
-        void UpdateAndGetElementPredelay(double fir_length,
-                                         double fs,
+        void UpdateAndGetElementPredelay(double fs,
                                          bool include_fir_group_delay,
                                          std::vector<int> *element_predelay_count,
                                          std::vector<double> *element_predelay_time);

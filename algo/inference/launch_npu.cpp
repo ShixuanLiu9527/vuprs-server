@@ -1,3 +1,4 @@
+#include <fstream>
 #include "logger/check.h"
 #include "misc/file_processing.h"
 #include "algo/inference/launch_npu.h"

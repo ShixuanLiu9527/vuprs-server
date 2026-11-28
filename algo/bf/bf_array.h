@@ -1,25 +1,21 @@
 #ifndef BEAM_FORMING_BASIC_H
 #define BEAM_FORMING_BASIC_H
 
+#include <memory>
 #include <string>
+#include <vector>
 #include <Eigen/Dense>
 #include <complex>
-#include <fstream>
-#include <stdio.h>
-#include <math.h>
-#include <mutex>
-#include <atomic>
-#include "3rdparty/nlohmann/json.hpp"
-#include "misc/string_parse.h"
-#include "fpga/fpga_data_conversion.h"
 #include "algo/dsp/dsp.h"
 #include "misc/mt.h"
-#include "algo/bf/aligned_eigen_vector.h"
+#include "misc/aligned_vec.h"
 
 #define VUPRS_EPS_1 1e-5
 
 namespace vuprs
 {
+    class SignalData;
+
     /**
      * @brief One beam forming element.
      *

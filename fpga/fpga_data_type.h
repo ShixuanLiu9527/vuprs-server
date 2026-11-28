@@ -5,8 +5,6 @@
 #include <cmath>
 #include <type_traits>
 #include <vector>
-#include <stdexcept>
-#include <iostream>
 #include <Eigen/Dense>
 #include "logger/check.h"
 

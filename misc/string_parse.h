@@ -3,12 +3,8 @@
 
 #include <string>
 #include <stdint.h>
-#include <fstream>
-#include <iostream>
+#include <vector>
 #include <algorithm>
-#include <cctype>
-#include <sstream>
-#include <iomanip>
 #include "3rdparty/nlohmann/json.hpp"
 #include "logger/check.h"
 

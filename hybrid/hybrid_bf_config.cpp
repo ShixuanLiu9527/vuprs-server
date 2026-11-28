@@ -1,5 +1,7 @@
+#include <fstream>
 #include "config.h"
 #include "hybrid/hybrid_bf_config.h"
+#include "misc/string_parse.h"
 #include "logger/check.h"
 
 void vuprs::HybridBeamformerConfig::SetDefault()

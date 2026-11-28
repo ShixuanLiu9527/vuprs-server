@@ -4,26 +4,9 @@
 #include <string>
 #include <stdint.h>
 #include <vector>
-#include <stdio.h>
-#include <stdlib.h>
-#include <memory>
-#include <fcntl.h>
+#include <new>
 #include <stdexcept>
 #include <cstring>
-#include <assert.h>
-#include <getopt.h>
-#ifndef _WIN32
-#include <sys/mman.h>
-#endif
-#include <sys/stat.h>
-#include <sys/time.h>
-#include <sys/types.h>
-#include <unistd.h>
-#ifdef _WIN32
-#include <malloc.h>
-#else
-#include <cstdlib>
-#endif
 
 #define __XDMA_DMA_ALIGNMENT_BYTES__ 4096U /* 4 kB alignment */
 #define __SERVER_ALIGNMENT_BYTES__ 128U    /* 128 B alignment, must bigger than sizeof(void*) */

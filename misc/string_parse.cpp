@@ -1,3 +1,5 @@
+#include <cctype>
+#include <sstream>
 #include "misc/string_parse.h"
 #include "logger/check.h"
 

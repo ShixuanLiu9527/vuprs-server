@@ -1,6 +1,7 @@
 #ifndef FPGA_MODULE_TEMPLATE_H
 #define FPGA_MODULE_TEMPLATE_H
 
+#include <unistd.h>
 #include "3rdparty/nlohmann/json.hpp"
 #include "misc/string_parse.h"
 #include "misc/aligned_buffer.h"

@@ -1,24 +1,33 @@
 #ifndef HYBRID_BEAMFORMGING__H
 #define HYBRID_BEAMFORMGING__H
 
-#include <mutex>
-#include <memory>
-#include <deque>
 #include <atomic>
 #include <condition_variable>
+#include <cstdint>
+#include <deque>
 #include <functional>
+#include <memory>
+#include <mutex>
 #include <string>
-#include "algo/bf/bf_engine.h"
-#include "algo/bf/bf_algo.h"
-#include "algo/bf/fir.h"
-#include "algo/detector/fault_detector.h"
-#include "misc/mt.h"
+#include <thread>
+#include <vector>
 #include "hybrid/hybrid_bf_config.h"
-#include "fpga/fpga_api.h"
-#include "logger/log_manager.h"
+#include "fpga/fpga_data_conversion.h"
+
+namespace spdlog
+{
+    class logger;
+}
 
 namespace vuprs
 {
+    class BeamFormingEngine;
+    class BeamFormingAlgo;
+    class FPGAController;
+    class FaultDetector;
+    class ThreadPool;
+    struct ScanCovarianceSnapshot;
+
     struct BeamformerResultMeta
     {
         std::vector<uint32_t> signal; /* raw signal from DDR (Q16) */
@@ -54,11 +63,13 @@ namespace vuprs
     private:
         std::shared_ptr<spdlog::logger> hybrid_logger;
 
+        struct FpgaState; /* DMA descriptors/config, defined in hybrid_bf.cpp */
+
         bool config_done;
-        std::vector<std::thread> threads;                                    /* Beam former threads */
-        vuprs::FPGAController controller;                                    /* FPGA controller */
-        std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> dma_descriptors; /* SG descriptors for AXI DMA */
-        vuprs::AXI_DMA_SGDescriptor_Config sg_descriptor_config;             /* SG descriptor config */
+        std::vector<std::thread> threads;                     /* Beam former threads */
+        std::unique_ptr<FpgaState> fpga_state_;               /* FPGA DMA descriptor state */
+        std::unique_ptr<vuprs::FPGAController> controller;    /* FPGA controller */
+        std::unique_ptr<vuprs::FaultDetector> fault_detector; /* inference / fault detection */
 
         /**
          * @brief Start beam former (hardware & algorithm).
@@ -77,7 +88,6 @@ namespace vuprs
 
         /* NPU / inference */
         std::mutex mut_npu;
-        FaultDetector fault_detector;
         std::atomic<bool> inference_ready{false}; /* true only after successful model init */
         std::mutex mut_inference_wait;
         std::condition_variable inference_cv;
@@ -100,7 +110,6 @@ namespace vuprs
         std::condition_variable algorithm_cv;                  /* Algorithm interrupt condition var, [controlled by mut_queue] */
         std::deque<vuprs::SignalData> array_signal_queue;      /* Array signal queue, [controlled by mut_queue] */
         std::mutex mut_alg;                                    /* Algorithm mutex lock (bf/fir/hardware_fs) */
-        vuprs::FIRCalculator fir;                              /* FIR algorithm, [controlled by mut_alg] (can be only used in thread_algorithm) */
         std::unique_ptr<vuprs::BeamFormingEngine> bf;          /* Beam forming engine, [controlled by mut_alg] (can be only used in thread_algorithm) */
         std::shared_ptr<vuprs::ThreadPool> shared_thread_pool; /* One pool for all bf/scan/fir/array parallel work, so workers never exceed the core count */
         std::atomic<double> hardware_fs{0.0};                  /* Hardware sampling frequency, calculate by SCI register */
@@ -160,7 +169,7 @@ namespace vuprs
          * @note If interrupt detected, circular_buffer_irq <-- true.
          * @note Control mutex lock: mut_queue.
          */
-        void thread_read_cbuf();
+        void thread_listen_and_read_cbuf();
 
         /**
          * @brief Pop the array signal queue, do beam forming, and issue FIR coefficients.
@@ -335,8 +344,6 @@ namespace vuprs
          * @brief Check config valid.
          */
         bool CheckScanningConfigValid(const ScanningConfig &config, std::string *info) const;
-
-        EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };
 }
 

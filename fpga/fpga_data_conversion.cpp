@@ -1,4 +1,8 @@
+#include <fstream>
 #include "fpga/fpga_data_conversion.h"
+#include "fpga/fpga_data_type.h"
+#include "misc/aligned_buffer.h"
+#include "misc/file_processing.h"
 #include "logger/check.h"
 
 vuprs::SignalData::SignalData()

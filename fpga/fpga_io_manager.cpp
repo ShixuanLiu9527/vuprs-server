@@ -1,3 +1,9 @@
+#include <fcntl.h>
+#include <unistd.h>
+#ifdef __linux__
+#include <sys/select.h>
+#include <sys/mman.h>
+#endif
 #include "fpga/fpga_io_manager.h"
 #include "logger/check.h"
 

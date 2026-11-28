@@ -4,6 +4,7 @@
 #include "logger/log_manager.h"
 #include "3rdparty/nlohmann/json.hpp"
 #include "algo/detector/fault_detector.h"
+#include "algo/inference/post_processing.h"
 #include "misc/string_parse.h"
 
 bool vuprs::FaultDetector::InitDetector(const std::string &model_config_json,

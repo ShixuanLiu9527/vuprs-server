@@ -1,3 +1,4 @@
+#include <fstream>
 #include "fpga/fpga_controller.h"
 #include "logger/check.h"
 

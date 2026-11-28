@@ -1,3 +1,4 @@
+#include <cstring>
 #include "algo/dsp/dsp.h"
 #include "logger/check.h"
 

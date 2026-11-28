@@ -1,4 +1,7 @@
+#include <fstream>
 #include "algo/bf/fir.h"
+#include "fpga/fpga_data_conversion.h"
+#include "misc/string_parse.h"
 #include "logger/check.h"
 
 vuprs::FIRCalculator::FIRCalculator()
