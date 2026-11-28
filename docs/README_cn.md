@@ -1,10 +1,12 @@
-# VUPRS Server
+# VUPRS Server: Acoustic Fault Localization and Recognition System
 
-<div align="center">
+<p align="center">
+  <img src="https://img.shields.io/badge/C%2B%2B-17-00599C.svg?style=flat-square" alt="C++17" /> <img src="https://img.shields.io/badge/CMake-%E2%89%A5%203.10-064F8C.svg?style=flat-square" alt="CMake >= 3.10" /> <img src="https://img.shields.io/badge/platform-Linux%20%7C%20ARM64-lightgrey.svg?style=flat-square" alt="Platform" />
+</p>
 
-[English](../README.md) | 简体中文
-
-</div>
+<p align="center">
+  <a href="../README.md">English</a> &nbsp;|&nbsp; <b>简体中文</b>
+</p>
 
 VUPRS Server 是车下故障声学定位与识别系统的 Linux 服务器端。程序运行于 **RK3568 (ARM64)** 平台，通过 **XDMA** 与板载 **XC7A100T (Artix-7) FPGA** 进行数据交互，完成多通道声学信号采集、宽带波束形成与 FIR 滤波，并运行 **RKNN NPU** 故障推理，通过单端口 TCP 服务对外提供控制与数据接口。
 

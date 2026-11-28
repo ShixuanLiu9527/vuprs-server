@@ -1,12 +1,12 @@
-# VUPRS Server
+# VUPRS Server: Acoustic Fault Localization and Recognition System Linux Server
 
-[![C++17](https://img.shields.io/badge/C%2B%2B-17-blue.svg)](https://isocpp.org/) [![CMake](https://img.shields.io/badge/CMake-%3E%3D%203.10-blue.svg)](https://cmake.org/) [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20ARM64-lightgrey.svg)]()
+<p align="center">
+  <img src="https://img.shields.io/badge/C%2B%2B-17-00599C.svg?style=flat-square" alt="C++17" /> <img src="https://img.shields.io/badge/CMake-%E2%89%A5%203.10-064F8C.svg?style=flat-square" alt="CMake >= 3.10" /> <img src="https://img.shields.io/badge/platform-Linux%20%7C%20ARM64-lightgrey.svg?style=flat-square" alt="Platform" />
+</p>
 
-<div align="center">
-
-English | [简体中文](docs/README_cn.md)
-
-</div>
+<p align="center">
+  <b>English</b> &nbsp;|&nbsp; <a href="./docs/README_cn.md">简体中文</a>
+</p>
 
 VUPRS Server is the Linux server component of an under-vehicle acoustic fault localization and recognition system. It runs on an **RK3568 (ARM64)** SoC, exchanges data with an on-board **XC7A100T (Artix-7) FPGA** over **XDMA**, performs multi-channel acoustic acquisition, broadband beamforming and FIR filtering, runs **RKNN NPU** fault inference, and exposes a single-port TCP command/data service.
 
