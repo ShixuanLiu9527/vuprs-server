@@ -1,242 +1,147 @@
-# VUPRS Linux Server
-# 故障声学定位与识别系统 `Linux` 服务器端
+# VUPRS Server
+
+[![C++17](https://img.shields.io/badge/C%2B%2B-17-blue.svg)](https://isocpp.org/) [![CMake](https://img.shields.io/badge/CMake-%3E%3D%203.10-blue.svg)](https://cmake.org/) [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20ARM64-lightgrey.svg)]()
 
 <div align="center">
-  <img src="./docs/server_structure.png" alt="Server" style="width:800px; height:auto;" />
+
+English | [简体中文](docs/README_cn.md)
+
 </div>
 
-[回到主仓库: vuprs-support](https://github.com/ShixuanLiu9527/vuprs-support.git)
+VUPRS Server is the Linux server component of an under-vehicle acoustic fault localization and recognition system. It runs on an **RK3568 (ARM64)** SoC, exchanges data with an on-board **XC7A100T (Artix-7) FPGA** over **XDMA**, performs multi-channel acoustic acquisition, broadband beamforming and FIR filtering, runs **RKNN NPU** fault inference, and exposes a single-port TCP command/data service.
 
-## 系统简介
+The FPGA handles the deterministic data path (acquisition, pre-delay, FIR filtering, DMA); the RK3568 estimates the spatial covariance, computes beamforming weights and FIR coefficients, writes them back to the FPGA, and publishes beamforming, scan and inference data to network clients.
 
-`VUPRS Server` 是车下故障声学定位与识别系统的服务器端软件, 运行于 `RK3568` (ARM64) 平台, 与板载 `XC7A100T` (Artix-7) `FPGA` 通过 `XDMA` 进行高速数据交互, 完成声学信号的采集, 波束形成, 故障检测与识别, 并通过以太网 `TCP` 服务器对外提供命令与数据服务.
+<div align="center">
+  <img src="./docs/server_structure.png" alt="VUPRS server architecture" style="width:700px; height:auto;" />
+</div>
 
-主要功能:
+Related project: [vuprs-support](https://github.com/ShixuanLiu9527/vuprs-support.git)
 
-- **FPGA 数据采集**: 通过 `XDMA` 驱动与 FPGA 交互, 支持 `AXI-Lite` 寄存器读写与 `AXI-Stream` 数据流传输;
-- **声学信号处理**: 波束形成 (`BF`) 与 `FIR` 滤波, 基于 `FFTW3` 加速;
-- **故障检测与识别**: 特征提取 + `RKNN` `NPU` 推理 + 后处理, 支持故障声学目标识别;
-- **网络服务**: 以太网 `TCP` 服务器, 支持命令流与控制流的解析与应答 (详见 [网络通信协议](#网络通信协议));
-- **调试工具**: `FPGA-Tool` 终端工具, 支持读写 FPGA 寄存器与内存, 方便系统调试.
+## Features
 
-## 项目结构
+- **FPGA data acquisition** — AXI-Lite register access and AXI-Stream/DDR transfers over XDMA.
+- **Broadband beamforming**
+  - pluggable `CBF`, `MVDR` and `DCRCB` algorithms behind a persistent `BeamFormingEngine`;
+  - the engine owns the array, signal history, covariance matrices, scan state and FIR filter bank;
+  - switching algorithms keeps the covariance matrix warm, so a new algorithm starts from a converged estimate instead of restarting the snapshot count;
+  - array geometry is loaded from JSON and normalized to ADC channel order (`A1`–`A8`, `B1`–`B8`).
+- **FIR filter bank** — expected frequency response synthesized from the beamforming weights with FFTW3, converted to FIR coefficients and issued to the FPGA.
+- **Scan mode** — rate-limited covariance snapshots, CBF power-map calculation and normalized scan-frame publication.
+- **Fault detection and recognition** — feature extraction, RKNN NPU inference and post-processing.
+- **Network service** — single TCP port with framed JSON control messages and binary data streams for beamforming results, scan maps and inference tensors; bounded queues and drop policies protect the real-time path.
+- **Debugging tools** — `fpga_tool` for register/memory access, plus a host-buildable mock server and network test suite.
 
-```bash
-root/
-├── 3rdparty          # 第三方库: asio, eigen, fftw3, nlohmann-json, rknpu2 (RKNN Runtime), spdlog
-├── algo              # 算法模块
-│   ├── bf            #   波束形成 (Beam Forming) 与 FIR 滤波
-│   ├── detector      #   故障检测
-│   ├── inference     #   特征提取 / RKNN NPU 推理 / 后处理
-│   └── dsp           # DSP 信号处理
-├── cmake             # CMake 辅助文件 (交叉编译工具链等)
-├── configs           # 项目配置文件 (7 个 JSON 模板)
-├── docs              # 项目相关文档
-├── fpga              # FPGA 通信与控制代码 (XDMA 设备封装, 寄存器读写, 数据转换)
-│   └── cli           #   FPGA 调试工具 FPGA-Tool
-├── hybrid            # 混合波束形成 (Hybrid Beam Forming) 模块
-├── logger            # 系统日志管理 (spdlog 封装) 与参数检查
-├── misc              # 系统通用工具 (对齐缓冲, 文件处理, 字符串解析)
-├── pcie              # PCIe/XDMA 驱动源代码 (内核模块 xdma.ko)
-├── scripts           # 板端运行脚本 (create_run_dir / run_server / net_config / mount_xdma)
-├── server            # TCP 服务器代码 (协议解析, 会话管理, Socket IO)
-│   ├── net           #   网络层 (Standalone Asio)
-│   └── test          #   网络层测试与 mock server
-├── build.sh          # 一键构建脚本 (XDMA 驱动 + 服务器 + FPGA-Tool)
-├── CMakeLists.txt    # 顶层 CMake 工程文件
-├── config.h          # 全局配置宏 (调试开关, 算法参数等)
-└── main.cpp          # 服务器入口
-```
+## Architecture
 
-## 环境依赖
-
-- `Linux` (开发机: x86_64; 目标板: RK3568, `aarch64`);
-- `CMake` >= 3.10, 支持 `C++17` 的交叉编译器 (如 `gcc-linaro-7.5.0` aarch64 工具链);
-- 目标板内核源码及其构建环境 (编译 `XDMA` 驱动用);
-- `3rdparty` 中已内置 `asio`, `eigen`, `fftw3`, `nlohmann-json`, `rknpu2`, `spdlog`, 无需额外安装.
-
-## 构建
-
-为了正常编译, 请按照以下步骤设置相关参数:
-
-### Step 1: 在 `cmake/rk3568_toolchain.cmake` 中指定交叉编译器路径
-
-```cmake
-set(CMAKE_C_COMPILER "/usr/local/arm/gcc-linaro-7.5.0-2019.12-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-gcc")
-set(CMAKE_CXX_COMPILER "/usr/local/arm/gcc-linaro-7.5.0-2019.12-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-g++")
-```
-
-[查看 `cmake/rk3568_toolchain.cmake`](./cmake/rk3568_toolchain.cmake)
-
-### Step 2: 在 `build.sh` 中指定 XDMA 交叉编译相关参数
-
-```shell
-XDMA__ARCH="arm64"
-XDMA__CROSS_COMPILE="/home/lsx/source/linux/rk356x_linux/prebuilts/gcc/linux-x86/aarch64/gcc-linaro-6.3.1-2017.05-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-"
-XDMA__KERNEL_DIR="/home/lsx/source/linux/rk356x_linux/kernel"
-```
-
-[查看 `build.sh`](./build.sh)
-
-### Step 3: 编译
-
-在项目根目录运行 `build.sh` 脚本:
-
-```bash
-sudo sh ./build.sh all  # 编译全部 (XDMA 驱动, Server 和 FPGA-Tool)
-```
-
-其他命令:
-
-| 命令 | 说明 |
+| Layer | Responsibility |
 | :--- | :--- |
-| `sh ./build.sh all` | 编译 XDMA 驱动, Server 和 FPGA-Tool |
-| `sh ./build.sh xdma` | 仅编译 XDMA 驱动 |
-| `sh ./build.sh server` | 仅编译 Server 和 FPGA-Tool |
-| `sh ./build.sh clean-all` | 清理所有编译产物 |
-| `sh ./build.sh clean-xdma` | 清理 XDMA 驱动编译产物 |
-| `sh ./build.sh clean-server` | 清理 Server 和 FPGA-Tool 编译产物 |
-| `sh ./build.sh help` | 查看帮助信息 |
+| FPGA (`XC7A100T`) | ADC acquisition, pre-delay, FIR filter bank, DMA buffers |
+| XDMA driver | PCIe enumeration, AXI-Lite/stream access, interrupt delivery |
+| VUPRS server (`RK3568`) | Signal processing, beamforming, inference, TCP service |
+| Network clients | Control commands and binary telemetry consumers |
 
-编译完成后, 在 `./build` 目录下将会出现如下文件:
+Processing pipeline:
+
+1. **Acquisition** — the circular-buffer thread reads a fixed-size multi-channel frame from the FPGA and converts it to `SignalData` (16 ADC channels).
+2. **Beamforming** — `BeamFormingEngine` ingests the frame, updates the spatial covariance matrix, computes per-frequency weights and synthesizes the FIR filter bank.
+3. **Hardware feedback** — pre-delay values and FIR coefficients are written back to the FPGA.
+4. **Inference** — beamformed result frames feed the feature extractor and RKNN model; tensors are published when ready and rate-limited.
+5. **Scan** — when enabled, covariance snapshots are converted to a normalized power map and streamed at a limited rate.
+6. **Networking** — control requests and binary data frames are multiplexed over a single TCP session.
+
+## Repository Layout
+
+```text
+├── 3rdparty/     # Vendored: Asio, Eigen, FFTW3, nlohmann/json, RKNN Runtime, spdlog
+├── algo/
+│   ├── bf/       # Beamforming engine, array model, CBF/MVDR/DCRCB algorithms, FIR filter bank
+│   ├── detector/ # Fault detection orchestration
+│   ├── dsp/      # FFTW3 wrappers and signal-processing helpers
+│   ├── inference/# Feature extraction, RKNN launcher, post-processing
+│   └── utils/    # Shared math utilities (iterative solvers, decomposition, scan grids)
+├── cmake/        # Cross-compilation toolchain
+├── configs/      # JSON configuration templates
+├── docs/         # Build guide, protocol, FPGA tool and Chinese README
+├── fpga/         # XDMA device abstraction and data conversion; cli/ hosts fpga_tool
+├── hybrid/       # FPGA + ARM beamformer orchestration
+├── logger/       # Logging and runtime checks
+├── misc/         # Aligned buffers, thread pool, file/string utilities, rate limiter
+├── pcie/         # XDMA kernel driver sources
+├── scripts/      # Board setup and launch scripts
+├── server/
+│   ├── net/      # Standalone Asio network layer
+│   └── test/     # Mock server and network tests
+├── build.sh      # Driver + server + tool build script
+├── CMakeLists.txt
+└── main.cpp      # Server entry point
+```
+
+## Requirements
+
+- **Target**: Linux on RK3568 (ARM64), kernel sources and build environment for the XDMA driver.
+- **Host**: Linux x86_64 with CMake **>= 3.10** and a C++17-capable aarch64 cross toolchain.
+- **Dependencies**: Asio, Eigen, FFTW3, nlohmann/json, RKNN Runtime and spdlog are vendored under `3rdparty/`; no system installation is required.
+- **Hardware**: XC7A100T FPGA with the VUPRS bitstream, XDMA-capable PCIe link and a network interface for clients.
+
+## Build
+
+1. Set the compiler paths in [`cmake/rk3568_toolchain.cmake`](./cmake/rk3568_toolchain.cmake).
+2. Set `XDMA__ARCH`, `XDMA__CROSS_COMPILE` and `XDMA__KERNEL_DIR` in [`build.sh`](./build.sh).
+3. Build:
 
 ```bash
-build/
-├── server                    # 服务器可执行文件
-├── fpga/
-│   └── cli/
-│       └── fpga_tool         # FPGA Tool 工具
-├── xdma/
-│   └── xdma.ko               # XDMA 驱动
-└── 3rdparty/fftw3/           # FFTW 动态库
-    ├── libfftw3.so
-    ├── libfftw3.so.3
-    ├── libfftw3.so.3.6.9
-    ├── libfftw3_threads.so
-    ├── libfftw3_threads.so.3
-    └── libfftw3_threads.so.3.6.9
+sudo sh ./build.sh all       # XDMA driver + server + FPGA tool
+sudo sh ./build.sh xdma      # driver only
+sudo sh ./build.sh server    # server + FPGA tool only
 ```
 
-## 部署与运行
+Other commands: `clean-all`, `clean-xdma`, `clean-server` and `help`.
 
-### Step 1: 生成运行目录
+Artifacts are written to `build/` (`server`, `fpga/cli/fpga_tool`, `xdma/xdma.ko`, `3rdparty/fftw3/`). See [Build & Usage](docs/build_and_usage.md) for a complete walkthrough.
 
-编译完成后, 在项目根目录运行脚本 `create_run_dir.sh` 自动生成运行目录 `vuprs`:
+## Deployment
 
 ```bash
-sudo sh ./scripts/create_run_dir.sh
+sudo sh ./scripts/create_run_dir.sh          # generate vuprs/ runtime directory
+# place the model at vuprs/model/model.rknn
+sudo sh ./net_config.sh                      # configure the board network (optional)
+cd vuprs/ && sudo sh ./run_server.sh         # start as root
 ```
 
-生成后的 `vuprs` 目录结构如下:
+`create_run_dir.sh` packages the server, `xdma.ko`, FFTW/RKNN libraries, configs and `run_server.sh` into `vuprs/`. The model path is configured in `configs/rknn_config.json`. `run_server.sh` loads `xdma.ko`, sets `LD_LIBRARY_PATH`, and passes the seven configuration files to the server.
 
-```bash
-vuprs/
-├── run_server.sh           # 启动脚本
-├── xdma.ko                 # XDMA 驱动
-├── server                  # 编译得到的服务器可执行文件
-├── configs/                # 7 个配置文件
-│   ├── fpga_config.json
-│   ├── server_config.json
-│   ├── array_config.json
-│   ├── fir_config.json
-│   ├── rknn_config.json
-│   ├── hybrid_default_config.json
-│   └── logger_config.json
-├── fftw3/                  # FFTW3 动态链接库
-├── rknpu2/                 # RKNN Runtime 动态链接库
-└── model/                  # 模型目录 (将 `model.rknn` 放到此处)
-```
+## Configuration
 
-注: 启动前请将推理模型 `model.rknn` 放入 `vuprs/model/` 目录 (路径对应 `rknn_config.json` 中的 `rknn-model.path`).
-
-### Step 2: 配置启动脚本 (可选)
-
-默认情况下 `run_server.sh` 已指向 `vuprs` 内的 `configs` 目录, 无需修改. 如需自定义配置路径, 编辑 `run_server.sh` 中的 7 个配置文件路径:
-
-```shell
-FPGA_CONFIG="./configs/fpga_config.json"
-SERVER_CONFIG="./configs/server_config.json"
-ARRAY_CONFIG="./configs/array_config.json"
-FIR_CONFIG="./configs/fir_config.json"
-INFERENCE_CONFIG="./configs/rknn_config.json"
-HYBRID_DEFAULT_CONFIG="./configs/hybrid_default_config.json"
-LOGGER_CONFIG="./configs/logger_config.json"
-```
-
-[查看 `run_server.sh`](./scripts/run_server.sh)
-
-### Step 3: 配置以太网静态 IP 地址
-
-在 `scripts/net_config.sh` 中设置以太网静态 IP (首次配置后脚本会将原配置备份为 `/etc/network/interfaces.bak_vuprs`):
-
-```shell
-INTERFACE="eth0"
-STATIC_IP="192.168.1.100"
-NETMASK="255.255.255.0"
-GATEWAY="192.168.1.1"
-DNS="114.114.114.114"
-```
-
-[查看 `net_config.sh`](./scripts/net_config.sh)
-
-`build.sh` 会将 `net_config.sh` 和 `mount_xdma.sh` 拷贝到项目根目录. 完成后, 在板端运行脚本文件:
-
-```bash
-sudo sh ./net_config.sh
-```
-
-### Step 4: 启动服务器
-
-将 `vuprs` 目录拷贝到板端任意位置, 进入目录, 以 `root` 权限执行启动脚本 (脚本会自动加载 `xdma.ko` 驱动并启动服务器):
-
-```bash
-cd vuprs/
-sudo sh ./run_server.sh
-```
-
-注: 脚本 `run_server.sh` 必须在 `root` 权限下执行.
-
-## 相关配置文件
-
-系统共设置 `7` 个 JSON 配置文件, 位于 [`configs/`](./configs/):
-
-| 配置文件 | 说明 |
+| File | Purpose |
 | :--- | :--- |
-| `fpga_config.json` | FPGA 侧各模块配置 (总线地址, DMA, 寄存器偏移等), 用于 ARM 端与 FPGA 通信 |
-| `server_config.json` | 服务器端口, 最大帧负载, 数据/控制队列长度 |
-| `array_config.json` | 麦克风阵列配置 (阵元坐标, ADC 通道), 通过修改该文件可适配不同的麦克风阵列 |
-| `fir_config.json` | FIR 滤波器模块参数配置 |
-| `rknn_config.json` | RKNN 模型推理配置 (分析频率范围, 帧时长, 模型路径) |
-| `hybrid_default_config.json` | 混合波束形成默认参数 (采样率, 波束指向, 声速等) |
-| `logger_config.json` | 系统日志输出目录配置 |
+| `fpga_config.json` | FPGA bus addresses, DMA and register layout |
+| `server_config.json` | TCP port, payload limit and queue depths |
+| `array_config.json` | Microphone array geometry and ADC channel assignment |
+| `fir_config.json` | FIR filter parameters |
+| `rknn_config.json` | Inference frequency range, frame time and model path |
+| `hybrid_default_config.json` | Sampling rate, target direction, wave velocity, DMA buffers |
+| `logger_config.json` | Log output directories |
 
-## FPGA 读写调试工具 FPGA-Tool
+## Network Protocol
 
-为了方便调试, 设计了 `FPGA-Tool` 终端调试工具, 可以通过终端读写 FPGA 中的寄存器和内存.
+The server uses a single TCP port with a framed protocol: JSON control commands and binary data streams for beamforming results, scan maps and inference tensors. See [Protocol](docs/protocol_cmd.md) for the complete command set, error codes and payload layouts.
 
-使用前请先通过脚本 `mount_xdma.sh` 挂载 `xdma` 驱动 (脚本会自动在自身目录, `build/xdma/` 和当前目录中查找 `xdma.ko`):
+## FPGA Debug Tool
+
+Mount the XDMA driver and use `fpga_tool` to read/write FPGA registers and memory:
 
 ```bash
 sudo sh ./mount_xdma.sh
 ```
 
-[查看 `mount_xdma.sh`](./scripts/mount_xdma.sh)
-[FPGA-Tool 使用手册](./docs/ug-fpga-tool.md)
+See [FPGA Tool Usage](docs/ug-fpga-tool.md) for details.
 
-## 网络通信协议
+## Documentation
 
-[网络通信协议](./docs/protocol_cmd.md)
-
-### 网络层 / mock server
-
-服务端网络层位于 `server/net/`, 使用 `3rdparty/asio` 中的 Standalone Asio; 协议为单端口, 定长帧, 控制 JSON + 二进制 BF/扫描/推理数据推送. 网络层测试与 mock server 位于 `server/test/`, 不依赖 FPGA/RKNN, 可以在主机上单独构建和测试:
-
-```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --target vuprs_mock_server vuprs_net_tests
-ctest --test-dir build -R vuprs_net_tests --output-on-failure
-./build/vuprs_mock_server --bind 127.0.0.1 --port 18080 --rate 2
-```
+- [Build and Usage Guide](docs/build_and_usage.md)
+- [Network Protocol](docs/protocol_cmd.md)
+- [FPGA Tool Manual](docs/ug-fpga-tool.md)
 
 ---
 _Shixuan Liu 2025_
