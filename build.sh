@@ -18,6 +18,7 @@ BUILD_OUTPUT="${SCRIPT_DIR}/build"  # Build dir
 
 XDMA_SOURCE_DIR="${SCRIPT_DIR}/pcie/xdma"
 XDMA_OUTPUT_DIR="${SCRIPT_DIR}/build/xdma"
+BOARD_SCRIPTS_OUTPUT="${BUILD_OUTPUT}/scripts"
 
 build_xdma()
 {
@@ -58,10 +59,18 @@ build_server()
 
 copy_board_scripts()
 {
-    echo -e "${BLUE}Copy board scripts to vuprs root...${NC}"
-    cp -f "${SCRIPT_DIR}/scripts/net_config.sh" "${SCRIPT_DIR}/net_config.sh" || exit 1
-    cp -f "${SCRIPT_DIR}/scripts/mount_xdma.sh" "${SCRIPT_DIR}/mount_xdma.sh" || exit 1
-    chmod +x "${SCRIPT_DIR}/net_config.sh" "${SCRIPT_DIR}/mount_xdma.sh"
+    echo -e "${BLUE}Copy board scripts to ${BOARD_SCRIPTS_OUTPUT}...${NC}"
+    mkdir -p "${BOARD_SCRIPTS_OUTPUT}"
+    for script in \
+        net_config.sh \
+        setup_dhcp.sh \
+        install_server_service.sh \
+        setup_all.sh \
+        mount_xdma.sh \
+        run_server.sh; do
+        cp -f "${SCRIPT_DIR}/scripts/${script}" "${BOARD_SCRIPTS_OUTPUT}/${script}" || exit 1
+    done
+    chmod +x "${BOARD_SCRIPTS_OUTPUT}"/*.sh
     echo -e "${GREEN}Copy board scripts DONE${NC}"
 }
 
@@ -106,6 +115,7 @@ show_help()
 
 mkdir -p "${BUILD_OUTPUT}"
 mkdir -p "${XDMA_OUTPUT_DIR}"
+mkdir -p "${BOARD_SCRIPTS_OUTPUT}"
 
 case "$1" in
     all)

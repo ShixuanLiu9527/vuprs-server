@@ -20,17 +20,17 @@ Related project: [vuprs-support](https://github.com/ShixuanLiu9527/vuprs-support
 
 ## Features
 
-- **FPGA data acquisition** — AXI-Lite register access and AXI-Stream/DDR transfers over XDMA.
+- **FPGA data acquisition** - AXI-Lite register access and AXI-Stream/DDR transfers over XDMA.
 - **Broadband beamforming**
   - pluggable `CBF`, `MVDR` and `DCRCB` algorithms behind a persistent `BeamFormingEngine`;
   - the engine owns the array, signal history, covariance matrices, scan state and FIR filter bank;
   - switching algorithms keeps the covariance matrix warm, so a new algorithm starts from a converged estimate instead of restarting the snapshot count;
-  - array geometry is loaded from JSON and normalized to ADC channel order (`A1`–`A8`, `B1`–`B8`).
-- **FIR filter bank** — expected frequency response synthesized from the beamforming weights with FFTW3, converted to FIR coefficients and issued to the FPGA.
-- **Scan mode** — rate-limited covariance snapshots, CBF power-map calculation and normalized scan-frame publication.
-- **Fault detection and recognition** — feature extraction, RKNN NPU inference and post-processing.
-- **Network service** — single TCP port with framed JSON control messages and binary data streams for beamforming results, scan maps and inference tensors; bounded queues and drop policies protect the real-time path.
-- **Debugging tools** — `fpga_tool` for register/memory access, plus a host-buildable mock server and network test suite.
+  - array geometry is loaded from JSON and normalized to ADC channel order (`A1`-`A8`, `B1`-`B8`).
+- **FIR filter bank** - expected frequency response synthesized from the beamforming weights with FFTW3, converted to FIR coefficients and issued to the FPGA.
+- **Scan mode** - rate-limited covariance snapshots, CBF power-map calculation and normalized scan-frame publication.
+- **Fault detection and recognition** - feature extraction, RKNN NPU inference and post-processing.
+- **Network service** - single TCP port with framed JSON control messages and binary data streams for beamforming results, scan maps and inference tensors; bounded queues and drop policies protect the real-time path.
+- **Debugging tools** - `fpga_tool` for register/memory access, plus a host-buildable mock server and network test suite.
 
 ## Architecture
 
@@ -43,12 +43,12 @@ Related project: [vuprs-support](https://github.com/ShixuanLiu9527/vuprs-support
 
 Processing pipeline:
 
-1. **Acquisition** — the circular-buffer thread reads a fixed-size multi-channel frame from the FPGA and converts it to `SignalData` (16 ADC channels).
-2. **Beamforming** — `BeamFormingEngine` ingests the frame, updates the spatial covariance matrix, computes per-frequency weights and synthesizes the FIR filter bank.
-3. **Hardware feedback** — pre-delay values and FIR coefficients are written back to the FPGA.
-4. **Inference** — beamformed result frames feed the feature extractor and RKNN model; tensors are published when ready and rate-limited.
-5. **Scan** — when enabled, covariance snapshots are converted to a normalized power map and streamed at a limited rate.
-6. **Networking** — control requests and binary data frames are multiplexed over a single TCP session.
+1. **Acquisition** - the circular-buffer thread reads a fixed-size multi-channel frame from the FPGA and converts it to `SignalData` (16 ADC channels).
+2. **Beamforming** - `BeamFormingEngine` ingests the frame, updates the spatial covariance matrix, computes per-frequency weights and synthesizes the FIR filter bank.
+3. **Hardware feedback** - pre-delay values and FIR coefficients are written back to the FPGA.
+4. **Inference** - beamformed result frames feed the feature extractor and RKNN model; tensors are published when ready and rate-limited.
+5. **Scan** - when enabled, covariance snapshots are converted to a normalized power map and streamed at a limited rate.
+6. **Networking** - control requests and binary data frames are multiplexed over a single TCP session.
 
 ## Repository Layout
 
@@ -91,25 +91,29 @@ Processing pipeline:
 3. Build:
 
 ```bash
-sudo sh ./build.sh all       # XDMA driver + server + FPGA tool
-sudo sh ./build.sh xdma      # driver only
-sudo sh ./build.sh server    # server + FPGA tool only
+sudo bash ./build.sh all       # XDMA driver + server + FPGA tool
+sudo bash ./build.sh xdma      # driver only
+sudo bash ./build.sh server    # server + FPGA tool only
 ```
 
 Other commands: `clean-all`, `clean-xdma`, `clean-server` and `help`.
 
-Artifacts are written to `build/` (`server`, `fpga/cli/fpga_tool`, `xdma/xdma.ko`, `3rdparty/fftw3/`). See [Build & Usage](docs/build_and_usage.md) for a complete walkthrough.
+Artifacts are written to `build/` (`server`, `fpga/cli/fpga_tool`, `xdma/xdma.ko`, `3rdparty/fftw3/`, `scripts/`). See [Build & Usage](docs/build_and_usage.md) for a complete walkthrough.
 
 ## Deployment
 
 ```bash
-sudo sh ./scripts/create_run_dir.sh          # generate vuprs/ runtime directory
+sudo bash ./scripts/create_run_dir.sh          # generate vuprs/ runtime directory
 # place the model at vuprs/model/model.rknn
-sudo sh ./net_config.sh                      # configure the board network (optional)
-cd vuprs/ && sudo sh ./run_server.sh         # start as root
+cd vuprs/
+sudo bash ./setup_all.sh                       # one-key: static IP + DHCP + boot services
+# or start manually:
+# sudo bash ./run_server.sh
 ```
 
 `create_run_dir.sh` packages the server, `xdma.ko`, FFTW/RKNN libraries, configs and `run_server.sh` into `vuprs/`. The model path is configured in `configs/rknn_config.json`. `run_server.sh` loads `xdma.ko`, sets `LD_LIBRARY_PATH`, and passes the seven configuration files to the server.
+
+`setup_all.sh` performs plug-and-play board provisioning (static IP + dnsmasq DHCP + boot services); `build/scripts/` also contains the individual board scripts for manual use.
 
 ## Configuration
 
@@ -132,7 +136,7 @@ The server uses a single TCP port with a framed protocol: JSON control commands 
 Mount the XDMA driver and use `fpga_tool` to read/write FPGA registers and memory:
 
 ```bash
-sudo sh ./mount_xdma.sh
+sudo bash ./mount_xdma.sh
 ```
 
 See [FPGA Tool Usage](docs/ug-fpga-tool.md) for details.

@@ -1,11 +1,13 @@
 #!/bin/bash
 
 # ---------------------------- Ethernet Config -------------------------------
-INTERFACE="eth0"
-STATIC_IP="192.168.1.100"
-NETMASK="255.255.255.0"
-GATEWAY="192.168.1.1"
-DNS="114.114.114.114"
+# Direct-link defaults: board and host share 192.168.50.0/24.
+# Keep GATEWAY/DNS empty for a direct Ethernet link.
+INTERFACE="${INTERFACE:-eth0}"
+STATIC_IP="${STATIC_IP:-192.168.50.10}"
+NETMASK="${NETMASK:-255.255.255.0}"
+GATEWAY="${GATEWAY-}"
+DNS="${DNS-}"
 # ----------------------------------------------------------------------------
 
 RED='\033[1;31m'
@@ -28,6 +30,17 @@ if ! command -v ip >/dev/null 2>&1; then
     exit 1
 fi
 
+if ! ip link show dev "${INTERFACE}" >/dev/null 2>&1; then
+    echo -e "${RED}Interface ${INTERFACE} not found. Available interfaces:${NC}"
+    ip -br link
+    exit 1
+fi
+
+if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet NetworkManager; then
+    echo -e "${YELLOW}Warning: NetworkManager is active; /etc/network/interfaces may be ignored.${NC}"
+    echo -e "${YELLOW}Consider configuring the interface with nmcli instead.${NC}"
+fi
+
 mkdir -p "$(dirname "${NETWORK_INTERFACES_CONFIG}")"
 
 # Back up the original configuration once.
@@ -44,9 +57,10 @@ fi
 echo "Config options:"
 echo -e "  Static IP: ${BLUE}${STATIC_IP}${NC}"
 echo -e "  Netmask: ${BLUE}${NETMASK}${NC}"
-echo -e "  Gateway: ${BLUE}${GATEWAY}${NC}"
-echo -e "  DNS: ${BLUE}${DNS}${NC}"
-if ! cat > "${NETWORK_INTERFACES_CONFIG}" <<EOF
+echo -e "  Gateway: ${BLUE}${GATEWAY:-<none>}${NC}"
+echo -e "  DNS: ${BLUE}${DNS:-<none>}${NC}"
+{
+    cat <<EOF
 auto lo
 iface lo inet loopback
 
@@ -54,31 +68,26 @@ auto ${INTERFACE}
 iface ${INTERFACE} inet static
     address ${STATIC_IP}
     netmask ${NETMASK}
-    gateway ${GATEWAY}
-    dns-nameservers ${DNS}
 EOF
-then
+    if [ -n "${GATEWAY}" ]; then
+        echo "    gateway ${GATEWAY}"
+    fi
+    if [ -n "${DNS}" ]; then
+        echo "    dns-nameservers ${DNS}"
+    fi
+} > "${NETWORK_INTERFACES_CONFIG}" || {
     echo -e "${RED}Failed to write ${NETWORK_INTERFACES_CONFIG}.${NC}"
     exit 1
-fi
+}
+
 echo -e "${GREEN}Successfully save config to ${NETWORK_INTERFACES_CONFIG}${NC}"
 echo -e "${BLUE}Restart ethernet ...${NC}"
 
 # Restart network
-if command -v systemctl >/dev/null 2>&1; then
-    if systemctl restart networking; then
-        echo -e "${GREEN}Network restarted successfully (systemctl)${NC}"
-    else
-        echo -e "${RED}Failed to restart network with systemctl${NC}"
-        exit 1
-    fi
-elif [ -f /etc/init.d/networking ]; then
-    if /etc/init.d/networking restart; then
-        echo -e "${GREEN}Network restarted successfully (init.d)${NC}"
-    else
-        echo -e "${RED}Failed to restart network with init.d${NC}"
-        exit 1
-    fi
+if command -v systemctl >/dev/null 2>&1 && systemctl restart networking; then
+    echo -e "${GREEN}Network restarted successfully (systemctl)${NC}"
+elif [ -f /etc/init.d/networking ] && /etc/init.d/networking restart; then
+    echo -e "${GREEN}Network restarted successfully (init.d)${NC}"
 else
     echo -e "${RED}Cannot restart network automatically.${NC}"
     echo -e "${YELLOW}Please reboot the system manually.${NC}"
