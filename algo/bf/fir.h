@@ -44,12 +44,12 @@ namespace vuprs
         /**
          * @brief Set interest region for frequency.
          *
-         * @note 0 < lower < upper < 0.5 * fs.
+         * @note 0 < lo < hi < 0.5 * fs.
          *
-         * @param lower lower boundary.
-         * @param upper upper boundary.
+         * @param lo lower boundary.
+         * @param hi upper boundary.
          */
-        void SetFrequencyRange(double lower, double upper);
+        void SetFrequencyRange(double lo, double hi);
 
         /**
          * @brief Solve FIR coefficient use expected frequency response.

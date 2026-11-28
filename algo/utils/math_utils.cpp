@@ -38,8 +38,8 @@ void vuprs::SetIterationConfigDefault(IterationConfig *config)
 {
     config->func = nullptr;
     config->diff = nullptr;
-    config->lower_region = 0.0;
-    config->upper_region = 0.0;
+    config->region_lo = 0.0;
+    config->region_hi = 0.0;
     config->jumpout = 1e-10;
     config->max_iteration = 2000;
 }
@@ -49,14 +49,14 @@ bool vuprs::SecantIteration1D(const vuprs::IterationConfig &config, double *resu
     RUNTIME_CHECK(config.func != nullptr, "math", "Original function = NULL");
     RUNTIME_CHECK(result != nullptr, "math", "Original result = NULL");
 
-    double f_lower = config.func(config.lower_region);
-    double f_upper = config.func(config.upper_region);
+    double f_lo = config.func(config.region_lo);
+    double f_hi = config.func(config.region_hi);
 
-    RUNTIME_CHECK(f_lower * f_upper <= 0.0, "math", "No zeros within the specified range");
-    double x0 = config.lower_region;
-    double x1 = config.upper_region;
-    double f0 = f_lower;
-    double f1 = f_upper;
+    RUNTIME_CHECK(f_lo * f_hi <= 0.0, "math", "No zeros within the specified range");
+    double x0 = config.region_lo;
+    double x1 = config.region_hi;
+    double f0 = f_lo;
+    double f1 = f_hi;
     int max_iter = std::max(config.max_iteration, 30);
     double tol = config.jumpout;
     for (int i = 0; i < max_iter; i++)
@@ -80,7 +80,7 @@ bool vuprs::SecantIteration1D(const vuprs::IterationConfig &config, double *resu
         }
 
         double x2 = x1 - f1 * (x1 - x0) / (f1 - f0);
-        if (x2 < config.lower_region || x2 > config.upper_region)
+        if (x2 < config.region_lo || x2 > config.region_hi)
         {
             x2 = 0.5 * (x0 + x1);
         }
@@ -113,11 +113,11 @@ bool vuprs::NewtonIteration1D(const vuprs::IterationConfig &config, double *resu
         return vuprs::BisectionIteration1D(config, result);
     }
     RUNTIME_CHECK(result != nullptr, "math", "result = NULL");
-    RUNTIME_CHECK(config.func(config.lower_region) * config.func(config.upper_region) <= 0.0,
+    RUNTIME_CHECK(config.func(config.region_lo) * config.func(config.region_hi) <= 0.0,
                   "math",
                   "No zeros within the specified range");
 
-    double x = 0.5 * (config.lower_region + config.upper_region), xp1 = x;
+    double x = 0.5 * (config.region_lo + config.region_hi), xp1 = x;
     double fx = 0.0, fxp1 = 0.0, diff_x = 0.0;
     int max_iteration = std::max(config.max_iteration, 10);
     bool threshold_jump = false;
@@ -136,7 +136,7 @@ bool vuprs::NewtonIteration1D(const vuprs::IterationConfig &config, double *resu
             threshold_jump = true;
             break;
         }
-        if (xp1 > config.upper_region || xp1 < config.lower_region)
+        if (xp1 > config.region_hi || xp1 < config.region_lo)
         {
             break;
         }
@@ -158,11 +158,11 @@ bool vuprs::RobustNewtonIteration1D(const vuprs::IterationConfig &config, double
         return vuprs::BisectionIteration1D(config, result);
     }
     RUNTIME_CHECK(result != nullptr, "math", "result = NULL");
-    RUNTIME_CHECK(config.func(config.lower_region) * config.func(config.upper_region) <= 0.0,
+    RUNTIME_CHECK(config.func(config.region_lo) * config.func(config.region_hi) <= 0.0,
                   "math",
                   "No zeros within the specified range");
 
-    double x = 0.5 * (config.lower_region + config.upper_region), xp1 = x, increase = 0.0;
+    double x = 0.5 * (config.region_lo + config.region_hi), xp1 = x, increase = 0.0;
     double fx = config.func(x), fxp1 = 0.0, diff_x;
     double lambda = 1.0;
     int max_iteration = std::max(config.max_iteration, 10),
@@ -191,7 +191,7 @@ bool vuprs::RobustNewtonIteration1D(const vuprs::IterationConfig &config, double
             threshold_jump = true;
             break;
         }
-        if (xp1 > config.upper_region || xp1 < config.lower_region)
+        if (xp1 > config.region_hi || xp1 < config.region_lo)
         {
             break;
         }
@@ -210,7 +210,7 @@ bool vuprs::BisectionIteration1D(const vuprs::IterationConfig &config, double *r
     RUNTIME_CHECK(config.func != nullptr, "math", "Original function = NULL");
     RUNTIME_CHECK(result != nullptr, "math", "result = NULL");
 
-    double left = config.lower_region, right = config.upper_region, mid = 0.5 * (left + right);
+    double left = config.region_lo, right = config.region_hi, mid = 0.5 * (left + right);
     double fl = config.func(left), fr = config.func(right), fm = 0.0;
     int max_iteration = std::max(config.max_iteration, 10);
     /* The function may be singular at an endpoint (e.g. lambda = -1 / max_eig in DCRCB).
@@ -268,7 +268,7 @@ bool vuprs::BisectionIteration1D(const vuprs::IterationConfig &config, double *r
             *result = mid;
             return true;
         }
-        if (mid > config.upper_region || mid < config.lower_region)
+        if (mid > config.region_hi || mid < config.region_lo)
         {
             break;
         }

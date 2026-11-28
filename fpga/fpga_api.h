@@ -209,7 +209,7 @@ namespace vuprs
      * @throw std::runtime_error
      */
     bool FPGA_API__DMA__StartScatterGatherDMA_S2MM(vuprs::FPGAController *controller,
-                                                   const std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> &descriptors,
+                                                   const std::vector<vuprs::ScatterGatherDescriptor> &descriptors,
                                                    bool is_cyclic_mode,
                                                    bool enable_ioc_interrupt);
 
@@ -255,10 +255,10 @@ namespace vuprs
      * @throw std::runtime_error
      */
     bool FPGA_API__DMA__GetCurrentDescriptor(vuprs::FPGAController *controller,
-                                             const std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> &reference_descriptors,
-                                             vuprs::AXI_DMA_ScatterGatherDescriptor *current_descriptor,
-                                             vuprs::AXI_DMA_ScatterGatherDescriptor *previous_descriptor,
-                                             vuprs::AXI_DMA_ScatterGatherDescriptor *next_descriptor);
+                                             const std::vector<vuprs::ScatterGatherDescriptor> &reference_descriptors,
+                                             vuprs::ScatterGatherDescriptor *current_descriptor,
+                                             vuprs::ScatterGatherDescriptor *previous_descriptor,
+                                             vuprs::ScatterGatherDescriptor *next_descriptor);
 
     /**
      * @brief Read current descriptor address.

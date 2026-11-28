@@ -29,9 +29,9 @@ uint32_t vuprs::BeamFormingEngine::FIRLength() const
     return this->fir_.FIRLength();
 }
 
-void vuprs::BeamFormingEngine::SetFIRFrequencyRange(double lower, double upper)
+void vuprs::BeamFormingEngine::SetFIRFrequencyRange(double lo, double hi)
 {
-    this->fir_.SetFrequencyRange(lower, upper);
+    this->fir_.SetFrequencyRange(lo, hi);
 }
 
 void vuprs::BeamFormingEngine::GetZeroFIRCoefficients(std::vector<std::vector<double>> *dst) const
@@ -74,8 +74,8 @@ void vuprs::BeamFormingEngine::ResetAll()
 {
     this->fs = 0.0;
     this->signal_points = 0;
-    this->work_freq_lower = 0.0;
-    this->work_freq_upper = 0.0;
+    this->work_freq_lo = 0.0;
+    this->work_freq_hi = 0.0;
     this->work_bin_lo = 0;
     this->work_bin_hi = -1;
     /* flags */
@@ -256,10 +256,10 @@ void vuprs::BeamFormingEngine::SetCovarianceMatrixFittingParam(double snaps_wind
     this->UpdateParameters();
 }
 
-void vuprs::BeamFormingEngine::SetWorkFrequencyRange(double lower, double upper)
+void vuprs::BeamFormingEngine::SetWorkFrequencyRange(double lo, double hi)
 {
-    this->work_freq_lower = lower;
-    this->work_freq_upper = upper;
+    this->work_freq_lo = lo;
+    this->work_freq_hi = hi;
     this->UpdateWorkBinRange();
 }
 
@@ -272,7 +272,7 @@ void vuprs::BeamFormingEngine::UpdateWorkBinRange()
         this->work_bin_hi = -1;
         return;
     }
-    if (this->work_freq_lower <= 0.0 && this->work_freq_upper <= 0.0)
+    if (this->work_freq_lo <= 0.0 && this->work_freq_hi <= 0.0)
     {
         this->work_bin_lo = 0;
         this->work_bin_hi = f_total - 1;
@@ -281,9 +281,9 @@ void vuprs::BeamFormingEngine::UpdateWorkBinRange()
     /* Cover the FIR bandpass transition band (10 bins) so no bin with non-zero gain is skipped. */
     double df = this->fs / static_cast<double>(this->signal_points);
     double pad = 10.0 * df;
-    double f_lo = (this->work_freq_lower > 0.0) ? std::max(0.0, this->work_freq_lower - pad) : 0.0;
-    double f_hi = (this->work_freq_upper > 0.0) ? std::min(this->fs / 2.0, this->work_freq_upper + pad)
-                                                : this->fs / 2.0;
+    double f_lo = (this->work_freq_lo > 0.0) ? std::max(0.0, this->work_freq_lo - pad) : 0.0;
+    double f_hi = (this->work_freq_hi > 0.0) ? std::min(this->fs / 2.0, this->work_freq_hi + pad)
+                                             : this->fs / 2.0;
     const double *freq = this->signal_frequency_list.data();
     int lo = static_cast<int>(std::lower_bound(freq, freq + f_total, f_lo) - freq);
     int hi = static_cast<int>(std::upper_bound(freq, freq + f_total, f_hi) - freq) - 1;
@@ -381,8 +381,8 @@ void vuprs::BeamFormingEngine::UpdateAndGetElementPredelay(double fs,
 }
 
 bool vuprs::BeamFormingEngine::SnapshotScanCovariance(ScanCovarianceSnapshot *snapshot,
-                                                      double freq_lower,
-                                                      double freq_upper)
+                                                      double freq_lo,
+                                                      double freq_hi)
 {
     RUNTIME_CHECK(snapshot, "bf", "Snapshot pointer cannot be NULL");
     RUNTIME_CHECK(this->ConfigDone(), "bf", "Config not complete");
@@ -395,20 +395,20 @@ bool vuprs::BeamFormingEngine::SnapshotScanCovariance(ScanCovarianceSnapshot *sn
      * Bins outside the bandpass only contain noise, so they are skipped. */
     int f_lo = 0;
     int f_hi = f_total - 1;
-    if (freq_lower > 0.0 || freq_upper > 0.0)
+    if (freq_lo > 0.0 || freq_hi > 0.0)
     {
-        if (freq_lower > 0.0)
+        if (freq_lo > 0.0)
         {
             f_lo = std::lower_bound(this->signal_frequency_list.data(),
                                     this->signal_frequency_list.data() + f_total,
-                                    freq_lower) -
+                                    freq_lo) -
                    this->signal_frequency_list.data();
         }
-        if (freq_upper > 0.0)
+        if (freq_hi > 0.0)
         {
             f_hi = std::upper_bound(this->signal_frequency_list.data(),
                                     this->signal_frequency_list.data() + f_total,
-                                    freq_upper) -
+                                    freq_hi) -
                    this->signal_frequency_list.data() - 1;
         }
     }

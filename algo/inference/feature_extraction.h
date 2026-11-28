@@ -27,8 +27,8 @@ namespace vuprs
     struct MelFilterDescriptor
     {
         double center_freq;
-        double lower_freq;
-        double upper_freq;
+        double freq_lo;
+        double freq_hi;
     };
 
     class MelFilterBank

@@ -48,11 +48,11 @@ bool vuprs::FIRCalculator::ConfigFIRFromJsonFile(const std::string &json_filenam
     return true;
 }
 
-void vuprs::FIRCalculator::SetFrequencyRange(double lower, double upper)
+void vuprs::FIRCalculator::SetFrequencyRange(double lo, double hi)
 {
-    PARAM_CHECK(lower < upper, "bf", " Lower >= Upper.");
-    this->freq_range_l = lower;
-    this->freq_range_u = upper;
+    PARAM_CHECK(lo < hi, "bf", " Lower >= Upper.");
+    this->freq_range_l = lo;
+    this->freq_range_u = hi;
 }
 
 bool vuprs::FIRCalculator::SolveCoeffUseExpectedFrequencyResponse(const Eigen::Matrix<Eigen::dcomplex, -1, -1> &response,

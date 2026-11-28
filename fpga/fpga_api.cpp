@@ -274,7 +274,7 @@ bool vuprs::FPGA_API__DDR__ReadDDR(vuprs::FPGAController *controller,
 /* ----------------------------------------------------------------------------- */
 
 bool vuprs::FPGA_API__DMA__StartScatterGatherDMA_S2MM(vuprs::FPGAController *controller,
-                                                      const std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> &descriptors,
+                                                      const std::vector<vuprs::ScatterGatherDescriptor> &descriptors,
                                                       bool is_cyclic_mode,
                                                       bool enable_ioc_interrupt)
 {
@@ -315,7 +315,7 @@ bool vuprs::FPGA_API__DMA__StartScatterGatherDMA_S2MM(vuprs::FPGAController *con
     /* Wait for S2MM_DMASR.Halted = 0 */
     operate_status &= controller->dev__axi_dma.WaitForRegisterBIT(vuprs::AXI_DMA__Registers::S2MM_DMASR, 0, 0, 100);
     /* STEP 4: Write descriptors to SG_BRAM */
-    buffer.from_vector<vuprs::AXI_DMA_ScatterGatherDescriptor>(descriptors);
+    buffer.from_vector<vuprs::ScatterGatherDescriptor>(descriptors);
     operate_status &= controller->mem__sg_bram.WriteMemory(&buffer, 0x00, buffer.size());
     /* STEP 5: Write tail descriptor register to trigger. */
     if (is_cyclic_mode)
@@ -364,10 +364,10 @@ bool vuprs::FPGA_API__DMA__ResetDMA(vuprs::FPGAController *controller)
 }
 
 bool vuprs::FPGA_API__DMA__GetCurrentDescriptor(vuprs::FPGAController *controller,
-                                                const std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> &reference_descriptors,
-                                                vuprs::AXI_DMA_ScatterGatherDescriptor *current_descriptor,
-                                                vuprs::AXI_DMA_ScatterGatherDescriptor *previous_descriptor,
-                                                vuprs::AXI_DMA_ScatterGatherDescriptor *next_descriptor)
+                                                const std::vector<vuprs::ScatterGatherDescriptor> &reference_descriptors,
+                                                vuprs::ScatterGatherDescriptor *current_descriptor,
+                                                vuprs::ScatterGatherDescriptor *previous_descriptor,
+                                                vuprs::ScatterGatherDescriptor *next_descriptor)
 {
     PARAM_CHECK(controller->ConfigDone(), "fpga", " FPGA Controller not configured in advance.");
 

@@ -108,13 +108,13 @@ namespace vuprs
         /* Circular buffer interrupt */
         std::mutex mut_queue;                                  /* Array signal queue mutex */
         std::condition_variable algorithm_cv;                  /* Algorithm interrupt condition var, [controlled by mut_queue] */
-        std::deque<vuprs::SignalData> array_signal_queue;      /* Array signal queue, [controlled by mut_queue] */
-        std::mutex mut_alg;                                    /* Algorithm mutex lock (bf/fir/hardware_fs) */
+        std::deque<vuprs::SignalData> array_signals;           /* Array signal queue, [controlled by mut_queue] */
+        std::mutex mut_alg;                                    /* Algorithm mutex lock (bf/fir/hw_fs) */
         std::unique_ptr<vuprs::BeamFormingEngine> bf;          /* Beam forming engine, [controlled by mut_alg] (can be only used in thread_algorithm) */
         std::shared_ptr<vuprs::ThreadPool> shared_thread_pool; /* One pool for all bf/scan/fir/array parallel work, so workers never exceed the core count */
-        std::atomic<double> hardware_fs{0.0};                  /* Hardware sampling frequency, calculate by SCI register */
-        double bf_freq__lower;                                 /* Bandpass lower boundary (Hz), set at start, read-only afterwards */
-        double bf_freq__upper;                                 /* Bandpass upper boundary (Hz), set at start, read-only afterwards */
+        std::atomic<double> hw_fs{0.0};                        /* Hardware sampling frequency, calculate by SCI register */
+        double bf_freq__lo;                                    /* Bandpass lower boundary (Hz), set at start, read-only afterwards */
+        double bf_freq__hi;                                    /* Bandpass upper boundary (Hz), set at start, read-only afterwards */
         /* Last successfully applied target [mut_alg]. */
         double target_alt_ = 0.0;
         double target_az_ = 0.0;
@@ -124,18 +124,18 @@ namespace vuprs
         /* DMA Interrupt */
         std::atomic<uint32_t> dma_current_desc{0xFFFFFFFF}; /* current descriptor address, initialized to an invalid value */
         std::mutex mut_dma;                                 /* DMA Interrupt mutex lock */
-        std::condition_variable dma_interrupt_cv;           /* DMA Interrupt condition var, [controlled by mut_dma] */
+        std::condition_variable bf_cv;                      /* DMA Interrupt condition var, [controlled by mut_dma] */
 
         /* Atomics */
-        std::atomic<bool> system_run{false};                  /* system run enable */
-        std::atomic<bool> circular_buffer_irq{false};         /* Circular buffer interrupt flag */
-        std::atomic<bool> dma_descriptor_irq{false};          /* DMA Interrupt flag */
-        std::atomic<int> interrupt_wait_time_us{0};           /* = descriptor_update_cycle_us / 10 */
-        std::atomic<int> circular_buffer_wait_time_us{0};     /* = descriptor_update_cycle_us / 5 */
-        std::atomic<uint32_t> circular_buffer_queue_size_max; /* MAX size of circular buffer queue */
-        std::atomic<bool> scan_enable{false};                 /* Scan enable flag */
-        std::atomic<bool> scan_options_changed{false};        /* Scan options changed flag */
-        std::atomic<bool> scan_options_initialized{false};    /* Scan options initialized flag */
+        std::atomic<bool> system_run{false};               /* system run enable */
+        std::atomic<bool> cbuf_irq{false};                 /* Circular buffer interrupt flag */
+        std::atomic<bool> bf_irq{false};                   /* DMA Interrupt flag */
+        std::atomic<int> bf_cycle_us{0};                   /* = desc_cycle_us / 10 */
+        std::atomic<int> cbuf_cycle_us{0};                 /* = desc_cycle_us / 5 */
+        std::atomic<uint32_t> cbuf_queue_size;             /* MAX size of circular buffer queue */
+        std::atomic<bool> scan_enable{false};              /* Scan enable flag */
+        std::atomic<bool> scan_options_changed{false};     /* Scan options changed flag */
+        std::atomic<bool> scan_options_initialized{false}; /* Scan options initialized flag */
 
         /* Optional consumers; set before run() and left unchanged while running. */
         std::function<void(BeamformerResultMeta &&)> result_callback_;
@@ -148,7 +148,7 @@ namespace vuprs
         /**
          * @brief Listen to interrupt.
          *
-         * @note If interrupt detected, dma_descriptor_irq <-- true.
+         * @note If interrupt detected, bf_irq <-- true.
          * @note Control mutex lock: mut_dma.
          */
         void thread_listen_bf();
@@ -166,7 +166,7 @@ namespace vuprs
         /**
          * @brief Read circular buffer and push data to the array signal queue.
          *
-         * @note If interrupt detected, circular_buffer_irq <-- true.
+         * @note If interrupt detected, cbuf_irq <-- true.
          * @note Control mutex lock: mut_queue.
          */
         void thread_listen_and_read_cbuf();

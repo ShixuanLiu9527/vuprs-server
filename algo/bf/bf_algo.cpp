@@ -85,11 +85,11 @@ void vuprs::BF_DCRCB::CalculateOneFrequency(int frequency_index,
     /* - Generate range. The lower bound is a pole of f(lambda); nudge it inward. */
     vuprs::IterationConfig iter;
     vuprs::SetIterationConfigDefault(&iter);
-    iter.lower_region = -(1.0 / max_eig);                                              /* -1/max(eig) */
-    iter.upper_region = ((1.0 / min_eig) - sqrt_M_rho / max_eig) / (sqrt_M_rho - 1.0); /* (1/min(eig) - sqrt(M*rho)/max(eig)) / (sqrt(M*rho) - 1) */
+    iter.region_lo = -(1.0 / max_eig);                                              /* -1/max(eig) */
+    iter.region_hi = ((1.0 / min_eig) - sqrt_M_rho / max_eig) / (sqrt_M_rho - 1.0); /* (1/min(eig) - sqrt(M*rho)/max(eig)) / (sqrt(M*rho) - 1) */
     iter.func = func_lambda;
-    iter.lower_region = std::nextafter(iter.lower_region, iter.upper_region);
-    RUNTIME_CHECK(std::isfinite(iter.lower_region) && std::isfinite(iter.upper_region) && iter.upper_region > iter.lower_region,
+    iter.region_lo = std::nextafter(iter.region_lo, iter.region_hi);
+    RUNTIME_CHECK(std::isfinite(iter.region_lo) && std::isfinite(iter.region_hi) && iter.region_hi > iter.region_lo,
                   "bf", " Invalid lambda region.");
     /* - Iteration */
     double lambda = 0.0; /* result lambda */

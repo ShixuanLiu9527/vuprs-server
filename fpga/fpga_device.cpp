@@ -41,13 +41,13 @@ bool vuprs::FPGA_Device__AXIDirectMemoryAccess::LoadFromJsonObj(const nlohmann::
     return true;
 }
 
-void vuprs::AXI_DMA_ScatterGatherDescriptor_ToDefault(vuprs::AXI_DMA_ScatterGatherDescriptor *descriptor)
+void vuprs::AXI_DMA_ScatterGatherDescriptor_ToDefault(vuprs::ScatterGatherDescriptor *descriptor)
 {
-    memset(descriptor, 0, sizeof(vuprs::AXI_DMA_ScatterGatherDescriptor));
+    memset(descriptor, 0, sizeof(vuprs::ScatterGatherDescriptor));
 }
 
-void vuprs::CreateDMAScatterGatherDescriptorChain(std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> *descriptor_list,
-                                                  const vuprs::AXI_DMA_SGDescriptor_Config &config)
+void vuprs::CreateDMAScatterGatherDescriptorChain(std::vector<vuprs::ScatterGatherDescriptor> *descriptor_list,
+                                                  const vuprs::SGDescriptorConfig &config)
 {
     PARAM_CHECK(!(config.buffer_size == 0 || config.buffer_count == 0), "fpga", " Buffer size or buffer count should not be 0.");
     PARAM_CHECK(config.buffer_size % vuprs::DMA_BUFFER_ALIGNMENT_1_WORD == 0, "fpga", " Buffer size must aligned to 1 word");
@@ -59,9 +59,9 @@ void vuprs::CreateDMAScatterGatherDescriptorChain(std::vector<vuprs::AXI_DMA_Sca
     {
         vuprs::AXI_DMA_ScatterGatherDescriptor_ToDefault(&(*descriptor_list)[i]);
         /* Next descriptor address (in bytes) = (i + 1) * 64U. */
-        (*descriptor_list)[i].NXTDESC = (i + 1) * sizeof(vuprs::AXI_DMA_ScatterGatherDescriptor) + config.sg_bram_fpga_base_addr;
+        (*descriptor_list)[i].NXTDESC = (i + 1) * sizeof(vuprs::ScatterGatherDescriptor) + config.sg_bram_fpga_base_addr;
         /* Current descriptor address */
-        (*descriptor_list)[i].ALIGNMENT_0_CURRENT_ADDR = i * sizeof(vuprs::AXI_DMA_ScatterGatherDescriptor) + config.sg_bram_fpga_base_addr;
+        (*descriptor_list)[i].ALIGNMENT_0_CURRENT_ADDR = i * sizeof(vuprs::ScatterGatherDescriptor) + config.sg_bram_fpga_base_addr;
         /* Previous descriptor address */
         if (i == 0)
         {
@@ -69,7 +69,7 @@ void vuprs::CreateDMAScatterGatherDescriptorChain(std::vector<vuprs::AXI_DMA_Sca
         }
         else
         {
-            (*descriptor_list)[i].ALIGNMENT_1_PREVIOUS_ADDR = (i - 1) * sizeof(vuprs::AXI_DMA_ScatterGatherDescriptor) + config.sg_bram_fpga_base_addr;
+            (*descriptor_list)[i].ALIGNMENT_1_PREVIOUS_ADDR = (i - 1) * sizeof(vuprs::ScatterGatherDescriptor) + config.sg_bram_fpga_base_addr;
         }
         /* Current buffer address (in bytes) = i * buffer size */
         (*descriptor_list)[i].BUFFER_ADDRESS = i * config.buffer_size + config.ddr_fpga_base_addr;
@@ -85,10 +85,10 @@ void vuprs::CreateDMAScatterGatherDescriptorChain(std::vector<vuprs::AXI_DMA_Sca
     }
 }
 
-bool vuprs::MatchDescriptor(const std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> &descriptor_list, uint32_t currentDescriptorAddr,
-                            vuprs::AXI_DMA_ScatterGatherDescriptor *cur_desc,
-                            vuprs::AXI_DMA_ScatterGatherDescriptor *next_desc,
-                            vuprs::AXI_DMA_ScatterGatherDescriptor *prev_desc)
+bool vuprs::MatchDescriptor(const std::vector<vuprs::ScatterGatherDescriptor> &descriptor_list, uint32_t currentDescriptorAddr,
+                            vuprs::ScatterGatherDescriptor *cur_desc,
+                            vuprs::ScatterGatherDescriptor *next_desc,
+                            vuprs::ScatterGatherDescriptor *prev_desc)
 {
     uint32_t next_addr = 0, previous_addr = 0;
     bool find_cur = false, find_next = false, find_prev = false;
@@ -175,9 +175,7 @@ uint32_t vuprs::FPGA_Device__ADCController::GetSCIValueForSamplingFrequency(doub
 {
     PARAM_CHECK(this->config_done, "fpga", " Config not complete.");
     if (!std::isfinite(fs) || fs > this->max_fs || fs <= 1e-2)
-    {
         return 0xFFFFFFFF;
-    }
     uint32_t SCI;
     {
         std::unique_lock<std::mutex> lock(this->mut); /* LOCK */
@@ -194,21 +192,12 @@ uint32_t vuprs::FPGA_Device__ADCController::GetSCIValueForSamplingFrequency(doub
     double f_SCI = this->SCI2FS(SCI);
     double f_SCI_u = this->SCI2FS(SCI_u);
     double f_SCI_l = this->SCI2FS(SCI_l);
-    if (std::abs(f_SCI - fs) <= std::abs(f_SCI_u - fs) &&
-        std::abs(f_SCI - fs) <= std::abs(f_SCI_l - fs))
-    {
+    if (std::abs(f_SCI - fs) <= std::abs(f_SCI_u - fs) && std::abs(f_SCI - fs) <= std::abs(f_SCI_l - fs))
         return SCI;
-    }
-    else if (std::abs(f_SCI_u - fs) <= std::abs(f_SCI - fs) &&
-             std::abs(f_SCI_u - fs) <= std::abs(f_SCI_l - fs))
-    {
+    else if (std::abs(f_SCI_u - fs) <= std::abs(f_SCI - fs) && std::abs(f_SCI_u - fs) <= std::abs(f_SCI_l - fs))
         return SCI_u;
-    }
-    else if (std::abs(f_SCI_l - fs) <= std::abs(f_SCI - fs) &&
-             std::abs(f_SCI_l - fs) <= std::abs(f_SCI_u - fs))
-    {
+    else if (std::abs(f_SCI_l - fs) <= std::abs(f_SCI - fs) && std::abs(f_SCI_l - fs) <= std::abs(f_SCI_u - fs))
         return SCI_l;
-    }
     return SCI;
 }
 

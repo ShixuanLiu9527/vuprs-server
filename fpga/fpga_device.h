@@ -11,13 +11,11 @@ namespace vuprs
     /* ---------------------------------------------------------------------- */
     /* -------------------------------- AXI DMA ----------------------------- */
     /* ---------------------------------------------------------------------- */
-
 #pragma pack(push, 1)
-
     /**
      * @brief AXI DMA Scatter/Gather Descriptor.
      */
-    struct AXI_DMA_ScatterGatherDescriptor
+    struct ScatterGatherDescriptor
     {
         uint32_t NXTDESC;                   /* 00h: Next Descriptor Pointer (16-word aligned), for S2MM, [5:0]: Reserved (should be 0), [31:6]: Indicates the lower order pointer pointing to the first word of the next descriptor. */
         uint32_t NXTDESC_MSB;               /* 04h: Upper 32 bits of Next Descriptor Pointer (16-word aligned), [31:0]: Indicates the MSB 32 bits of the pointer pointing to the first word of the next descriptor. */
@@ -36,10 +34,9 @@ namespace vuprs
         uint32_t ALIGNMENT_1_PREVIOUS_ADDR; /* Address of previous descriptor, to aligned to 16-word */
         uint32_t ALIGNMENT_2_BUFFER_SIZE;   /* to aligned to 16-word */
     };
-
 #pragma pack(pop)
 
-    struct AXI_DMA_SGDescriptor_Config
+    struct SGDescriptorConfig
     {
         uint32_t buffer_size;            /* buffer size (4 byte aligned) */
         uint32_t buffer_count;           /* buffer count */
@@ -54,12 +51,12 @@ namespace vuprs
     constexpr uint32_t DMA_MAX_BUFFER_LENGTH = 0x3FF'FFFF;
     constexpr uint32_t DMA_BUFFER_LENGTH_MASK = 0x3FF'FFFF;
 
-    static_assert(sizeof(AXI_DMA_ScatterGatherDescriptor) == 64, "AXI DMA Descriptor must be 52 bytes");
+    static_assert(sizeof(ScatterGatherDescriptor) == 64, "AXI DMA Descriptor must be 64 bytes");
 
     /**
      * @brief Set AXI DMA Scatter/Gather Descriptor to default value (0).
      */
-    void AXI_DMA_ScatterGatherDescriptor_ToDefault(vuprs::AXI_DMA_ScatterGatherDescriptor *descriptor);
+    void AXI_DMA_ScatterGatherDescriptor_ToDefault(vuprs::ScatterGatherDescriptor *descriptor);
 
     /**
      * @brief Create AXI DMA Scatter/Gather Descriptor chain.
@@ -71,8 +68,8 @@ namespace vuprs
      *
      * @throw std::runtime_error
      */
-    void CreateDMAScatterGatherDescriptorChain(std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> *descriptor_list,
-                                               const vuprs::AXI_DMA_SGDescriptor_Config &config);
+    void CreateDMAScatterGatherDescriptorChain(std::vector<vuprs::ScatterGatherDescriptor> *descriptor_list,
+                                               const vuprs::SGDescriptorConfig &config);
 
     /**
      * @brief Match AXI DMA Scatter/Gather Descriptor in the descriptor list by current descriptor address.
@@ -86,10 +83,10 @@ namespace vuprs
      * @return true if match successfully, false if no matched descriptor found.
      * @throw std::runtime_error
      */
-    bool MatchDescriptor(const std::vector<vuprs::AXI_DMA_ScatterGatherDescriptor> &descriptor_list, uint32_t currentDescriptorAddr,
-                         vuprs::AXI_DMA_ScatterGatherDescriptor *cur_desc,
-                         vuprs::AXI_DMA_ScatterGatherDescriptor *next_desc,
-                         vuprs::AXI_DMA_ScatterGatherDescriptor *prev_desc);
+    bool MatchDescriptor(const std::vector<vuprs::ScatterGatherDescriptor> &descriptor_list, uint32_t currentDescriptorAddr,
+                         vuprs::ScatterGatherDescriptor *cur_desc,
+                         vuprs::ScatterGatherDescriptor *next_desc,
+                         vuprs::ScatterGatherDescriptor *prev_desc);
 
     enum class AXI_DMA__Registers
     {
@@ -172,6 +169,8 @@ namespace vuprs
 
         /**
          * @brief Get SCI value for certain sampling frequency.
+         *
+         * @note 0xFFFFFFFF will returned when failed.
          */
         uint32_t GetSCIValueForSamplingFrequency(double fs) const;
 

@@ -69,8 +69,8 @@ namespace vuprs
         Eigen::Matrix<Eigen::dcomplex, -1, -1> pre_delay_exp_arg;                              /* Predelay exp matrix */
         double fs;                                                                             /* Current sampling frequency */
         int signal_points;                                                                     /* Current signal points */
-        double work_freq_lower = 0.0;                                                          /* Work band lower boundary (Hz), <= 0 means no lower bound */
-        double work_freq_upper = 0.0;                                                          /* Work band upper boundary (Hz), <= 0 means no upper bound */
+        double work_freq_lo = 0.0;                                                             /* Work band lower boundary (Hz), <= 0 means no lower bound */
+        double work_freq_hi = 0.0;                                                             /* Work band upper boundary (Hz), <= 0 means no upper bound */
         int work_bin_lo = 0;                                                                   /* First in-band bin (inclusive, includes FIR transition band) */
         int work_bin_hi = -1;                                                                  /* Last in-band bin (inclusive, includes FIR transition band) */
         std::vector<int> element_predelay_count;                                               /* Predelay count (size = M) */
@@ -137,7 +137,7 @@ namespace vuprs
         /**
          * @brief Set the FIR bandpass frequency range.
          */
-        void SetFIRFrequencyRange(double lower, double upper);
+        void SetFIRFrequencyRange(double lo, double hi);
 
         /**
          * @brief Get a zero FIR filter bank (one bank per array element).
@@ -227,10 +227,10 @@ namespace vuprs
          * @note Bins outside the band (plus the FIR transition band) are skipped by the beam forming
          * @note calculation because the FIR synthesis bandpass already zeroes them.
          *
-         * @param lower lower boundary (Hz), <= 0 means no lower bound.
-         * @param upper upper boundary (Hz), <= 0 means no upper bound.
+         * @param lo lower boundary (Hz), <= 0 means no lower bound.
+         * @param hi upper boundary (Hz), <= 0 means no upper bound.
          */
-        void SetWorkFrequencyRange(double lower, double upper);
+        void SetWorkFrequencyRange(double lo, double hi);
 
         /**
          * @brief Reset covariance matrices.
@@ -269,15 +269,15 @@ namespace vuprs
          * @note The copy itself is fast, so the lock is only held for the duration of this call.
          *
          * @param snapshot output snapshot.
-         * @param freq_lower lower boundary of the scanned frequency band (unit: Hz). <= 0 means no lower bound.
-         * @param freq_upper upper boundary of the scanned frequency band (unit: Hz). <= 0 means no upper bound.
+         * @param freq_lo lower boundary of the scanned frequency band (unit: Hz). <= 0 means no lower bound.
+         * @param freq_hi upper boundary of the scanned frequency band (unit: Hz). <= 0 means no upper bound.
          *
          * @retval true: success.
          * @retval false: failed (e.g. covariance matrix not ready).
          */
         bool SnapshotScanCovariance(ScanCovarianceSnapshot *snapshot,
-                                    double freq_lower,
-                                    double freq_upper);
+                                    double freq_lo,
+                                    double freq_hi);
 
         /**
          * @brief Scan for position power.

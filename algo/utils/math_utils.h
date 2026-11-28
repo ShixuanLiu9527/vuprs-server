@@ -12,17 +12,17 @@ namespace vuprs
     {
         std::function<double(double)> func; /* Original Function */
         std::function<double(double)> diff; /* First Derivative */
-        double lower_region;                /* lower boundary */
-        double upper_region;                /* upper boundary */
+        double region_lo;                   /* lower boundary */
+        double region_hi;                   /* upper boundary */
         double jumpout;                     /* jumpout threshold */
         int max_iteration;                  /* max iteration counts */
     };
 
-    /** @brief Clamp value into [lower, upper]. */
+    /** @brief Clamp value into [lo, hi]. */
     template <typename T>
-    inline T Clamp(const T &value, const T &lower, const T &upper)
+    inline T Clamp(const T &value, const T &lo, const T &hi)
     {
-        return value < lower ? lower : (value > upper ? upper : value);
+        return value < lo ? lo : (value > hi ? hi : value);
     }
 
     double rad2deg(double rad);
@@ -53,7 +53,7 @@ namespace vuprs
     /**
      * @brief Secant iteration for 1D function.
      *
-     * @note result = Solve(func(val) == 0), val in [lower_region, upper_region].
+     * @note result = Solve(func(val) == 0), val in [region_lo, region_hi].
      *
      * @param config iteration configuration.
      * @param result output result.
@@ -65,7 +65,7 @@ namespace vuprs
     /**
      * @brief Newton iteration for 1D function.
      *
-     * @note result = Solve(func(val) == 0), val in [lower_region, upper_region].
+     * @note result = Solve(func(val) == 0), val in [region_lo, region_hi].
      *
      * @param config iteration configuration.
      * @param result output result.
@@ -77,7 +77,7 @@ namespace vuprs
     /**
      * @brief Robust newton iteration for 1D function.
      *
-     * @note result = Solve(func(val) == 0), val in [lower_region, upper_region].
+     * @note result = Solve(func(val) == 0), val in [region_lo, region_hi].
      *
      * @param config iteration configuration.
      * @param result output result.
@@ -89,7 +89,7 @@ namespace vuprs
     /**
      * @brief Bisection iteration for 1D function.
      *
-     * @note result = Solve(func(val) == 0), val in [lower_region, upper_region].
+     * @note result = Solve(func(val) == 0), val in [region_lo, region_hi].
      *
      * @param config iteration configuration.
      * @param result output result.

@@ -63,12 +63,12 @@ namespace
             *error = "invalid wave_velocity";
             return false;
         }
-        if (params.contains("lower_frequency") && !GetDouble(params, "lower_frequency", &config->bf_freq__lower))
+        if (params.contains("lower_frequency") && !GetDouble(params, "lower_frequency", &config->bf_freq__lo))
         {
             *error = "invalid lower_frequency";
             return false;
         }
-        if (params.contains("upper_frequency") && !GetDouble(params, "upper_frequency", &config->bf_freq__upper))
+        if (params.contains("upper_frequency") && !GetDouble(params, "upper_frequency", &config->bf_freq__hi))
         {
             *error = "invalid upper_frequency";
             return false;
@@ -451,10 +451,10 @@ vuprs::net::ControlResult vuprs::ServerCore::Execute(const std::string &cmd, con
                               ? config.fs / static_cast<double>(fft_points)
                               : 0.0;
         int band_bins = 0;
-        if (df > 0.0 && config.bf_freq__upper > config.bf_freq__lower)
+        if (df > 0.0 && config.bf_freq__hi > config.bf_freq__lo)
         {
-            const double low_index = std::ceil(config.bf_freq__lower / df);
-            const double high_index = std::floor(config.bf_freq__upper / df);
+            const double low_index = std::ceil(config.bf_freq__lo / df);
+            const double high_index = std::floor(config.bf_freq__hi / df);
             const double count = high_index - low_index + 1.0;
             band_bins = count > 0.0 ? static_cast<int>(count) : 0;
         }
@@ -529,8 +529,8 @@ vuprs::net::ControlResult vuprs::ServerCore::Execute(const std::string &cmd, con
         auto result = Ok();
         result.params["fs"] = std::to_string(config.fs);
         result.params["wave_velocity"] = std::to_string(config.bf_wave_velocity);
-        result.params["lower_frequency"] = std::to_string(config.bf_freq__lower);
-        result.params["upper_frequency"] = std::to_string(config.bf_freq__upper);
+        result.params["lower_frequency"] = std::to_string(config.bf_freq__lo);
+        result.params["upper_frequency"] = std::to_string(config.bf_freq__hi);
         result.params["snapshot_window_size"] = std::to_string(config.bf_cov_snapshots_window_size);
         result.params["covariance_average_index"] = std::to_string(config.bf_cov_freq_average_index);
         return result;

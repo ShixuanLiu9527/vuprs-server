@@ -37,13 +37,13 @@ void vuprs::MelFilterBank::SetFilterParameters(double f_l,
         /* Generate mel filter bank */
         for (uint32_t i = 0; i < K; ++i)
         {
-            double lower = vuprs::mel2f(interval_m * i + f_l_m);
+            double lo = vuprs::mel2f(interval_m * i + f_l_m);
             double center = vuprs::mel2f(interval_m * (i + 1));
-            double upper = vuprs::mel2f(interval_m * (i + 2));
-            this->filter_descriptors[i] = {lower, center, upper};
-            int idx_l = (int)std::floor(lower / freq_per_bin);
+            double hi = vuprs::mel2f(interval_m * (i + 2));
+            this->filter_descriptors[i] = {center, lo, hi};
+            int idx_l = (int)std::floor(lo / freq_per_bin);
             int idx_c = (int)std::floor(center / freq_per_bin + 0.5);
-            int idx_u = (int)std::ceil(upper / freq_per_bin);
+            int idx_u = (int)std::ceil(hi / freq_per_bin);
             idx_l = std::max(0, std::min(idx_l, max_bin));
             idx_c = std::max(0, std::min(idx_c, max_bin));
             idx_u = std::max(0, std::min(idx_u, max_bin));

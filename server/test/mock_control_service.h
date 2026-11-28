@@ -87,24 +87,24 @@ namespace vuprs
                 {
                     double fs = this->fs_.load();
                     double wave_velocity = this->wave_velocity_.load();
-                    double lower = this->lower_frequency_.load();
-                    double upper = this->upper_frequency_.load();
+                    double lo = this->freq_lo_.load();
+                    double hi = this->freq_hi_.load();
                     double snapshot = this->snapshot_window_size_.load();
                     double covariance = this->covariance_average_index_.load();
                     if (!AssignDoubleField(params, "fs", &fs) ||
                         !AssignDoubleField(params, "wave_velocity", &wave_velocity) ||
-                        !AssignDoubleField(params, "lower_frequency", &lower) ||
-                        !AssignDoubleField(params, "upper_frequency", &upper) ||
+                        !AssignDoubleField(params, "lower_frequency", &lo) ||
+                        !AssignDoubleField(params, "upper_frequency", &hi) ||
                         !AssignDoubleField(params, "snapshot_window_size", &snapshot) ||
                         !AssignDoubleField(params, "covariance_average_index", &covariance))
                         return Err(ControlError::INVALID_PARAMS, "invalid algorithm parameters");
                     std::string error;
-                    if (!ValidateAlgorithmConfig(fs, wave_velocity, lower, upper, snapshot, covariance, &error))
+                    if (!ValidateAlgorithmConfig(fs, wave_velocity, lo, hi, snapshot, covariance, &error))
                         return Err(ControlError::INVALID_PARAMS, error);
                     this->fs_ = fs;
                     this->wave_velocity_ = wave_velocity;
-                    this->lower_frequency_ = lower;
-                    this->upper_frequency_ = upper;
+                    this->freq_lo_ = lo;
+                    this->freq_hi_ = hi;
                     this->snapshot_window_size_ = snapshot;
                     this->covariance_average_index_ = covariance;
                     return Ok();
@@ -113,24 +113,24 @@ namespace vuprs
                 {
                     double fs = this->fs_.load();
                     double wave_velocity = this->wave_velocity_.load();
-                    double lower = this->lower_frequency_.load();
-                    double upper = this->upper_frequency_.load();
+                    double lo = this->freq_lo_.load();
+                    double hi = this->freq_hi_.load();
                     double snapshot = this->snapshot_window_size_.load();
                     double covariance = this->covariance_average_index_.load();
                     if (!AssignDoubleField(params, "fs", &fs) ||
                         !AssignDoubleField(params, "wave_velocity", &wave_velocity) ||
-                        !AssignDoubleField(params, "lower_frequency", &lower) ||
-                        !AssignDoubleField(params, "upper_frequency", &upper) ||
+                        !AssignDoubleField(params, "lower_frequency", &lo) ||
+                        !AssignDoubleField(params, "upper_frequency", &hi) ||
                         !AssignDoubleField(params, "snapshot_window_size", &snapshot) ||
                         !AssignDoubleField(params, "covariance_average_index", &covariance))
                         return Err(ControlError::INVALID_PARAMS, "invalid algorithm parameters");
                     std::string error;
-                    if (!ValidateAlgorithmConfig(fs, wave_velocity, lower, upper, snapshot, covariance, &error))
+                    if (!ValidateAlgorithmConfig(fs, wave_velocity, lo, hi, snapshot, covariance, &error))
                         return Err(ControlError::INVALID_PARAMS, error);
 
                     const double df = fs / 512.0;
-                    const double low_index = std::ceil(lower / df);
-                    const double high_index = std::floor(upper / df);
+                    const double low_index = std::ceil(lo / df);
+                    const double high_index = std::floor(hi / df);
                     const int band_bins = high_index >= low_index
                                               ? static_cast<int>(high_index - low_index + 1.0)
                                               : 0;
@@ -156,8 +156,8 @@ namespace vuprs
                     ControlResult result = Ok();
                     result.params["fs"] = std::to_string(this->fs_.load());
                     result.params["wave_velocity"] = std::to_string(this->wave_velocity_.load());
-                    result.params["lower_frequency"] = std::to_string(this->lower_frequency_.load());
-                    result.params["upper_frequency"] = std::to_string(this->upper_frequency_.load());
+                    result.params["lower_frequency"] = std::to_string(this->freq_lo_.load());
+                    result.params["upper_frequency"] = std::to_string(this->freq_hi_.load());
                     result.params["snapshot_window_size"] = std::to_string(this->snapshot_window_size_.load());
                     result.params["covariance_average_index"] = std::to_string(this->covariance_average_index_.load());
                     return result;
@@ -261,8 +261,8 @@ namespace vuprs
 
             static bool ValidateAlgorithmConfig(double fs,
                                                 double wave_velocity,
-                                                double lower,
-                                                double upper,
+                                                double lo,
+                                                double hi,
                                                 double snapshot,
                                                 double covariance,
                                                 std::string *error)
@@ -277,7 +277,7 @@ namespace vuprs
                     *error = "invalid wave_velocity";
                     return false;
                 }
-                if (!(lower >= 10.0 && upper >= 10.0 && lower < upper && upper < fs / 2.0))
+                if (!(lo >= 10.0 && hi >= 10.0 && lo < hi && hi < fs / 2.0))
                 {
                     *error = "band out of range";
                     return false;
@@ -299,11 +299,11 @@ namespace vuprs
             std::atomic<bool> scan_enabled_{false};
             std::atomic<int> scan_points_{100};
             std::atomic<double> scan_alt_min_{15.0};
-            std::atomic<double> fs_{10000.0};
+            std::atomic<double> fs_{50000.0};
             std::atomic<double> wave_velocity_{346.0};
-            std::atomic<double> lower_frequency_{500.0};
-            std::atomic<double> upper_frequency_{3000.0};
-            std::atomic<double> snapshot_window_size_{200.0};
+            std::atomic<double> freq_lo_{500.0};
+            std::atomic<double> freq_hi_{3000.0};
+            std::atomic<double> snapshot_window_size_{30.0};
             std::atomic<double> covariance_average_index_{0.8};
             std::mutex mut_;
             std::string beamformer_ = "mvdr";

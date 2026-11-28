@@ -496,31 +496,31 @@ namespace vuprs
          * @brief Read value to bits of certain register.
          *
          * @param reg_selection register to operate.
-         * @param lower lower boundary of written.
-         * @param upper upper boundary of written.
+         * @param lo lowest bit position.
+         * @param hi highest bit position.
          * @param value read value.
          *
-         * @note e.g. lower = 1, upper = 4, value = 0x10
+         * @note e.g. lo = 1, hi = 4, value = 0x10
          * @note then, region [1:4] (contains bit-1 and bit-4) of the register will be read.
          * @note [0:0], [1:1], ..., [31:31] are also supported.
-         * @note lower <= upper.
+         * @note lo <= hi.
          *
          * @retval true: success, false: failed.
          */
-        bool ReadSingleRegisterBITRegion(REG_SEL_ENUM reg_selection, uint32_t lower, uint32_t upper, uint32_t *value)
+        bool ReadSingleRegisterBITRegion(REG_SEL_ENUM reg_selection, uint32_t lo, uint32_t hi, uint32_t *value)
         {
-            PARAM_CHECK(lower <= 31 && upper <= 31, "fpga", " Invalid Bit position (valid <= 31).");
-            if (lower == upper)
+            PARAM_CHECK(lo <= 31 && hi <= 31, "fpga", " Invalid Bit position (valid <= 31).");
+            if (lo == hi)
             {
-                return this->ReadSingleRegisterBIT(reg_selection, lower, value);
+                return this->ReadSingleRegisterBIT(reg_selection, lo, value);
             }
             bool operate_status = true;
             uint32_t r_val;
             uint32_t reg_addr = this->GetRegisterAbsoluteAddress(reg_selection);
             operate_status &= this->RegisterIO(reg_addr, &r_val, true); /* read */
-            uint32_t bit_count = upper - lower + 1;
-            uint32_t mask = ((1 << bit_count) - 1) << lower;
-            *value = (r_val & mask) >> lower;
+            uint32_t bit_count = hi - lo + 1;
+            uint32_t mask = ((1 << bit_count) - 1) << lo;
+            *value = (r_val & mask) >> lo;
             return operate_status;
         }
 
@@ -528,34 +528,34 @@ namespace vuprs
          * @brief Write value to bits of certain register.
          *
          * @param reg_selection register to operate.
-         * @param lower lower boundary of written.
-         * @param upper upper boundary of written.
+         * @param lo lowest bit position.
+         * @param hi highest bit position.
          * @param value write value.
          *
-         * @note e.g. lower = 1, upper = 4, value = 0x10
+         * @note e.g. lo = 1, hi = 4, value = 0x10
          * @note then, region [1:4] (contains bit-1 and bit-4) of the register will be set with 0x10.
          * @note [0:0], [1:1], ..., [31:31] are also supported.
-         * @note lower <= upper.
+         * @note lo <= hi.
          *
          * @retval true: success, false: failed.
          */
-        bool WriteSingleRegisterBITRegion(REG_SEL_ENUM reg_selection, uint32_t lower, uint32_t upper, uint32_t value)
+        bool WriteSingleRegisterBITRegion(REG_SEL_ENUM reg_selection, uint32_t lo, uint32_t hi, uint32_t value)
         {
-            PARAM_CHECK(lower <= 31 && upper <= 31, "fpga", " Invalid Bit position (valid <= 31).");
-            if (lower == upper)
+            PARAM_CHECK(lo <= 31 && hi <= 31, "fpga", " Invalid Bit position (valid <= 31).");
+            if (lo == hi)
             {
-                return this->WriteSingleRegisterBIT(reg_selection, lower, (bool)(value & 0x01));
+                return this->WriteSingleRegisterBIT(reg_selection, lo, (bool)(value & 0x01));
             }
             std::lock_guard<std::mutex> lock(this->mut_reg);
             bool operate_status = true;
             uint32_t r_val = 0, w_val;
             uint32_t reg_addr = this->GetRegisterAbsoluteAddress(reg_selection);
             operate_status &= this->RegisterIO(reg_addr, &r_val, true); /* read */
-            uint32_t bit_count = upper - lower + 1;
-            uint32_t mask = ((1 << bit_count) - 1) << lower;
+            uint32_t bit_count = hi - lo + 1;
+            uint32_t mask = ((1 << bit_count) - 1) << lo;
             uint32_t max_value = (1 << bit_count) - 1;
             uint32_t safe_value = value & max_value;
-            w_val = (r_val & ~mask) | (safe_value << lower);
+            w_val = (r_val & ~mask) | (safe_value << lo);
             operate_status &= this->RegisterIO(reg_addr, &w_val, false);
             return operate_status;
         }

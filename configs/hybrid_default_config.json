@@ -1,6 +1,6 @@
 {
     "fs": {
-        "value": "10000.0",
+        "value": "50000.0",
         "unit": "Hz",
         "description": "sampling frequency"
     },
@@ -19,18 +19,18 @@
         "unit": "m/s",
         "description": "wave velocity, e.g. 346.0 for speed of sound in air"
     },
-    "bf_freq__lower": {
+    "bf_freq__lo": {
         "value": "500.0",
         "unit": "Hz",
         "description": "lower boundary of beam former work frequency"
     },
-    "bf_freq__upper": {
+    "bf_freq__hi": {
         "value": "3000.0",
         "unit": "Hz",
         "description": "upper boundary of beam former work frequency"
     },
     "bf_cov_snapshots_window_size": {
-        "value": "200.0",
+        "value": "30.0",
         "description": "snapshots window size to fit covariance matrix"
     },
     "bf_cov_freq_average_index": {
@@ -46,8 +46,8 @@
         "value": "20",
         "description": "AXI DMA descriptor buffer count"
     },
-    "queue__circular_buffer_queue_size_max": {
-        "value": "10",
+    "queue__cbuf_queue_size": {
+        "value": "4",
         "description": "MAX size of circular buffer data queue"
     }
 }
